@@ -75,6 +75,9 @@ function blink_init_gateway_class() {
             $this->description = $this->get_option( 'description' );
             $this->enabled = $this->get_option( 'enabled' );
             $this->testmode = 'yes' === $this->get_option( 'testmode' );
+            $paymentMethods[] = ('yes' === $this->get_option( 'credit_card' )) ? 'credit_card' : '';
+            $paymentMethods[] = ('yes' === $this->get_option( 'direct_debit' )) ? 'direct_debit': '';
+            $this->paymentMethods = array_filter($paymentMethods);
             $this->api_key = $this->testmode ? $this->get_option( 'test_api_key' ) : $this->get_option( 'api_key' );
             $this->secret_key = $this->testmode ? $this->get_option( 'test_secret_key' ) : $this->get_option( 'secret_key' );
 
@@ -89,7 +92,7 @@ function blink_init_gateway_class() {
             // We need custom JavaScript to obtain a token
             add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
 
-            $this->accessToken  = $this->generate_access_token();
+            $accessToken  = '';
             $paymentIntent = '';
             $formElements = '';
          }
@@ -98,7 +101,7 @@ function blink_init_gateway_class() {
          {
 
             $requestData = [
-            	'payment_intent' => $this->paymentIntent,
+            	'payment_intent' => $this->paymentIntent['intent'],
             ];
 
             $url = $this->host_url.'/v1/pay/element';
@@ -122,12 +125,12 @@ function blink_init_gateway_class() {
 
          public function generate_access_token()
          {
-            $url = $this->host_url.'/v1/pay/token';
-            $response = $response = wp_remote_post( $url, array(
+            $url = $this->host_url.'/v1/pay/token'; 
+            $response = wp_remote_post( $url, array(
                 'method'      => 'POST',
                 'body'        => array(
-                    'apiKey' => $this->api_key,
-                    'secretKey' => $this->secret_key
+                    'api_key' => $this->api_key,
+                    'secret_key' => $this->secret_key
                 )
                 )
             );
@@ -163,18 +166,14 @@ function blink_init_gateway_class() {
 
             $requestData = [
             	'amount' => $woocommerce->cart->total,
-            	'payment_type' => 'card_payment',
+            	'payment_type' => $this->paymentMethods,
             	'currency' => 'GBP',
             	'return_url' => $this->get_return_url(),
-            	'notification_url' => WC()->api_request_url( 'WC_Blink_Gateway' ),
-            	'user_metadata' => json_encode(['user_email' => 'blinktestuser@yopmail.com',
-            		'user_name' => 'Test User'
-                ]
-                ),
+            	'notification_url' => WC()->api_request_url( 'wc_blink_gateway' ),
             ];
 
             $url = $this->host_url.'/v1/pay/intent';
-            $response = $response = wp_remote_post( $url, array(
+            $response = wp_remote_post( $url, array(
                 'method'      => 'POST',
                 'headers' => array(
                     'Authorization' => 'Bearer '.$this->accessToken,
@@ -184,7 +183,7 @@ function blink_init_gateway_class() {
             );
             if ( ! is_wp_error( $response ) ) {
                 $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
-                return $apiBody['payment_intent'];
+                return ['id'=>$apiBody['id'],'intent'=>$apiBody['payment_intent']];
             } else {
                 $error_message = $response->get_error_message();
                 throw new Exception( $error_message );
@@ -216,6 +215,26 @@ function blink_init_gateway_class() {
                     'type'        => 'textarea',
                     'description' => 'This controls the description which the user sees during checkout.',
                     'default'     => 'Pay with your credit card or direct debit at your convenience.',
+                ),
+                'pay_methods' => array(
+                    'title'       => 'Payment Methods',
+                    'label'       => '',
+                    'type'        => 'hidden',
+                    'description' => '',
+                    'default'     => '',
+                ),
+                'credit_card' => array(
+                    'title'       => '',
+                    'label'       => 'Credit Card',
+                    'type'        => 'checkbox',
+                    'default'     => 'yes',
+                ),
+                'direct_debit' => array(
+                    'title'       => '',
+                    'label'       => 'Direct Debit',
+                    'type'        => 'checkbox',
+                    'description' => '',
+                    'default'     => 'yes',
                 ),
                 'testmode' => array(
                     'title'       => 'Test mode',
@@ -252,21 +271,66 @@ function blink_init_gateway_class() {
             if ($this->description) {
                 echo wpautop(wp_kses_post($this->description));
             }
+            $this->accessToken  = $this->generate_access_token();
+
             $this->paymentIntent = $this->create_payment_intent();
+            //print_r($this->paymentIntent); die;
             $this->formElements = $this->generate_form_element();
-            echo $this->formElements['element']['ccElement'];
+            //print_r($this->formElements); die;
+            if(is_array($this->paymentMethods) && !empty($this->paymentMethods)):
             ?> 
-                       
-            <input type="hidden" name="transaction_unique" value="<?php echo $this->formElements['transaction_unique']?>">
-                <input type="hidden" name="amount" value="<?php echo $this->formElements['raw_amount']?>">
-                <br>
-                <input type="hidden" name="device_timezone" value="0">
-                <input type="hidden" name="device_capabilities" value="">
-                <input type="hidden" name="device_accept_language" value="">
-                <input type="hidden" name="device_screen_resolution" value="1x1x1">
-                <input type="hidden" name="remote_address" value="<?php echo $_SERVER["REMOTE_ADDR"]?>">
+
+            <div class="form-page-design mt-4 d-flex align-items-center justify-content-between">
+                <div class="form-stracture w-100">
+                <h2 class="heading-text"></h2>
+
+                    <!-- Tabs navs -->
+                    <ul class="nav nav-tabs m-0" role="tablist">
+                        <?php if(in_array('credit_card', $this->paymentMethods)): ?>
+                        <li class="nav-item">
+                            <a href="#credit_card" role="tab" data-toggle="tab" class="nav-link active"> Card </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if(in_array('direct_debit', $this->paymentMethods)): ?>
+                        <li class="nav-item">
+                            <a href="#direct_debit" role="tab" data-toggle="tab" class="nav-link"> Direct Debit </a>
+                        </li>
+                        <?php endif; ?>
+                    </ul>
+                    <!-- End Tabs navs -->
+                    <!-- Tabs content -->
+                    <div class="tab-content">
+                        <?php if(isset($this->formElements['element']['ccElement'])): ?>
+                        <div class="tab-pane active" role="tabpanel" id="credit_card">
+                        <div id="card_fields">    
+                        <?php echo $this->formElements['element']['ccElement']; ?>
+                        </div>
+
+                        <input type="hidden" name="transaction_unique" value="<?php echo $this->formElements['transaction_unique']?>">
+                        <input type="hidden" name="amount" value="<?php echo $this->formElements['raw_amount']?>">
+                        <input type="hidden" name="payment_intent_id" value="<?php echo $this->paymentIntent['id'];?>">
+                        <br>
+                        <input type="hidden" name="device_timezone" value="0">
+                        <input type="hidden" name="device_capabilities" value="">
+                        <input type="hidden" name="device_accept_language" value="">
+                        <input type="hidden" name="device_screen_resolution" value="1x1x1">
+                        <input type="hidden" name="remote_address" value="<?php echo $_SERVER["REMOTE_ADDR"]?>">
+                        </div>
+                        <?php endif; ?>
+                        <?php if(isset($this->formElements['element']['ddElement'])): ?>
+                        <div class="tab-pane" role="tabpanel" id="direct_debit">
+                            <div id="dddiv">
+                                <?php echo $this->formElements['element']['ddElement']; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                </div>
+            </div>
 
             <?php
+             endif;
 				 
 		}
 
@@ -296,6 +360,9 @@ function blink_init_gateway_class() {
         
             // let's suppose it is our payment processor JavaScript that allows to obtain a token
             wp_enqueue_script( 'blinkv2_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js' );
+            wp_enqueue_script( 'blinkv2_bootstrap', 'https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js',[],rand(),false );
+            wp_enqueue_style(  'bootstrap_style', 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/css/bootstrap.min.css', [], rand(), false );
+            wp_enqueue_style( 'woocommerce_blinkv2_payment_style', plugins_url( 'style.css', __FILE__ ), [] );
         
             // and this is our custom JS in your plugin directory that works with token.js
             wp_register_script( 'woocommerce_blinkv2_payment', plugins_url( 'custom.js', __FILE__ ), array( 'jquery', 'blinkv2_js' ) );
@@ -389,10 +456,10 @@ function blink_init_gateway_class() {
                 ),
             ];
 
-            $url = $this->host_url.'/v1/pay/refresh-intent';
+            $url = $this->host_url.'/v1/pay/intent/'.$request['payment_intent_id'];
 
-            $response = wp_remote_post( $url, array(
-                'method'      => 'POST',
+            $response = wp_remote_request( $url, array(
+                'method'      => 'PATCH',
                 'headers' => array(
                     'Authorization' => 'Bearer '.$this->accessToken,
                 ),
@@ -419,18 +486,18 @@ function blink_init_gateway_class() {
             $order = wc_get_order( $order_id );
             $request = $_POST;
 
-
-            $updatedIntent = $this->update_payment_information($order,$request);
+print_r($request); die;
+            $this->paymentIntent['intent'] = $this->update_payment_information($order,$request);
 
 
             $requestData = ['merchant_id' => $request['merchantID'],
-    		'payment_intent' => $updatedIntent ?? $request['payment_intent'],
+    		'payment_intent' => $this->paymentIntent['intent'] ?? $request['payment_intent'],
     		'paymentToken' => $request['paymentToken'],
     		'raw_amount' => $request['amount'],
-    		'customer_email' => $request['billing_email'],
-    		'customer_name' => $request['billing_first_name'].' '.$request['billing_last_name'],
+    		'customer_email' => $request['user_name'] ?? $request['billing_email'],
+    		'customer_name' => $request['user_email'] ?? $request['billing_first_name'].' '.$request['billing_last_name'],
     		'transaction_unique' => $request['transaction_unique']
-    	];
+    	    ];
 
                 if(isset($request['remote_address'])) {
                 $requestData['remote_address'] = $request['remote_address'];
@@ -442,7 +509,7 @@ function blink_init_gateway_class() {
 
             
 
-            $url = $this->host_url.'/v1/pay/process';
+            $url = $this->host_url.'/v1/pay/cc/process';
             $response =  wp_remote_post( $url, array(
                 'method'      => 'POST',
                 'headers' => array(
@@ -459,12 +526,17 @@ function blink_init_gateway_class() {
 
             if ( ! is_wp_error( $response ) ) {
                 $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+                if(isset($apiBody['acsform'])){
                 $threedToken = $apiBody['acsform'];
                 set_transient( 'blink3dProcess'.$order_id, $threedToken, 300 );
+                $redirect = site_url('checkout').'/?blink3dprocess='.$order_id;
+                }else{
+                    $redirect = $apiBody['url']; 
+                }
 
                 return array(
                     'result'   => 'success',
-                    'redirect' => site_url('checkout').'/?blink3dprocess='.$order_id,
+                    'redirect' => $redirect,
                 );
             } else {
                 $error_message = $response->get_error_message();
@@ -515,7 +587,7 @@ function blink_init_gateway_class() {
 
 
         public function check_response_for_order( $order_id ) 
-        {
+        { 
             
             if ( empty( $_REQUEST['res'] ) ) {
                 return;
