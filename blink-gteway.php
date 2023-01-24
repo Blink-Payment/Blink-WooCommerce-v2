@@ -92,7 +92,7 @@ function blink_init_gateway_class() {
             // We need custom JavaScript to obtain a token
             add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
 
-            $accessToken  = '';
+            $this->accessToken  = $this->generate_access_token();
             $paymentIntent = '';
             $formElements = '';
          }
@@ -268,10 +268,17 @@ function blink_init_gateway_class() {
 		 */
 		public function payment_fields() {
 
+            // print_r($_POST);
+            // $post = array();
+            // $vars = explode('&', $_POST['post_data']);
+            // foreach ($vars as $k => $value){
+            //     $v = explode('=', urldecode($value));
+            //     $post[$v[0]] = $v[1];
+            // }
+
             if ($this->description) {
                 echo wpautop(wp_kses_post($this->description));
             }
-            $this->accessToken  = $this->generate_access_token();
 
             $this->paymentIntent = $this->create_payment_intent();
             //print_r($this->paymentIntent); die;
@@ -305,10 +312,6 @@ function blink_init_gateway_class() {
                         <div id="card_fields">    
                         <?php echo $this->formElements['element']['ccElement']; ?>
                         </div>
-
-                        <input type="hidden" name="transaction_unique" value="<?php echo $this->formElements['transaction_unique']?>">
-                        <input type="hidden" name="amount" value="<?php echo $this->formElements['raw_amount']?>">
-                        <input type="hidden" name="payment_intent_id" value="<?php echo $this->paymentIntent['id'];?>">
                         <br>
                         <input type="hidden" name="device_timezone" value="0">
                         <input type="hidden" name="device_capabilities" value="">
@@ -316,13 +319,17 @@ function blink_init_gateway_class() {
                         <input type="hidden" name="device_screen_resolution" value="1x1x1">
                         <input type="hidden" name="remote_address" value="<?php echo $_SERVER["REMOTE_ADDR"]?>">
                         </div>
-                        <?php endif; ?>
+                        <?php  endif; ?>
                         <?php if(isset($this->formElements['element']['ddElement'])): ?>
                         <div class="tab-pane" role="tabpanel" id="direct_debit">
                             <div id="dddiv">
                                 <?php echo $this->formElements['element']['ddElement']; ?>
                             </div>
                         </div>
+                        <input type="hidden" name="transaction_unique" value="<?php echo $this->formElements['transaction_unique']?>">
+                        <input type="hidden" name="amount" value="<?php echo $this->formElements['raw_amount']?>">
+                        <input type="hidden" name="payment_intent_id" value="<?php echo $this->paymentIntent['id'];?>">
+                        <input type="hidden" name="payment_by" id="payment_by" value="<?php echo $this->paymentMethods[0];?>">
                         <?php endif; ?>
                     </div>
                     
@@ -475,23 +482,54 @@ function blink_init_gateway_class() {
             }
         }
 
-		/*
-		 * We're processing the payments here
-		 */
-		public function process_payment( $order_id ) {
-
-            global $woocommerce;
- 
-            // we need it to get any order detailes
-            $order = wc_get_order( $order_id );
-            $request = $_POST;
-
-print_r($request); die;
-            $this->paymentIntent['intent'] = $this->update_payment_information($order,$request);
-
+        public function processDirectDebit($order,$request)
+        {
 
             $requestData = ['merchant_id' => $request['merchantID'],
-    		'payment_intent' => $this->paymentIntent['intent'] ?? $request['payment_intent'],
+    		'payment_intent' => $request['payment_intent'],
+    		'raw_amount' => $request['amount'],
+    		'transaction_unique' => $request['transaction_unique'],
+    		'given_name' => $request['given_name'],
+    		'family_name' => $request['family_name'],
+    		'company_name' => $request['company_name'],
+    		'email' => $request['email'],
+    		'account_holder_name' => $request['account_holder_name'],
+    		'branch_code' => $request['branch_code'],
+    		'account_number' => $request['account_number'],
+    		'country_code' => 'GB',
+    	    ];
+
+
+            $url = $this->host_url.'/v1/pay/dd/process';
+
+            $response =  wp_remote_post( $url, array(
+                'method'      => 'POST',
+                'headers' => array(
+                    'Authorization' => 'Bearer '.$this->accessToken,
+                    'user-agent'    => $_SERVER['HTTP_USER_AGENT'],
+                    'accept' => $_SERVER['HTTP_ACCEPT'],
+                    'accept-encoding'=> 'gzip, deflate, br',
+                    'accept-charset' => 'charset=utf-8'
+
+                ),
+                'body'        => $requestData
+                )
+            );
+            
+            if ( ! is_wp_error( $response ) ) {
+                $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+                wp_redirect($apiBody['url']);
+            } else {
+                $error_message = $response->get_error_message();
+                throw new Exception( $error_message );
+            }
+        }
+
+        public function processCreditCard($order,$request)
+        {
+
+            $requestData = ['merchant_id' => $request['merchantID'],
+    		'payment_intent' => $request['payment_intent'],
     		'paymentToken' => $request['paymentToken'],
     		'raw_amount' => $request['amount'],
     		'customer_email' => $request['user_name'] ?? $request['billing_email'],
@@ -523,6 +561,35 @@ print_r($request); die;
                 'body'        => $requestData
                 )
             );
+
+            return $response;
+
+        }
+
+		/*
+		 * We're processing the payments here
+		 */
+		public function process_payment( $order_id ) {
+
+            global $woocommerce;
+ 
+            // we need it to get any order detailes
+            $order = wc_get_order( $order_id );
+            $request = $_POST;
+
+            $request['payment_intent'] = $this->update_payment_information($order,$request);
+
+
+            //print_r($request); die;
+            if($request['payment_by'] == 'direct_debit')
+            {
+                $response = $this->processDirectDebit($order,$request);
+            }
+            else
+            {
+                $response = $this->processCreditCard($order,$request);
+
+            }
 
             if ( ! is_wp_error( $response ) ) {
                 $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
