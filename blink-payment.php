@@ -281,6 +281,11 @@ function blink_init_gateway_class() {
                 'secret_key' => array(
                     'title'       => 'Live Secret Key',
                     'type'        => 'password'
+                ),
+                'custom_style' => array(
+                    'title'       => 'Custom Style',
+                    'type'        => 'textarea',
+                    'description' => 'Do not include style tag',
                 )
             );
         }
@@ -296,8 +301,7 @@ function blink_init_gateway_class() {
 
             $this->paymentIntent = $this->create_payment_intent();
             $this->formElements = $this->generate_form_element();
-            if(is_array($this->paymentMethods) && !empty($this->paymentMethods)):
-            ?> 
+            if(is_array($this->paymentMethods) && !empty($this->paymentMethods)):?> 
 
             <section class="blink-api-section">
                     <div class="blink-api-form-stracture">
@@ -355,8 +359,8 @@ function blink_init_gateway_class() {
         
             // let's suppose it is our payment processor JavaScript that allows to obtain a token
             wp_enqueue_script( 'blink_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js' );
-            wp_enqueue_style( 'woocommerce_blink_payment_style', plugins_url( 'style.css', __FILE__ ), [] );
-        
+            wp_register_style( 'woocommerce_blink_payment_style', plugins_url( 'style.css', __FILE__ ), [] );
+
             // and this is our custom JS in your plugin directory that works with token.js
             wp_register_script( 'woocommerce_blink_payment', plugins_url( 'custom.js', __FILE__ ), array( 'jquery', 'blink_js' ) );
         
@@ -367,6 +371,14 @@ function blink_init_gateway_class() {
             ) );
         
             wp_enqueue_script( 'woocommerce_blink_payment' );
+            wp_enqueue_style( 'woocommerce_blink_payment_style' );
+            $custom_css = $this->get_option( 'custom_style' );
+
+                if($custom_css)
+                { 
+                    wp_add_inline_style('woocommerce_blink_payment_style', $custom_css );
+
+                }
 
             do_action('wc_blink_custom_script');
             do_action('wc_blink_custom_style');
