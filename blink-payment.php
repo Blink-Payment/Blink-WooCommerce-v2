@@ -305,7 +305,6 @@ function blink_init_gateway_class() {
 
             <section class="blink-api-section">
                     <div class="blink-api-form-stracture">
-                        <h2 class="heading-text">Pay By Card</h2>
                         <section class="blink-api-tabs-content">
                             <div id="tab1" class="tab-contents active">
                             <?php if(isset($this->formElements['element']['ccElement'])): ?>
