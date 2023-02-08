@@ -210,7 +210,7 @@ a:focus, input:focus, textarea:focus, button:focus {
 .hostedfield-wrapper:focus, .hostedfield-wrapper:focus-visible, .hostedfield-wrapper:focus-within, .hostedfield-wrapper:hover, .hostedfield-wrapper:active {
     outline: 1px solid #80bdff;
 
-}
+} 
 
 .blink-pay-options a {
     display: flex;

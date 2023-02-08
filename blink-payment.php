@@ -833,5 +833,5 @@ function blink_init_gateway_class() {
         {
             return false;
         }
- 	}
+ 	} 
 }
