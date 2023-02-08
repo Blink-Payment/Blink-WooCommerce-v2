@@ -86,9 +86,9 @@ header.blink-api-tabs-nav,
 }
 
 .blink-api-tabs-content {
-    height: 65vh;
-    overflow-y: scroll;
-
+    /*height: 65vh;
+    overflow-y: scroll;*/
+    padding-top: 20px;
 }
 
 /* .blink-api-tabs-content div:not(:first-child) {
@@ -111,7 +111,7 @@ header.blink-api-tabs-nav,
 }
 
 .blink-api-tabs-content input[type="submit"],
-button {
+button, .blink-pay-options a {
     width: 100%;
     text-transform: capitalize;
     height: 55px;
@@ -129,7 +129,7 @@ button {
 
 header.blink-api-tabs-nav ul li a:hover,
 .blink-api-tabs-content input[type="submit"]:hover,
-button:hover {
+button:hover, .blink-pay-options a:hover {
     background: #024dff;
     color: #fff;
     border-color: #024dff;
@@ -165,10 +165,57 @@ button:hover {
     font-size: 14px;
 }
 
+.hostedfield-wrapper {
+    display: block;
+    width: 100%;
+    height: calc(1.5em + 0.75rem + 2px);
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #495057;
+    background-color: #fff;
+    background-clip: padding-box;
+    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    margin-bottom: 10px;
+    height: 55px;
+    border: 1px solid #DBDBDB !important;
+    box-shadow: 0px 1px 0px #DBDBDB;
+    border-radius: 5px;
+}
+
+.responsive-screen .blink-api-tabs-content br {
+    display: none;
+}
+.blink-api-tabs-content br {
+    display: none;
+}
+
 .tab-contents {
     display: none;
 }
 
 .tab-contents.active {
     display: block;
+}
+
+a:focus, button:focus, .button.alt:focus, input:focus, textarea:focus, input[type="button"]:focus, input[type="reset"]:focus, input[type="submit"]:focus, input[type="email"]:focus, input[type="tel"]:focus, input[type="url"]:focus, input[type="password"]:focus, input[type="search"]:focus {
+    outline-color: #80bdff;
+}
+
+a:focus, input:focus, textarea:focus, button:focus {
+    outline: 1px solid #80bdff;
+}
+
+.hostedfield-wrapper:focus, .hostedfield-wrapper:focus-visible, .hostedfield-wrapper:focus-within, .hostedfield-wrapper:hover, .hostedfield-wrapper:active {
+    outline: 1px solid #80bdff;
+
+}
+
+.blink-pay-options a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none !important;
+    margin-bottom: 15px;
 }
