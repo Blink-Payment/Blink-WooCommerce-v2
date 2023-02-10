@@ -428,39 +428,41 @@ function blink_init_gateway_class() {
 		/**
 		 * credit card form
 		 */
-		public function payment_fields() {
+		public function payment_fields() 
+        {
 
             if ($this->description) {
                 echo wpautop(wp_kses_post($this->description));
             }
 
-            if(is_array($this->paymentMethods) && !empty($this->paymentMethods)):?> 
+            if(is_array($this->paymentMethods) && !empty($this->paymentMethods))
+            { ?> 
 
             <section class="blink-api-section">
                     <div class="blink-api-form-stracture">
                         <section class="blink-api-tabs-content">
-                            <?php if(in_array('credit-card',$this->paymentMethods)) : ?>
+                            <?php if(in_array('credit-card',$this->paymentMethods)) { ?>
                             <div class="blink-pay-options">
                                 <a href="javascript:void(0);" onclick="updatePaymentBy('credit-card')" > Pay with Credit Card</a>
                             </div>
-                            <?php endif; ?>
-                            <?php if(in_array('direct-debit',$this->paymentMethods)) : ?>
+                            <?php } ?>
+                            <?php if(in_array('direct-debit',$this->paymentMethods)) { ?>
                             <div class="blink-pay-options">
                                 <a href="javascript:void(0);" onclick="updatePaymentBy('direct-debit')" > Pay with Direct Debit</a>
                             </div>
-                            <?php endif; ?>
-                            <?php if(in_array('open-banking',$this->paymentMethods)) : ?>
+                            <?php } ?>
+                            <?php if(in_array('open-banking',$this->paymentMethods)) { ?>
                             <div class="blink-pay-options">
                              <a href="javascript:void(0);" onclick="updatePaymentBy('open-banking')" > Pay with Open Banking</a>
                             </div>   
-                            <? endif; ?> 
+                            <? } ?> 
                             <input type="hidden" name="payment_by" id="payment_by" value="">
                         </section>
                     </div>
                 </section>
 
             <?php
-             endif;
+            }
 				 
 		}
 
