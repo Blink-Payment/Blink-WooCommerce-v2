@@ -170,8 +170,20 @@ function blink_3d_form_submission($content)
 
     return $content;
 }
+/**
+ * WooCommerce fallback notice.
+ */
+function wc_blink_missing_notice() {
+	/* translators: 1. URL link. */
+	echo '<div class="error"><p><strong>' . sprintf( esc_html__( 'Blink requires WooCommerce to be installed and active. You can download %s here.', 'blink' ), '<a href="https://woocommerce.com/" target="_blank">WooCommerce</a>' ) . '</strong></p></div>';
+}
 
 function blink_init_gateway_class() {
+
+    if ( ! class_exists( 'WooCommerce' ) ) {
+		add_action( 'admin_notices', 'wc_blink_missing_notice' );
+		return;
+	}
 
 	class WC_Blink_Gateway extends WC_Payment_Gateway {
 
@@ -462,7 +474,7 @@ function blink_init_gateway_class() {
                             <div class="blink-pay-options">
                              <a href="javascript:void(0);" onclick="updatePaymentBy('open-banking')" > Pay with Open Banking</a>
                             </div>   
-                            <? } ?> 
+                            <?php } ?> 
                             <input type="hidden" name="payment_by" id="payment_by" value="">
                         </section>
                     </div>
@@ -973,3 +985,4 @@ function blink_init_gateway_class() {
         }
  	} 
 }
+?>
