@@ -29,32 +29,62 @@ jQuery(function($){
     };
 
     blink_checkout_form.init();
+
     jQuery(document).ready(function () {
-        var $form = $('#blink-card');
-        var auto = {
-        autoSetup: true,
-        autoSubmit: true,
-        };
-        try {
-        var hf = $form.hostedForm(auto);
-        var screen_width = (window && window.screen ? window.screen.width : '0');
-        var screen_height = (window && window.screen ? window.screen.height : '0');
-        var screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
-        var language = (window && window.navigator ? (window.navigator.language ? window.navigator
-            .language : window.navigator.browserLanguage) : '');
-        var java = (window && window.navigator ? navigator.javaEnabled() : false);
-        var timezone = (new Date()).getTimezoneOffset();
-        
-        $form.find('input[name=device_timezone]').val(timezone);
-        $form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
-        $form.find('input[name=device_accept_language]').val(language);
-        $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
-            screen_depth);
-        } catch(e) {
-        //Add your exception handling code here
+        if($('#blink-card').length)
+        {
+            var $form = $('#blink-card');
+            var auto = {
+            autoSetup: true,
+            autoSubmit: true,
+            };
+            try {
+            var hf = $form.hostedForm(auto);
+            var screen_width = (window && window.screen ? window.screen.width : '0');
+            var screen_height = (window && window.screen ? window.screen.height : '0');
+            var screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
+            var language = (window && window.navigator ? (window.navigator.language ? window.navigator
+                .language : window.navigator.browserLanguage) : '');
+            var java = (window && window.navigator ? navigator.javaEnabled() : false);
+            var timezone = (new Date()).getTimezoneOffset();
+            
+            $form.find('input[name=customer_name]').val(order_params.customer_name);
+            $form.find('input[name=customer_email]').val(order_params.customer_email);
+            $form.find('input[name=device_timezone]').val(timezone);
+            $form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
+            $form.find('input[name=device_accept_language]').val(language);
+            $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
+                screen_depth);
+            } catch(e) {
+            //Add your exception handling code here
+            }
+        }
+
+        if($('#blink-debit').length)
+        {
+            try{
+            var $form = $('#blink-debit');
+            
+            $form.find('input[name=given_name]').val(order_params.billing_first_name);
+            $form.find('input[name=family_name]').val(order_params.billing_last_name);
+            $form.find('input[name=email]').val(order_params.billing_email);
+            $form.find('input[name=account_holder_name]').val(order_params.customer_name);
+            } catch(e) {
+            //Add your exception handling code here
+            }
+        }
+        if($('#blink-open').length)
+        {
+            try{
+            var $form = $('#blink-open');
+            $form.find('input[name=user_name]').val(order_params.customer_name);
+            $form.find('input[name=user_email]').val(order_params.customer_email);
+            } catch(e) {
+            //Add your exception handling code here
+            }
         }
         
-        });
+    });
     
     if (jQuery(".blink-api-section").width() < 500)
     jQuery('.blink-api-section').addClass('responsive-screen');

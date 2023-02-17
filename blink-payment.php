@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.0.1
+ * Version: 1.0.3
  */
 
 /*
@@ -73,7 +73,7 @@ function checkBlinkPaymentMethod($content)
 
             
                 $gateWay->accessToken = $gateWay->generate_access_token();
-                $gateWay->paymentIntent = $gateWay->create_payment_intent();
+                $gateWay->paymentIntent = $gateWay->create_payment_intent($_GET['p']);
                 if(isset($gateWay->paymentIntent['payment_intent']))
                 {
                 $gateWay->formElements = $gateWay->generate_form_element();
@@ -111,7 +111,7 @@ function checkBlinkPaymentMethod($content)
                                     if( $_GET['p'] == 'open-banking' && $gateWay->formElements['element']['obElement'])
                                     {
                                         $html .='<div id="tab1" class="tab-contents active">
-                                            <form name="blink-debit" id="blink-debit" method="POST" action="">
+                                            <form name="blink-open" id="blink-open" method="POST" action="">
                                                 '.$gateWay->formElements['element']['obElement'].'
                                                 <input type="hidden" name="type" value="1">
                                                 <input type="hidden" name="remote_address" value="'.$_SERVER['REMOTE_ADDR'].'">';
@@ -275,6 +275,7 @@ function blink_init_gateway_class() {
 
          public function generate_access_token()
          {
+            $request = $_GET;
             $url = $this->host_url.'/v1/pay/token'; 
             $response = wp_remote_post( $url, array(
                 'method'      => 'POST',
@@ -290,7 +291,10 @@ function blink_init_gateway_class() {
                 return $apiBody['access_token'] ?: '';
             } else {
                 $error_message = $response->get_error_message();
-                //throw new Exception( $error_message );
+                wc_add_notice(  $error_message, 'error' );
+                $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$request['blinkPay'];
+                wp_redirect($redirect,302);
+                exit();
             }
          }
 
@@ -310,13 +314,14 @@ function blink_init_gateway_class() {
             return apply_filters( 'woocommerce_get_return_url', $return_url, $order );
         }
 
-         public function create_payment_intent()
+         public function create_payment_intent($payment_type)
          {
             global $woocommerce;
+            $request = $_GET;
 
             $requestData = [
             	'amount' => $woocommerce->cart->total,
-            	'payment_type' => $this->paymentMethods,
+            	'payment_type' => $payment_type,
             	'currency' => 'GBP',
             	'return_url' => $this->get_return_url(),
             	'notification_url' => WC()->api_request_url( 'wc_blink_gateway' ),
@@ -331,12 +336,16 @@ function blink_init_gateway_class() {
                 'body'        => $requestData
                 )
             );
+
             if ( ! is_wp_error( $response ) ) {
                 $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
                 return $apiBody;
             } else {
                 $error_message = $response->get_error_message();
-                throw new Exception( $error_message );
+                wc_add_notice(  $error_message, 'error' );
+                $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$request['blinkPay'];
+                wp_redirect($redirect,302);
+                exit();
             }
          }
 
@@ -428,15 +437,13 @@ function blink_init_gateway_class() {
 		/**
 		 * credit card form
 		 */
-		public function payment_fields() 
-        {
+		public function payment_fields() {
 
             if ($this->description) {
                 echo wpautop(wp_kses_post($this->description));
             }
 
-            if(is_array($this->paymentMethods) && !empty($this->paymentMethods))
-            { ?> 
+            if(is_array($this->paymentMethods) && !empty($this->paymentMethods)) { ?> 
 
             <section class="blink-api-section">
                     <div class="blink-api-form-stracture">
@@ -500,6 +507,13 @@ function blink_init_gateway_class() {
                 'apiKey' => $this->api_key,
                 'secretKey' => $this->secret_key
             ) );
+
+            if(isset($_GET['blinkPay']) && $_GET['blinkPay'] !== '')
+            {
+               $order_id = $_GET['blinkPay'];
+               $order = wc_get_order($order_id);
+               wp_localize_script( 'woocommerce_blink_payment', 'order_params', $this->get_customer_data($order) );
+            }
         
             wp_enqueue_script( 'woocommerce_blink_payment' );
             wp_enqueue_style( 'woocommerce_blink_payment_style' );
@@ -526,6 +540,8 @@ function blink_init_gateway_class() {
                 'customer_user' => $order->get_user_id(),
                 'customer_name' => $order->get_billing_first_name().' '.$order->get_billing_last_name(),
                 'customer_email' => $order->get_billing_email(),
+                'customer_address' => $order->get_billing_address_1().','.$order->get_billing_address_2(),
+                'customer_postcode' => $order->get_billing_postcode(),
                 'billing_first_name' => $order->get_billing_first_name(),
                 'billing_last_name' => $order->get_billing_last_name(),
                 'billing_company' => $order->get_billing_company(),
@@ -601,7 +617,10 @@ function blink_init_gateway_class() {
                 return $apiBody['payment_intent'];
             } else {
                 $error_message = $response->get_error_message();
-                throw new Exception( $error_message );
+                wc_add_notice(  $error_message, 'error' );
+                $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$order->get_id();
+                wp_redirect($redirect,302);
+                exit();
             }
         }
 
@@ -834,7 +853,6 @@ function blink_init_gateway_class() {
             $order = wc_get_order( $order_id );
             $request = $_POST;
             $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$order_id;
-
             return array(
                 'result'   => 'success',
                 'redirect' => $redirect,
