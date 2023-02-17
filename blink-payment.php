@@ -517,6 +517,7 @@ function blink_init_gateway_class() {
         
             wp_enqueue_script( 'woocommerce_blink_payment' );
             wp_enqueue_style( 'woocommerce_blink_payment_style' );
+
             $custom_css = $this->get_option( 'custom_style' );
 
                 if($custom_css)
@@ -692,6 +693,7 @@ function blink_init_gateway_class() {
     		'user_name' => $request['user_name'],
     		'user_email' => $request['user_email'],
     	    ];
+            
 
 
             $url = $this->host_url.'/v1/pay/ob/process';
@@ -788,8 +790,8 @@ function blink_init_gateway_class() {
     		'payment_intent' => $request['payment_intent'],
     		'paymentToken' => $request['paymentToken'],
     		'raw_amount' => $request['amount'],
-    		'customer_email' => $request['user_name'] ?? $request['billing_email'],
-    		'customer_name' => $request['user_email'] ?? $request['billing_first_name'].' '.$request['billing_last_name'],
+    		'customer_email' => $request['customer_email'] ?? $request['billing_email'],
+    		'customer_name' => $request['customer_name'] ?? $request['billing_first_name'].' '.$request['billing_last_name'],
     		'transaction_unique' => $request['transaction_unique'],
     		'type' => $request['type']
     	    ];
