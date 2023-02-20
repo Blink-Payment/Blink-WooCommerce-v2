@@ -17,7 +17,7 @@ once click on it, user get a option to upload the plugin zip. Upload the plugin 
 The plugin will be listed there and activate it.
 ```
 
-![Plugin List](PluginList.png)
+![Plugin List](assets/img/PluginList.png)
 
 
 
@@ -33,7 +33,7 @@ Once you activate it, you get a settings link under the plugin name. Click on it
 6. Custom Style: Use can put custom style into this text area. It can be used to overwrite the existing style of the payment form.
 Note: Please don't use any style tag in to that text area.
 
-![Settings](settings.png)
+![Settings](assets/img/settings.png)
 
 
 ```
@@ -64,13 +64,14 @@ https://developer.wordpress.org/reference/functions/wp_enqueue_style/
 
 
 ## Required styling can be found from plugin root directory
+  1. assets/css/style.css
 
 ## Required js can be found in plugin root directory
 
 Following js files need to be added in payment form page
 
   1. https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js
-  2. ./custom.js
+  2. assets/js/custom.js
 
   hostedfields.min.js is required to tokenize the card details and create a paymentToken value on blink server which will be auto added in the payment form through this js file.
 
