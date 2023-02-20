@@ -42,8 +42,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         // if needed we can use this webhook
         //add_action( 'woocommerce_api_wc_blink_gateway', array( $this, 'webhook' ) );
         add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response' ) );
-        add_filter('plugin_action_links', array( $this,'add_wc_blink_payment_action_plugin'), 10, 5);
-
         // We need custom JavaScript to obtain a token
         add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
 
@@ -57,25 +55,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         ];
 
      }
-
-    public function add_wc_blink_payment_action_plugin($actions, $plugin_file)
-    {
-        static $plugin;
-
-        if (!isset($plugin))
-        {
-            $plugin = plugin_basename(__FILE__);
-        }
-
-        if ($plugin == $plugin_file)
-        {
-            $section = $this->id;
-
-            $actions = array_merge(array('settings' => '<a href="' . admin_url('admin.php?page=wc-settings&tab=checkout&section='.$section) . '">' . __('Settings', 'General') . '</a>'), $actions);
-        }
-
-        return $actions;
-    }
 
      public function generate_form_element()
      {

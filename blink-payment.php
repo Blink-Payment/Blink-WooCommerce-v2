@@ -177,6 +177,27 @@ function wc_blink_missing_notice() {
 	echo '<div class="error"><p><strong>' . sprintf( esc_html__( 'Blink requires WooCommerce to be installed and active. You can download %s here.', 'blink' ), '<a href="https://woocommerce.com/" target="_blank">WooCommerce</a>' ) . '</strong></p></div>';
 }
 
+function add_wc_blink_payment_action_plugin($actions, $plugin_file)
+    {
+        static $plugin;
+
+        if (!isset($plugin))
+        {
+            $plugin = plugin_basename(__FILE__);
+        }
+
+        if ($plugin == $plugin_file)
+        {
+            $configs = include(dirname(__FILE__) . '/config.php');
+
+            $section = str_replace(' ', '', strtolower($configs['method_title']));
+    
+            $actions = array_merge(array('settings' => '<a href="' . admin_url('admin.php?page=wc-settings&tab=checkout&section='.$section) . '">' . __('Settings', 'General') . '</a>'), $actions);
+        }
+
+        return $actions;
+    }
+
 function blink_init_gateway_class() {
 
     if ( ! class_exists( 'WooCommerce' ) ) {
@@ -184,8 +205,10 @@ function blink_init_gateway_class() {
 		return;
 	}
 
+    add_filter('plugin_action_links', 'add_wc_blink_payment_action_plugin', 10, 5);
+
     include(dirname(__FILE__) . '/includes/wc-blink-gateway-class.php');
-    
+
 	add_filter( 'woocommerce_payment_gateways', 'blink_add_gateway_class' );
 
 }
