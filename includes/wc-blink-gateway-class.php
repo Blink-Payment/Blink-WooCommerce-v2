@@ -40,7 +40,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         // This action hook saves the settings
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
         // if needed we can use this webhook
-        //add_action( 'woocommerce_api_wc_blink_gateway', array( $this, 'webhook' ) );
+        add_action( 'woocommerce_api_wc_'.$this->id, array( $this, 'webhook' ) );
         add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response' ) );
         // We need custom JavaScript to obtain a token
         add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
@@ -683,9 +683,26 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
      */
     public function webhook() {
 
-     return;
+      $request  = $_POST; 
+      $order_id = $request['order_id'] ?? '';
+      $action = $request['action'] ?? '';
+      $status = $request['status'] ?? '';
+      $note = $request['note'] ?? '';
+
+      if($order_id)
+      {
+        $order = wc_get_order($order_id);
+        if($action == 'update_order_status') 
+        {
+            $order->update_status($status, $note);
+
+        }else{
+            $order->add_meta_data( '_debug', $request );
+
+        }
+      }
                 
-     }
+    }
 
     public function validate_transaction( $transaction )
     {
@@ -751,7 +768,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
                 
             } else {
                 
-                    $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), '' ) );
+                    $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
                 }
             }
     } 
@@ -767,7 +784,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         if ( ! $order->has_status( array( 'processing', 'completed' ) ) ) {
             $order->add_order_note( $note );
             $order->payment_complete( $txn_id );
-
+            
             if ( isset( WC()->cart ) ) {
                 WC()->cart->empty_cart();
             }
