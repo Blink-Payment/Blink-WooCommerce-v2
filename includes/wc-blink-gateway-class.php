@@ -41,10 +41,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
         // if needed we can use this webhook
         add_action( 'woocommerce_api_wc_'.$this->id, array( $this, 'webhook' ) );
+        add_action( 'woocommerce_before_thankyou', array( $this, 'check_response' ) );
         add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response' ) );
+        add_filter( 'woocommerce_endpoint_order-received_title', array( $this, 'change_title' ), 99 );
         // We need custom JavaScript to obtain a token
         add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
-
+        
         $this->accessToken  = '';
         $this->paymentIntent = '';
         $this->formElements = '';
@@ -738,6 +740,20 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         $this->check_response_for_order( $order_id );
     }
 
+    public function change_title($title)
+    {
+        global $wp;
+        $order_id = $wp->query_vars['order-received'];
+        $this->check_response_for_order( $order_id );
+        $order = wc_get_order($order_id);
+        if ( $order->has_status( 'failed' ) )
+        {
+            return __( 'Order Failed', 'woocommerce' );
+        }
+
+        return $title;
+    }
+
 
 
     public function check_response_for_order( $order_id ) 
@@ -748,7 +764,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         }
 
         $wc_order = wc_get_order( $order_id );
-        if ( ! $wc_order->needs_payment() ) {
+        if ( ! $wc_order->needs_payment() || $wc_order->get_meta('_process',true)) {
             return;
         }
 
@@ -757,20 +773,28 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
         if ( $transaction_result ) {
             $status = strtolower( $transaction_result['status'] );
+            $source = strtolower( $transaction_result['payment_source'] );
 
             $wc_order->add_meta_data( '_blink_status', $status );
-            $wc_order->add_meta_data( 'payment_mode', $transaction_result['payment_source'] );
+            $wc_order->add_meta_data( 'payment_mode', $source );
+            $wc_order->add_meta_data( '_process', 'true' );
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
-            $wc_order->add_order_note( 'Pay by '.$transaction_result['payment_source'] );
+            $wc_order->add_order_note( 'Pay by '. $source );
 
-            if ( 'captured' === strtolower($status) || 'success' === strtolower($status) ) {
+            if ( 'captured' === strtolower($status) || 'success' === strtolower($status) ) 
+            {
                     $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
-                
-            } else {
-                
+            } 
+            elseif (strpos(strtolower($status),'direct debit'))
+            {
                     $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
-                }
+
             }
+            else 
+            {
+                    $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
+            }
+        }
     } 
 
     /**
@@ -784,7 +808,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         if ( ! $order->has_status( array( 'processing', 'completed' ) ) ) {
             $order->add_order_note( $note );
             $order->payment_complete( $txn_id );
-            
+
             if ( isset( WC()->cart ) ) {
                 WC()->cart->empty_cart();
             }
@@ -803,6 +827,24 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         if ( isset( WC()->cart ) ) {
             WC()->cart->empty_cart();
         }
+
+        // w
+    }
+
+    /**
+     * Hold order and add note.
+     *
+     * @param  WC_Order $order Order object.
+     * @param  string   $reason Reason why the payment is on hold.
+     */
+    public function payment_failed( $order, $reason = '' ) {
+        $order->update_status( 'failed', $reason );
+
+        if ( isset( WC()->cart ) ) {
+            WC()->cart->empty_cart();
+        }
+
+        // w
     }
     
 
