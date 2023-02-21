@@ -78,5 +78,43 @@ Following js files need to be added in payment form page
   custom.js is required to initiate the hosted js and also add some required values regarding browser settings for 3DS authentication.
 
 
+## Order status update example"
+
+`````
+Fields:
+
+order_id = int (required)
+status = string (required) e.g: [wc-pending, wc-processing, wc-on-hold, wc-completed, wc-cancelled, wc-refunded, wc-failed]
+note = string (optional)
+action = 'update_order_status' (required)
+
+`````
+
+````
+
+<?php
+
+$curl = curl_init();
+
+curl_setopt_array($curl, array(
+  CURLOPT_URL => '[host url]/wc-api/wc_blink/',
+  CURLOPT_RETURNTRANSFER => true,
+  CURLOPT_ENCODING => '',
+  CURLOPT_MAXREDIRS => 10,
+  CURLOPT_TIMEOUT => 0,
+  CURLOPT_FOLLOWLOCATION => true,
+  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+  CURLOPT_CUSTOMREQUEST => 'POST',
+  CURLOPT_POSTFIELDS => array(,,,),
+));
+
+$response = curl_exec($curl);
+
+curl_close($curl);
+echo $response;
+
+`````
+
+
 
 

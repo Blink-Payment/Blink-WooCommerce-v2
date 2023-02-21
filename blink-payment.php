@@ -151,20 +151,16 @@ function blink_3d_form_submission($content)
 
     if(isset($_GET['blink3dprocess']) && $_GET['blink3dprocess'] !== '')
     {
+        $token = get_transient( 'blink3dProcess'.$_GET['blink3dprocess']);
+        $html = '<div class="blink-loading">Loading&#8230;</div><div class="3d-content">'.$token.'</div>';
         $script = '<script nonce="2020">
         jQuery(document).ready(function(){
     
-            jQuery(\'#btnSubmit\').on(\'click\',function(){
-                jQuery(this).val(\'Please Wait...\');
-                setTimeout(function(){jQuery(\'#btnSubmit\').val(\'Process Payment\');},300);
-            });
-    
             jQuery(\'#form3ds22\').submit();
-            setTimeout(function(){jQuery(\'#btnSubmit\').val(\'Process Payment\');},300);
+            setTimeout(function(){jQuery(\'#btnSubmit\').val(\'Please Wait...\');},100);
         });
     </script>';
-        $token = get_transient( 'blink3dProcess'.$_GET['blink3dprocess']);
-        return $token.$script;
+        return $html.$script;
     }
 
     return $content;
