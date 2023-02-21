@@ -83,6 +83,15 @@ jQuery(function($){
             //Add your exception handling code here
             }
         }
+
+        var paymentMode = jQuery('input[name=payment_method]:checked').val();
+        if(paymentMode == 'blink')
+        {
+            jQuery('#place_order').hide();
+        }else{
+            jQuery('#place_order').show();
+
+        }
         
     });
     
@@ -116,10 +125,44 @@ else
     jQuery('.blink-api-section').removeClass('responsive-screen');
 }
 
+var blink_order_review_form = {
+    init: function() {  
+        
+        var paymentMode = jQuery('input[name=payment_method]:checked').val();
+        if(paymentMode == 'blink')
+        {
+            jQuery('#place_order').hide();
+        }else{
+            jQuery('#place_order').show();
+
+        }
+        
+        var paymentBy = jQuery('input[name=payment_by]').val();
+        console.log(paymentBy);
+    
+        if(paymentBy != ''){
+            jQuery('#order_review').submit();
+            return;
+        }  
+          
+        
+    }
+};
+
 
 var updatePaymentBy = function(data) {
-    jQuery('#payment_by').val(data);
-    jQuery( document.body ).trigger( 'update_checkout' );
+
+    var $form = jQuery('#payment_by').closest('form');
+    jQuery('#payment_by').val(data);    
+    
+    if($form[0].id == 'order_review')
+    {   
+        blink_order_review_form.init();
+    }
+    else
+    {
+        jQuery( document.body ).trigger( 'update_checkout' );
+    }
 
 }
 

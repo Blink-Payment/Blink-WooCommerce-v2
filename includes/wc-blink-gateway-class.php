@@ -637,7 +637,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             )
         );
 
-
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
             if(isset($apiBody['acsform'])){
@@ -672,7 +671,20 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         // we need it to get any order detailes
         $order = wc_get_order( $order_id );
         $request = $_POST;
+
+        if ( count( WC()->cart->get_cart() ) == 0 ) {
+            $items = $order->get_items();
+            foreach ( $items as $item ) {
+                $quantity = $item['quantity'];
+                $product_id = $item['product_id'];
+                $variation_id = $item['variation_id'];
+                WC()->cart->add_to_cart( $product_id, $quantity, $variation_id );
+            }
+        }
+        
+
         $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$order_id;
+
         return array(
             'result'   => 'success',
             'redirect' => $redirect,
@@ -683,24 +695,28 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
     /*
      * In case we need a webhook, like PayPal IPN etc
      */
-    public function webhook() {
+    public function webhook() 
+    {
+      $headers = getallheaders();
+      if($headers['Api-Key'] === $this->api_key && $headers['Secret-Key'] === $this->secret_key)
+      { 
+        $request  = $_POST; 
+        $order_id = $request['order_id'] ?? '';
+        $action = $request['action'] ?? '';
+        $status = $request['status'] ?? '';
+        $note = $request['note'] ?? '';
 
-      $request  = $_POST; 
-      $order_id = $request['order_id'] ?? '';
-      $action = $request['action'] ?? '';
-      $status = $request['status'] ?? '';
-      $note = $request['note'] ?? '';
-
-      if($order_id)
-      {
-        $order = wc_get_order($order_id);
-        if($action == 'update_order_status') 
+        if($order_id)
         {
-            $order->update_status($status, $note);
+            $order = wc_get_order($order_id);
+            if($action == 'update_order_status') 
+            {
+                $order->update_status($status, $note);
 
-        }else{
-            $order->add_meta_data( '_debug', $request );
+            }else{
+                $order->add_meta_data( '_debug', $request );
 
+            }
         }
       }
                 
@@ -764,7 +780,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         }
 
         $wc_order = wc_get_order( $order_id );
-        if ( ! $wc_order->needs_payment() || $wc_order->get_meta('_process',true)) {
+        if ( ! $wc_order->needs_payment()) {
             return;
         }
 
@@ -776,8 +792,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             $source = strtolower( $transaction_result['payment_source'] );
 
             $wc_order->add_meta_data( '_blink_status', $status );
-            $wc_order->add_meta_data( 'payment_mode', $source );
-            $wc_order->add_meta_data( '_process', 'true' );
+            $wc_order->add_meta_data( 'payment_type', $source );
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
             $wc_order->add_order_note( 'Pay by '. $source );
 
@@ -823,6 +838,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
      */
     public function payment_on_hold( $order, $reason = '' ) {
         $order->update_status( 'on-hold', $reason );
+        $order->add_order_note( $reason );
+
 
         if ( isset( WC()->cart ) ) {
             WC()->cart->empty_cart();
@@ -839,12 +856,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
      */
     public function payment_failed( $order, $reason = '' ) {
         $order->update_status( 'failed', $reason );
+        $order->add_order_note( $reason );
 
-        if ( isset( WC()->cart ) ) {
-            WC()->cart->empty_cart();
-        }
-
-        // w
     }
     
 
