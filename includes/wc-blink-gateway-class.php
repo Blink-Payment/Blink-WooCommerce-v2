@@ -713,7 +713,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             {
                 $order->update_status($status, $note);
                 $response =  [
-                    'status' => 200,
                     'order_id' => $order_id,
                     'order_status' => $status,
                 ];
