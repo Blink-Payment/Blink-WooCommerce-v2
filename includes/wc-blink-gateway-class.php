@@ -778,13 +778,18 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         if ( empty( $_REQUEST['res'] ) ) {
             return;
         }
-
+        
         $wc_order = wc_get_order( $order_id );
         if ( ! $wc_order->needs_payment()) {
             return;
         }
 
         $transaction        = wc_clean( wp_unslash( $_REQUEST['res'] ) );
+
+        if ( $wc_order->get_meta('blink_res', true) == $transaction) {
+            return;
+        }
+
         $transaction_result = $this->validate_transaction( $transaction );
 
         if ( $transaction_result ) {
@@ -793,6 +798,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
             $wc_order->update_meta_data( '_blink_status', $status );
             $wc_order->update_meta_data( 'payment_type', $source );
+            $wc_order->update_meta_data( 'blink_res', $transaction );
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
             $wc_order->add_order_note( 'Pay by '. $source );
 
@@ -800,7 +806,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             {
                     $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
             } 
-            elseif (strpos(strtolower($status),'direct debit'))
+            else if (strpos(strtolower($source),'direct debit') !== false)
             {
                     $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
 
