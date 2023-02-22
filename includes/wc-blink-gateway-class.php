@@ -795,15 +795,18 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         if ( $transaction_result ) {
             $status = strtolower( $transaction_result['status'] );
             $source = strtolower( $transaction_result['payment_source'] );
+            $message = strtolower( $transaction_result['message'] );
 
             $wc_order->update_meta_data( '_blink_status', $status );
             $wc_order->update_meta_data( 'payment_type', $source );
             $wc_order->update_meta_data( 'blink_res', $transaction );
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
             $wc_order->add_order_note( 'Pay by '. $source );
+            $wc_order->add_order_note( 'Transaction Note: '. $message );
 
             if ( 'captured' === strtolower($status) || 'success' === strtolower($status) ) 
             {
+                    $wc_order->add_order_note( 'Transaction status - '. $status );
                     $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
             } 
             else if (strpos(strtolower($source),'direct debit') !== false)
