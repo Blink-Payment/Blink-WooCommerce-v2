@@ -793,9 +793,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         $transaction_result = $this->validate_transaction( $transaction );
 
         if ( $transaction_result ) {
-            $status = strtolower( $transaction_result['status'] );
-            $source = strtolower( $transaction_result['payment_source'] );
-            $message = strtolower( $transaction_result['message'] );
+            $status = $transaction_result['status'] ?? '';
+            $source = $transaction_result['payment_source'] ?? '';
+            $message = $transaction_result['message'] ?? '';
 
             $wc_order->update_meta_data( '_blink_status', $status );
             $wc_order->update_meta_data( 'payment_type', $source );
