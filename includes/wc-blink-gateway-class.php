@@ -41,10 +41,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
         // if needed we can use this webhook
         add_action( 'woocommerce_api_wc_'.$this->id, array( $this, 'webhook' ) );
+        add_action( 'woocommerce_before_thankyou', array( $this, 'check_response' ) );
         add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response' ) );
+        add_filter( 'woocommerce_endpoint_order-received_title', array( $this, 'change_title' ), 99 );
         // We need custom JavaScript to obtain a token
         add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
-
+        
         $this->accessToken  = '';
         $this->paymentIntent = '';
         $this->formElements = '';
@@ -635,7 +637,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             )
         );
 
-
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
             if(isset($apiBody['acsform'])){
@@ -670,7 +671,20 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         // we need it to get any order detailes
         $order = wc_get_order( $order_id );
         $request = $_POST;
+
+        if ( count( WC()->cart->get_cart() ) == 0 ) {
+            $items = $order->get_items();
+            foreach ( $items as $item ) {
+                $quantity = $item['quantity'];
+                $product_id = $item['product_id'];
+                $variation_id = $item['variation_id'];
+                WC()->cart->add_to_cart( $product_id, $quantity, $variation_id );
+            }
+        }
+        
+
         $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$order_id;
+
         return array(
             'result'   => 'success',
             'redirect' => $redirect,
@@ -681,24 +695,28 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
     /*
      * In case we need a webhook, like PayPal IPN etc
      */
-    public function webhook() {
+    public function webhook() 
+    {
+      $headers = getallheaders();
+      if($headers['Api-Key'] === $this->api_key && $headers['Secret-Key'] === $this->secret_key)
+      { 
+        $request  = $_POST; 
+        $order_id = $request['order_id'] ?? '';
+        $action = $request['action'] ?? '';
+        $status = $request['status'] ?? '';
+        $note = $request['note'] ?? '';
 
-      $request  = $_POST; 
-      $order_id = $request['order_id'] ?? '';
-      $action = $request['action'] ?? '';
-      $status = $request['status'] ?? '';
-      $note = $request['note'] ?? '';
-
-      if($order_id)
-      {
-        $order = wc_get_order($order_id);
-        if($action == 'update_order_status') 
+        if($order_id)
         {
-            $order->update_status($status, $note);
+            $order = wc_get_order($order_id);
+            if($action == 'update_order_status') 
+            {
+                $order->update_status($status, $note);
 
-        }else{
-            $order->add_meta_data( '_debug', $request );
+            }else{
+                $order->update_meta_data( '_debug', $request );
 
+            }
         }
       }
                 
@@ -738,6 +756,20 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         $this->check_response_for_order( $order_id );
     }
 
+    public function change_title($title)
+    {
+        global $wp;
+        $order_id = $wp->query_vars['order-received'];
+        $this->check_response_for_order( $order_id );
+        $order = wc_get_order($order_id);
+        if ( $order->has_status( 'failed' ) )
+        {
+            return __( 'Order Failed', 'woocommerce' );
+        }
+
+        return $title;
+    }
+
 
 
     public function check_response_for_order( $order_id ) 
@@ -746,31 +778,47 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         if ( empty( $_REQUEST['res'] ) ) {
             return;
         }
-
+        
         $wc_order = wc_get_order( $order_id );
-        if ( ! $wc_order->needs_payment() ) {
+        if ( ! $wc_order->needs_payment()) {
             return;
         }
 
         $transaction        = wc_clean( wp_unslash( $_REQUEST['res'] ) );
+
+        if ( $wc_order->get_meta('blink_res', true) == $transaction) {
+            return;
+        }
+
         $transaction_result = $this->validate_transaction( $transaction );
 
         if ( $transaction_result ) {
-            $status = strtolower( $transaction_result['status'] );
+            $status = $transaction_result['status'] ?? '';
+            $source = $transaction_result['payment_source'] ?? '';
+            $message = $transaction_result['message'] ?? '';
 
-            $wc_order->add_meta_data( '_blink_status', $status );
-            $wc_order->add_meta_data( 'payment_mode', $transaction_result['payment_source'] );
+            $wc_order->update_meta_data( '_blink_status', $status );
+            $wc_order->update_meta_data( 'payment_type', $source );
+            $wc_order->update_meta_data( 'blink_res', $transaction );
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
-            $wc_order->add_order_note( 'Pay by '.$transaction_result['payment_source'] );
+            $wc_order->add_order_note( 'Pay by '. $source );
+            $wc_order->add_order_note( 'Transaction Note: '. $message );
 
-            if ( 'captured' === strtolower($status) || 'success' === strtolower($status) ) {
+            if ( 'captured' === strtolower($status) || 'success' === strtolower($status) ) 
+            {
+                    $wc_order->add_order_note( 'Transaction status - '. $status );
                     $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
-                
-            } else {
-                
+            } 
+            else if (strpos(strtolower($source),'direct debit') !== false)
+            {
                     $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
-                }
+
             }
+            else 
+            {
+                    $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
+            }
+        }
     } 
 
     /**
@@ -784,7 +832,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         if ( ! $order->has_status( array( 'processing', 'completed' ) ) ) {
             $order->add_order_note( $note );
             $order->payment_complete( $txn_id );
-            
+
             if ( isset( WC()->cart ) ) {
                 WC()->cart->empty_cart();
             }
@@ -799,10 +847,26 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
      */
     public function payment_on_hold( $order, $reason = '' ) {
         $order->update_status( 'on-hold', $reason );
+        $order->add_order_note( $reason );
+
 
         if ( isset( WC()->cart ) ) {
             WC()->cart->empty_cart();
         }
+
+        // w
+    }
+
+    /**
+     * Hold order and add note.
+     *
+     * @param  WC_Order $order Order object.
+     * @param  string   $reason Reason why the payment is on hold.
+     */
+    public function payment_failed( $order, $reason = '' ) {
+        $order->update_status( 'failed', $reason );
+        $order->add_order_note( $reason );
+
     }
     
 

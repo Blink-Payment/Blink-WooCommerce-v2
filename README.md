@@ -88,6 +88,11 @@ status = string (required) e.g: [wc-pending, wc-processing, wc-on-hold, wc-compl
 note = string (optional)
 action = 'update_order_status' (required)
 
+Headers:
+api-key = Marchant Api Key
+secret-key = Marchant Secret Key
+
+
 `````
 
 ````
@@ -97,7 +102,7 @@ action = 'update_order_status' (required)
 $curl = curl_init();
 
 curl_setopt_array($curl, array(
-  CURLOPT_URL => '[host url]/wc-api/wc_blink/',
+  CURLOPT_URL => '[Host Url]/wc-api/wc_blink/',
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_ENCODING => '',
   CURLOPT_MAXREDIRS => 10,
@@ -106,6 +111,10 @@ curl_setopt_array($curl, array(
   CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
   CURLOPT_CUSTOMREQUEST => 'POST',
   CURLOPT_POSTFIELDS => array(,,,),
+  CURLOPT_HTTPHEADER => array(
+    'api-key: *******************************',
+    'secret-key: *******************************'
+  ),
 ));
 
 $response = curl_exec($curl);
