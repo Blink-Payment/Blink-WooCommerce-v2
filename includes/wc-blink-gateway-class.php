@@ -712,12 +712,24 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             if($action == 'update_order_status') 
             {
                 $order->update_status($status, $note);
+                $response =  [
+                    'order_id' => $order_id,
+                    'order_status' => $status,
+                ];
+                echo json_encode($response); exit;
 
             }else{
                 $order->update_meta_data( '_debug', $request );
 
             }
         }
+      }
+      else
+      {
+        $response =  [
+            'error' => 'Invalid Api and Secret Key',
+        ];
+        echo json_encode($response); exit;
       }
                 
     }
