@@ -714,7 +714,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
                 $order->update_status($status, $note);
 
             }else{
-                $order->add_meta_data( '_debug', $request );
+                $order->update_meta_data( '_debug', $request );
 
             }
         }
@@ -791,8 +791,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             $status = strtolower( $transaction_result['status'] );
             $source = strtolower( $transaction_result['payment_source'] );
 
-            $wc_order->add_meta_data( '_blink_status', $status );
-            $wc_order->add_meta_data( 'payment_type', $source );
+            $wc_order->update_meta_data( '_blink_status', $status );
+            $wc_order->update_meta_data( 'payment_type', $source );
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
             $wc_order->add_order_note( 'Pay by '. $source );
 
