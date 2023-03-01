@@ -816,7 +816,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             $wc_order->add_order_note( 'Pay by '. $source );
             $wc_order->add_order_note( 'Transaction Note: '. $message );
 
-            if ( 'captured' === strtolower($status) || 'success' === strtolower($status) ) 
+            if ( 'captured' === strtolower($status) || 'success' === strtolower($status) || 'captured' === strtolower($status) || 'accept' === strtolower($status) ) 
             {
                     $wc_order->add_order_note( 'Transaction status - '. $status );
                     $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
