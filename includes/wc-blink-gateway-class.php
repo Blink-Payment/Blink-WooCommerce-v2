@@ -12,7 +12,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         $this->has_fields = true; // in case you need a custom credit card form
         $this->method_title = $configs['method_title'];
         $this->method_description = $configs['method_description'];
-        $this->host_url = ('yes' === $this->get_option( 'testmode' )) ? $configs['test_host_url'].'/api' : $configs['host_url'].'/api';
+        $this->host_url = $configs['host_url'].'/api';
 
         // gateways can support subscriptions, refunds, saved payment methods,
         // but in this tutorial we begin with simple payments
