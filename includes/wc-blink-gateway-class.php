@@ -12,7 +12,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         $this->has_fields = true; // in case you need a custom credit card form
         $this->method_title = $configs['method_title'];
         $this->method_description = $configs['method_description'];
-        $this->host_url = ('yes' === $this->get_option( 'testmode' )) ? $configs['test_host_url'].'/api' : $configs['host_url'].'/api';
+        $this->host_url = $configs['host_url'].'/api';
 
         // gateways can support subscriptions, refunds, saved payment methods,
         // but in this tutorial we begin with simple payments
@@ -816,12 +816,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             $wc_order->add_order_note( 'Pay by '. $source );
             $wc_order->add_order_note( 'Transaction Note: '. $message );
 
-            if ( 'captured' === strtolower($status) || 'success' === strtolower($status) ) 
+            if( 'captured' === strtolower($status) || 'success' === strtolower($status) ) 
             {
                     $wc_order->add_order_note( 'Transaction status - '. $status );
                     $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
             } 
-            else if (strpos(strtolower($source),'direct debit') !== false)
+            else if(strpos(strtolower($source),'direct debit') !== false)
             {
                     $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
 
