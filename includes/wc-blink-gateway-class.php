@@ -43,7 +43,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
         // if needed we can use this webhook
         add_action( 'woocommerce_api_wc_'.$this->id, array( $this, 'webhook' ) );
-        add_action( 'parse_request', array( $this, 'update_order_response' ), 999 );
         add_action( 'woocommerce_before_thankyou', array( $this, 'check_response' ) );
         add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response' ) );
         add_filter( 'woocommerce_endpoint_order-received_title', array( $this, 'change_title' ), 99 );
@@ -510,6 +509,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         'transaction_unique' => $request['transaction_unique'],
         'user_name' => $request['user_name'],
         'user_email' => $request['user_email'],
+        'customer_address' => $request['customer_address'] ?? $request['billing_address_1'].', '.$request['billing_address_2'],
+        'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
         ];
         
 
@@ -566,6 +567,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         'account_holder_name' => $request['account_holder_name'],
         'branch_code' => $request['branch_code'],
         'account_number' => $request['account_number'],
+        'customer_address' => $request['customer_address'] ?? $request['billing_address_1'].', '.$request['billing_address_2'],
+        'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
         'country_code' => 'GB',
         ];
 
@@ -616,6 +619,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         'raw_amount' => $request['amount'],
         'customer_email' => $request['customer_email'] ?? $request['billing_email'],
         'customer_name' => $request['customer_name'] ?? $request['billing_first_name'].' '.$request['billing_last_name'],
+        'customer_address' => $request['customer_address'] ?? $request['billing_address_1'].', '.$request['billing_address_2'],
+        'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
         'transaction_unique' => $request['transaction_unique'],
         'type' => $request['type']
         ];
@@ -757,7 +762,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         ));
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
-            return $apiBody['data'];
+            return $apiBody['data'] ?? [];
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
@@ -767,25 +772,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         wp_redirect($redirect,302);
         exit();
         
-    }
-
-    public function update_order_response($query)
-    {
-        if (  isset($query->query_vars['order-received']) && $query->query_vars['order-received'] !== '' ) 
-        {
-            $order_id = apply_filters( 'woocommerce_thankyou_order_id', absint( $query->query_vars['order-received'] ) );
-            
-            if ( empty( $_REQUEST['res'] ) ) {
-                return;
-            }
-
-            $transaction = wc_clean( wp_unslash( $_REQUEST['res'] ) );
-            $wc_order = wc_get_order( $order_id );
-            $wc_order->update_meta_data( 'blink_res', $transaction );
-            $wc_order->update_meta_data( '_blink_res_expired', 'false' );
-        }
-
-        return $query;
     }
 
     public function check_response()
@@ -824,13 +810,18 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         {
             return;
         }
+        // else
+        // {
+        //     $wc_order->update_meta_data( 'once executed', time() );
+
+        // }
 
         $transaction = $wc_order->get_meta('blink_res', true);
 
 
         $transaction_result = $this->validate_transaction( $transaction );
 
-        if ( $transaction_result ) {
+        if ( !empty($transaction_result) ) {
             $status = $transaction_result['status'] ?? '';
             $source = $transaction_result['payment_source'] ?? '';
             $message = $transaction_result['message'] ?? '';
@@ -841,8 +832,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
             $wc_order->add_order_note( 'Pay by '. $source );
             $wc_order->add_order_note( 'Transaction Note: '. $message );
+            $wc_order->save();
 
-            if( 'captured' === strtolower($status) || 'success' === strtolower($status) ) 
+            if( 'captured' === strtolower($status) || 'success' === strtolower($status) || 'accept' === strtolower($status) ) 
             {
                     $wc_order->add_order_note( 'Transaction status - '. $status );
                     $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
@@ -856,6 +848,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             {
                     $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
             }
+        }
+        else
+        {
+            $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - Null' ) );
+
         }
     } 
 
