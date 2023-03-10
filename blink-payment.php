@@ -39,6 +39,7 @@ function update_order_response($wp)
         $transaction = wc_clean( wp_unslash( $_REQUEST['res'] ) );
         $wc_order = wc_get_order( $order_id );
         $wc_order->update_meta_data( 'blink_res', $transaction );
+        $wc_order->update_meta_data( '_blink_res_expired', 'false' );
         $wc_order->save();
     }
 
