@@ -50,6 +50,8 @@ jQuery(function($){
             
             $form.find('input[name=customer_name]').val(order_params.customer_name);
             $form.find('input[name=customer_email]').val(order_params.customer_email);
+            $form.find('input[name=customer_address]').val(order_params.billing_address_1 + ', ' + order_params.billing_address_2);
+            $form.find('input[name=customer_postcode]').val(order_params.billing_postcode);
             $form.find('input[name=device_timezone]').val(timezone);
             $form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
             $form.find('input[name=device_accept_language]').val(language);
@@ -69,6 +71,8 @@ jQuery(function($){
             $form.find('input[name=family_name]').val(order_params.billing_last_name);
             $form.find('input[name=email]').val(order_params.billing_email);
             $form.find('input[name=account_holder_name]').val(order_params.customer_name);
+            $form.find('input[name=customer_address]').val(order_params.billing_address_1 + ', ' + order_params.billing_address_2);
+            $form.find('input[name=customer_postcode]').val(order_params.billing_postcode);
             } catch(e) {
             //Add your exception handling code here
             }
@@ -79,6 +83,8 @@ jQuery(function($){
             var $form = $('#blink-open');
             $form.find('input[name=user_name]').val(order_params.customer_name);
             $form.find('input[name=user_email]').val(order_params.customer_email);
+            $form.find('input[name=customer_address]').val(order_params.billing_address_1 + ', ' + order_params.billing_address_2);
+            $form.find('input[name=customer_postcode]').val(order_params.billing_postcode);
             } catch(e) {
             //Add your exception handling code here
             }

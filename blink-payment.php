@@ -23,6 +23,28 @@ add_action( 'plugins_loaded', 'blink_init_gateway_class' );
 add_action( 'the_content', 'blink_3d_form_submission' );
 add_action( 'the_content', 'checkBlinkPaymentMethod' );
 add_action( 'init', 'checkFromSubmission' );
+add_action( 'parse_request', 'update_order_response', 999 );
+
+
+function update_order_response($wp)
+{
+    if (  isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '' ) 
+    {
+        $order_id = apply_filters( 'woocommerce_thankyou_order_id', absint( $wp->query_vars['order-received'] ) );
+        
+        if ( empty( $_REQUEST['res'] ) ) {
+            return;
+        }
+
+        $transaction = wc_clean( wp_unslash( $_REQUEST['res'] ) );
+        $wc_order = wc_get_order( $order_id );
+        $wc_order->update_meta_data( 'blink_res', $transaction );
+        $wc_order->update_meta_data( '_blink_res_expired', 'false' );
+        $wc_order->save();
+    }
+
+    return $wp;
+}
 
 function checkOrderPayment($order_id)
 {
