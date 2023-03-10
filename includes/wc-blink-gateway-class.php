@@ -1,8 +1,10 @@
 <?php
 
-class WC_Blink_Gateway extends WC_Payment_Gateway {
+class WC_Blink_Gateway extends WC_Payment_Gateway 
+{
 
-    public function __construct() {
+    public function __construct() 
+    {
 
         $configs = include(dirname(__FILE__) . '/../config.php');
 
@@ -41,6 +43,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
         // if needed we can use this webhook
         add_action( 'woocommerce_api_wc_'.$this->id, array( $this, 'webhook' ) );
+        add_action( 'parse_request', array( $this, 'update_order_response' ), 999 );
         add_action( 'woocommerce_before_thankyou', array( $this, 'check_response' ) );
         add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response' ) );
         add_filter( 'woocommerce_endpoint_order-received_title', array( $this, 'change_title' ), 99 );
@@ -115,7 +118,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
      * @param WC_Order|null $order Order object.
      * @return string
      */
-    public function get_return_url( $order = null ) {
+    public function get_return_url( $order = null ) 
+    {
         if ( $order ) {
             $return_url = $order->get_checkout_order_received_url();
         } else {
@@ -163,7 +167,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
     /**
       * Plugin options, 
       */
-    public function init_form_fields(){
+    public function init_form_fields()
+    {
 
         $this->form_fields = array(
             'enabled' => array(
@@ -248,7 +253,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
     /**
      * credit card form
      */
-    public function payment_fields() {
+    public function payment_fields() 
+    {
 
         if ($this->description) {
             echo wpautop(wp_kses_post($this->description));
@@ -284,7 +290,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
              
     }
 
-    public function payment_scripts() {
+    public function payment_scripts() 
+    {
 
         // we need JavaScript to process a token only on cart/checkout pages, right?
         if ( ! is_cart() && ! is_checkout() && ! isset( $_GET['pay_for_order'] ) ) {
@@ -666,7 +673,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
     /*
      * We're processing the payments here
      */
-    public function process_payment( $order_id ) {
+    public function process_payment( $order_id ) 
+    {
 
         // we need it to get any order detailes
         $order = wc_get_order( $order_id );
@@ -690,7 +698,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             'redirect' => $redirect,
         );
                 
-     }
+    }
 
     /*
      * In case we need a webhook, like PayPal IPN etc
@@ -761,6 +769,25 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         
     }
 
+    public function update_order_response($query)
+    {
+        if (  isset($query->query_vars['order-received']) && $query->query_vars['order-received'] !== '' ) 
+        {
+            $order_id = apply_filters( 'woocommerce_thankyou_order_id', absint( $query->query_vars['order-received'] ) );
+            
+            if ( empty( $_REQUEST['res'] ) ) {
+                return;
+            }
+
+            $transaction = wc_clean( wp_unslash( $_REQUEST['res'] ) );
+            $wc_order = wc_get_order( $order_id );
+            $wc_order->update_meta_data( 'blink_res', $transaction );
+            $wc_order->update_meta_data( '_blink_res_expired', 'false' );
+        }
+
+        return $query;
+    }
+
     public function check_response()
     {
         global $wp;
@@ -774,6 +801,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         $order_id = $wp->query_vars['order-received'];
         $this->check_response_for_order( $order_id );
         $order = wc_get_order($order_id);
+
         if ( $order->has_status( 'failed' ) )
         {
             return __( 'Order Failed', 'woocommerce' );
@@ -787,20 +815,18 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
     public function check_response_for_order( $order_id ) 
     { 
         
-        if ( empty( $_REQUEST['res'] ) ) {
-            return;
-        }
-        
         $wc_order = wc_get_order( $order_id );
         if ( ! $wc_order->needs_payment()) {
             return;
         }
 
-        $transaction        = wc_clean( wp_unslash( $_REQUEST['res'] ) );
-
-        if ( $wc_order->get_meta('blink_res', true) == $transaction) {
+        if ( $wc_order->get_meta('_blink_res_expired', true) == 'true') 
+        {
             return;
         }
+
+        $transaction = $wc_order->get_meta('blink_res', true);
+
 
         $transaction_result = $this->validate_transaction( $transaction );
 
@@ -811,7 +837,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
             $wc_order->update_meta_data( '_blink_status', $status );
             $wc_order->update_meta_data( 'payment_type', $source );
-            $wc_order->update_meta_data( 'blink_res', $transaction );
+            $wc_order->update_meta_data( '_blink_res_expired', 'true' );
             $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
             $wc_order->add_order_note( 'Pay by '. $source );
             $wc_order->add_order_note( 'Transaction Note: '. $message );
@@ -857,7 +883,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
      * @param  WC_Order $order Order object.
      * @param  string   $reason Reason why the payment is on hold.
      */
-    public function payment_on_hold( $order, $reason = '' ) {
+    public function payment_on_hold( $order, $reason = '' ) 
+    {
         $order->update_status( 'on-hold', $reason );
         $order->add_order_note( $reason );
 
@@ -866,7 +893,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
             WC()->cart->empty_cart();
         }
 
-        // w
     }
 
     /**
@@ -886,7 +912,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
     {
         return false;
     }
- } 
+} 
 
 
 
