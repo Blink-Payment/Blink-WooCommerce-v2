@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.0.3
+ * Version: 1.0.4
  */
 
 /*
