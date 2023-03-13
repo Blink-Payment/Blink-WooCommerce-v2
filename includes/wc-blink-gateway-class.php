@@ -43,8 +43,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
         // if needed we can use this webhook
         add_action( 'woocommerce_api_wc_'.$this->id, array( $this, 'webhook' ) );
-        add_action( 'woocommerce_before_thankyou', array( $this, 'check_response' ) );
-        add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response' ) );
+        add_action( 'woocommerce_thankyou_blink', array( $this, 'check_response_for_order' ) );
         add_filter( 'woocommerce_endpoint_order-received_title', array( $this, 'change_title' ), 99 );
         // We need custom JavaScript to obtain a token
         add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
@@ -774,18 +773,10 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         
     }
 
-    public function check_response()
-    {
-        global $wp;
-        $order_id = apply_filters( 'woocommerce_thankyou_order_id', absint( $wp->query_vars['order-received'] ) );
-        $this->check_response_for_order( $order_id );
-    }
-
     public function change_title($title)
     {
         global $wp;
         $order_id = $wp->query_vars['order-received'];
-        $this->check_response_for_order( $order_id );
         $order = wc_get_order($order_id);
 
         if ( $order->has_status( 'failed' ) )
@@ -800,59 +791,61 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
     public function check_response_for_order( $order_id ) 
     { 
-        
-        $wc_order = wc_get_order( $order_id );
-        if ( ! $wc_order->needs_payment()) {
-            return;
-        }
-
-        if ( $wc_order->get_meta('_blink_res_expired', true) == 'true') 
+        if($order_id)
         {
-            return;
-        }
-        // else
-        // {
-        //     $wc_order->update_meta_data( 'once executed', time() );
+            $wc_order = wc_get_order( $order_id );
+            if ( ! $wc_order->needs_payment()) {
+                return;
+            }
 
-        // }
-
-        $transaction = $wc_order->get_meta('blink_res', true);
-
-
-        $transaction_result = $this->validate_transaction( $transaction );
-
-        if ( !empty($transaction_result) ) {
-            $status = $transaction_result['status'] ?? '';
-            $source = $transaction_result['payment_source'] ?? '';
-            $message = $transaction_result['message'] ?? '';
-
-            $wc_order->update_meta_data( '_blink_status', $status );
-            $wc_order->update_meta_data( 'payment_type', $source );
-            $wc_order->update_meta_data( '_blink_res_expired', 'true' );
-            $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
-            $wc_order->add_order_note( 'Pay by '. $source );
-            $wc_order->add_order_note( 'Transaction Note: '. $message );
-            $wc_order->save();
-
-            if( 'captured' === strtolower($status) || 'success' === strtolower($status) || 'accept' === strtolower($status) ) 
+            if ( $wc_order->get_meta('_blink_res_expired', true) == 'true') 
             {
-                    $wc_order->add_order_note( 'Transaction status - '. $status );
-                    $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
-            } 
-            else if(strpos(strtolower($source),'direct debit') !== false)
+                return;
+            }
+            // else
+            // {
+            //     $wc_order->update_meta_data( 'once executed', time() );
+
+            // }
+
+            $transaction = $wc_order->get_meta('blink_res', true);
+
+
+            $transaction_result = $this->validate_transaction( $transaction );
+
+            if ( !empty($transaction_result) ) {
+                $status = $transaction_result['status'] ?? '';
+                $source = $transaction_result['payment_source'] ?? '';
+                $message = $transaction_result['message'] ?? '';
+
+                $wc_order->update_meta_data( '_blink_status', $status );
+                $wc_order->update_meta_data( 'payment_type', $source );
+                $wc_order->update_meta_data( '_blink_res_expired', 'true' );
+                $wc_order->set_transaction_id( $transaction_result['transaction_id'] );
+                $wc_order->add_order_note( 'Pay by '. $source );
+                $wc_order->add_order_note( 'Transaction Note: '. $message );
+                $wc_order->save();
+
+                if( 'captured' === strtolower($status) || 'success' === strtolower($status) || 'accept' === strtolower($status) ) 
+                {
+                        $wc_order->add_order_note( 'Transaction status - '. $status );
+                        $this->payment_complete( $wc_order, $transaction_result['transaction_id'], __( 'Blink payment completed', 'woocommerce' ) );
+                } 
+                else if(strpos(strtolower($source),'direct debit') !== false)
+                {
+                        $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
+
+                }
+                else 
+                {
+                        $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
+                }
+            }
+            else
             {
-                    $this->payment_on_hold( $wc_order, sprintf( __( 'Payment pending (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
+                $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - Null' ) );
 
             }
-            else 
-            {
-                    $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - '.$status ) );
-            }
-        }
-        else
-        {
-            $this->payment_failed( $wc_order, sprintf( __( 'Payment Failed (%s).', 'woocommerce' ), 'Transaction status - Null' ) );
-
         }
     } 
 

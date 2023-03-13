@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.0.3
+ * Version: 1.0.4
  */
 
 /*
@@ -23,8 +23,36 @@ add_action( 'plugins_loaded', 'blink_init_gateway_class' );
 add_action( 'the_content', 'blink_3d_form_submission' );
 add_action( 'the_content', 'checkBlinkPaymentMethod' );
 add_action( 'init', 'checkFromSubmission' );
-add_action( 'parse_request', 'update_order_response', 999 );
+add_action( 'parse_request', 'update_order_response', 99 );
+add_action( 'wp', 'check_order_response', 999 );
 
+function check_order_response($wp)
+{ 
+    global $wp;
+    $order_id = 0;
+
+    if (  isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '' ) 
+    {
+        $order_id = apply_filters( 'woocommerce_thankyou_order_id', absint( $wp->query_vars['order-received'] ) );
+        
+    }
+    else {
+        // Check if the order ID exists.
+		if ( !empty( $_GET['key'] ) || !empty( $_GET['order'] ) ) {
+         $order_id  = absint( apply_filters( 'woocommerce_thankyou_order_id', absint( $_GET['order'] ?? 0 ) ) );
+		}
+    }
+
+    if($order_id){  
+        $gateWay = new WC_Blink_Gateway();
+        $gateWay->check_response_for_order($order_id);
+
+    }
+
+    return $wp;
+    
+
+}
 
 function update_order_response($wp)
 {
