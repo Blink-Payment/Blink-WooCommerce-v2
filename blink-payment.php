@@ -25,6 +25,13 @@ add_action( 'the_content', 'checkBlinkPaymentMethod' );
 add_action( 'init', 'checkFromSubmission' );
 add_action( 'parse_request', 'update_order_response', 99 );
 add_action( 'wp', 'check_order_response', 999 );
+add_filter( 'http_request_timeout', 'timeout_extend', 99 );
+
+function timeout_extend( $time )
+{
+    // Default timeout is 5
+    return 10;
+}
 
 function check_order_response($wp)
 { 
@@ -116,10 +123,10 @@ function checkBlinkPaymentMethod($content)
 {
     if(isset($_GET['blinkPay']) && $_GET['blinkPay'] !== '')
     {
+        
             checkOrderPayment($_GET['blinkPay']);
             $gateWay = new WC_Blink_Gateway();
             if(isset($_GET['p']) && in_array($_GET['p'],$gateWay->paymentMethods)){
-
             
                 $gateWay->accessToken = $gateWay->generate_access_token();
                 $gateWay->paymentIntent = $gateWay->create_payment_intent($_GET['p']);
