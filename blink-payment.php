@@ -116,10 +116,10 @@ function checkBlinkPaymentMethod($content)
 {
     if(isset($_GET['blinkPay']) && $_GET['blinkPay'] !== '')
     {
+        
             checkOrderPayment($_GET['blinkPay']);
             $gateWay = new WC_Blink_Gateway();
             if(isset($_GET['p']) && in_array($_GET['p'],$gateWay->paymentMethods)){
-
             
                 $gateWay->accessToken = $gateWay->generate_access_token();
                 $gateWay->paymentIntent = $gateWay->create_payment_intent($_GET['p']);

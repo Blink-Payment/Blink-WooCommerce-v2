@@ -85,6 +85,18 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
      }
 
+     public function checkAPIException($response, $redirect)
+     {
+        if(isset($response['error']))
+        {
+            wc_add_notice(  $response['error'], 'error' );
+            wp_redirect($redirect,302);
+            exit();
+        }
+
+        return;
+     }
+
      public function generate_access_token()
      {
         $request = $_GET;
@@ -98,13 +110,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             )
         );
 
+        $redirect = trailingslashit(wc_get_checkout_url());
+
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+            $this->checkAPIException($apiBody, $redirect);
             return $apiBody['access_token'] ?: '';
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
-            $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$request['blinkPay'];
             wp_redirect($redirect,302);
             exit();
         }
@@ -150,13 +164,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             )
         );
 
+        $redirect = trailingslashit(wc_get_checkout_url());
+
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+            $this->checkAPIException($apiBody, $redirect);
             return $apiBody;
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
-            $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$request['blinkPay'];
             wp_redirect($redirect,302);
             exit();
         }
@@ -429,13 +445,16 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'body'        => $requestData
             )
         );
+
+        $redirect = trailingslashit(wc_get_checkout_url()).'?p='.$request['payment_by'].'&blinkPay='.$order->get_id();
+
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+            $this->checkAPIException($apiBody, $redirect);
             return $apiBody['payment_intent'];
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
-            $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$order->get_id();
             wp_redirect($redirect,302);
             exit();
         }
@@ -486,7 +505,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             
             if($errors > 0)
             {
-                $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$order_id;
+                $redirect = trailingslashit(wc_get_checkout_url()).'?p='.$request['payment_by'].'&blinkPay='.$order_id;
                 wp_redirect($redirect,302);
                 exit();
     
@@ -529,22 +548,23 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'body'        => $requestData
             )
         );
+
+        $redirect = trailingslashit(wc_get_checkout_url()).'?p=open-banking&blinkPay='.$order_id;
+
         
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+            $this->checkAPIException($apiBody, $redirect);
             if($apiBody['redirect_url'])
             {
                 $redirect = $apiBody['redirect_url'];
             }
             else{
                 wc_add_notice(  'Something Wrong! Please try again', 'error' );
-                $redirect = wc_get_checkout_url();
-
             }
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
-            $redirect = wc_get_checkout_url();
         }
 
         wp_redirect($redirect,302);
@@ -587,22 +607,24 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'body'        => $requestData
             )
         );
+
+        $redirect = trailingslashit(wc_get_checkout_url()).'?p=direct-debit&blinkPay='.$order_id;
+
         
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+            $this->checkAPIException($apiBody, $redirect);
             if($apiBody['url'])
             {
                 $redirect = $apiBody['url'];
             }
             else{
                 wc_add_notice(  'Something Wrong! Please try again', 'error' );
-                $redirect = wc_get_checkout_url();
 
             }
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
-            $redirect = wc_get_checkout_url();
         }
 
         wp_redirect($redirect,302);
@@ -648,25 +670,26 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             )
         );
 
+        $redirect = trailingslashit(wc_get_checkout_url()).'?p=credit-card&blinkPay='.$order_id;
+
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+            $this->checkAPIException($apiBody, $redirect);
             if(isset($apiBody['acsform'])){
             $threedToken = $apiBody['acsform'];
             set_transient( 'blink3dProcess'.$order_id, $threedToken, 300 );
-            $redirect = site_url('checkout').'/?blink3dprocess='.$order_id;
+            $redirect = trailingslashit(wc_get_checkout_url()).'?blink3dprocess='.$order_id;
             }elseif($apiBody['url'])
             {
                 $redirect = $apiBody['url'];
             }
             else{
                 wc_add_notice(  'Something Wrong! Please try again', 'error' );
-                $redirect = wc_get_checkout_url();
             }
 
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
-            $redirect = wc_get_checkout_url();
         }
 
         wp_redirect($redirect,302);
@@ -695,7 +718,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         }
         
 
-        $redirect = site_url('checkout').'/?p='.$request['payment_by'].'&blinkPay='.$order_id;
+        $redirect = trailingslashit(wc_get_checkout_url()).'?p='.$request['payment_by'].'&blinkPay='.$order_id;
 
         return array(
             'result'   => 'success',
@@ -759,13 +782,16 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 'Authorization' => 'Bearer '.$this->accessToken,
             )
         ));
+
+        $redirect = trailingslashit(wc_get_checkout_url());
+
         if ( ! is_wp_error( $response ) ) {
             $apiBody = json_decode( wp_remote_retrieve_body( $response ), true );
+            $this->checkAPIException($apiBody, $redirect);
             return $apiBody['data'] ?? [];
         } else {
             $error_message = $response->get_error_message();
             wc_add_notice(  $error_message, 'error' );
-            $redirect = wc_get_checkout_url();
         }
 
         wp_redirect($redirect,302);
