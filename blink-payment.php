@@ -25,6 +25,13 @@ add_action( 'the_content', 'checkBlinkPaymentMethod' );
 add_action( 'init', 'checkFromSubmission' );
 add_action( 'parse_request', 'update_order_response', 99 );
 add_action( 'wp', 'check_order_response', 999 );
+add_filter( 'http_request_timeout', 'timeout_extend', 99 );
+
+function timeout_extend( $time )
+{
+    // Default timeout is 5
+    return 10;
+}
 
 function check_order_response($wp)
 { 
