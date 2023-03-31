@@ -50,6 +50,7 @@ function check_order_response($wp)
 
     if ($order_id) {
         $gateWay = new WC_Blink_Gateway();
+        $gateWay->accessToken = $gateWay->generate_access_token();
         $gateWay->check_response_for_order($order_id);
     }
 
@@ -92,7 +93,6 @@ function checkFromSubmission()
         $request = $_POST;
         $order_id = $_POST['order_id'];
         $order = checkOrderPayment($_POST['order_id']);
-        $gateWay->update_payment_information($order, $request);
 
         if ($request['payment_by'] == 'credit-card') {
             $gateWay->processCreditCard($order_id, $request);
@@ -116,7 +116,7 @@ function checkBlinkPaymentMethod($content)
 
         if (isset($_GET['p']) && in_array($_GET['p'], $gateWay->paymentMethods)) {
             $gateWay->accessToken = $gateWay->generate_access_token();
-            $gateWay->paymentIntent = $gateWay->create_payment_intent($_GET['p']);
+            $gateWay->paymentIntent = $gateWay->create_payment_intent();
             if (isset($gateWay->paymentIntent['payment_intent'])) {
                 $string = implode(' ', array_map('ucfirst', explode('-', $_GET['p'])));
                 $html =    wc_print_notices();
