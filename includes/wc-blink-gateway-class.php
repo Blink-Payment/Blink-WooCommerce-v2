@@ -331,7 +331,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         // in most payment processors you have to use API KEY and SECRET KEY to obtain a token
         wp_localize_script('woocommerce_blink_payment', 'blink_params', array(
             'apiKey' => $this->api_key,
-            'secretKey' => $this->secret_key
+            'secretKey' => $this->secret_key,
+            'remoteAddress' => $_SERVER['REMOTE_ADDR']
         ));
 
         if (isset($_GET['blinkPay']) && $_GET['blinkPay'] !== '') {
