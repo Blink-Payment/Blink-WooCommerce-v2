@@ -62,11 +62,11 @@ function update_order_response($wp)
     if (isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '') {
         $order_id = apply_filters('woocommerce_thankyou_order_id', absint($wp->query_vars['order-received']));
 
-        if (empty($_REQUEST['res'])) {
+        if (empty($_REQUEST['transaction_id'])) {
             return;
         }
 
-        $transaction = wc_clean(wp_unslash($_REQUEST['res']));
+        $transaction = wc_clean(wp_unslash($_REQUEST['transaction_id']));
         $wc_order = wc_get_order($order_id);
         $wc_order->update_meta_data('blink_res', $transaction);
         $wc_order->update_meta_data('_blink_res_expired', 'false');
