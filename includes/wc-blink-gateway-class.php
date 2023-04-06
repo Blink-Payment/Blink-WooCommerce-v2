@@ -628,7 +628,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         if ('captured' === strtolower($status) || 'success' === strtolower($status) || 'accept' === strtolower($status)) {
             $wc_order->add_order_note('Transaction status - ' . $status);
             $this->payment_complete($wc_order, $transaction_id, $note ?? __('Blink payment completed', 'woocommerce'));
-        } else if (strpos(strtolower($source), 'direct debit') !== false) {
+        } else if (strpos(strtolower($source), 'direct debit') !== false || 'pending submission' === strtolower($status)) {
             $this->payment_on_hold($wc_order, $note ?? sprintf(__('Payment pending (%s).', 'woocommerce'), 'Transaction status - ' . $status));
         } else {
             $this->payment_failed($wc_order, $note ?? sprintf(__('Payment Failed (%s).', 'woocommerce'), 'Transaction status - ' . $status));
@@ -641,35 +641,44 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     public function webhook()
     {
        global $wpdb;
-       
+       $order_id = '';
+
        $body  =  file_get_contents('php://input');
        if($body)
        {
            $request = json_decode($body, true);
        }
        $transaction_id = $request['transaction_id'] ?? '';
-       $order_id = $wpdb->get_var("SELECT `post_id`
-       FROM ".$wpdb->postmeta."
-       WHERE (`meta_key` = '_transaction_id' AND `meta_value` = '".$transaction_id."') OR (`meta_key` = 'blink_res' AND `meta_value` = '".$transaction_id."')");
-       $status = $request['status'] ?? '';
-       $note = $request['note'] ?? '';
+       if($transaction_id){
+            $marchant_data = $request['merchant_data'];
+            if(!empty($marchant_data)){
+                $order_id = $marchant_data['order_info']['order_id'] ?? '';
+            }
+            if(!$order_id){
+                $order_id = $wpdb->get_var("SELECT `post_id`
+                FROM ".$wpdb->postmeta."
+                WHERE (`meta_key` = '_transaction_id' AND `meta_value` = '".$transaction_id."') OR (`meta_key` = 'blink_res' AND `meta_value` = '".$transaction_id."')");
+            }
 
-       if ($order_id) {
-           $order = wc_get_order($order_id);
-           $this->change_status($order, $transaction_id, $status, $note);
-           $order->update_meta_data('_debug', $body);
+            $status = $request['status'] ?? '';
+            $note = $request['note'] ?? '';
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $this->change_status($order, $transaction_id, $status, $note);
+                $order->update_meta_data('_debug', $body);
 
-               $response =  [
-                   'order_id' => $order_id,
-                   'order_status' => $status,
-               ];
-               echo json_encode($response);
-               exit;
-       }
-       $response =  [
-           'transaction_id' => $transaction_id,
-           'error' => 'no order found with this transaction id',
-       ];
+                    $response =  [
+                        'order_id' => $order_id,
+                        'order_status' => $status,
+                    ];
+                    echo json_encode($response);
+                    exit;
+            }
+        }
+        $response =  [
+            'transaction_id' => $transaction_id ?? null,
+            'error' => 'no order found with this transaction id',
+        ];
        echo json_encode($response);
        exit;
     }
