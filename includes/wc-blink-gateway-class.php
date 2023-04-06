@@ -623,7 +623,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         );
     }
 
-    public function change_status($wc_order, $transaction_id, $status = '', $note = '', $source = '')
+    public function change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null )
     {
         if ('captured' === strtolower($status) || 'success' === strtolower($status) || 'accept' === strtolower($status)) {
             $wc_order->add_order_note('Transaction status - ' . $status);
@@ -664,7 +664,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             $note = $request['note'] ?? '';
             $order = wc_get_order($order_id);
             if ($order) {
-                $this->change_status($order, $transaction_id, $status, $note);
+                $this->change_status($order, $transaction_id, $status, '', $note);
                 $order->update_meta_data('_debug', $body);
 
                     $response =  [
@@ -776,7 +776,10 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     public function payment_complete($order, $txn_id = '', $note = '')
     {
         if (!$order->has_status(array('processing', 'completed'))) {
-            $order->add_order_note($note);
+            if($note){
+                $order->add_order_note($note);
+            }
+
             $order->payment_complete($txn_id);
 
             if (isset(WC()->cart)) {
@@ -794,7 +797,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     public function payment_on_hold($order, $reason = '')
     {
         $order->update_status('on-hold', $reason);
-        $order->add_order_note($reason);
+        if($reason){
+            $order->add_order_note($reason);
+        }
 
         if (isset(WC()->cart)) {
             WC()->cart->empty_cart();
@@ -810,7 +815,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     public function payment_failed($order, $reason = '')
     {
         $order->update_status('failed', $reason);
-        $order->add_order_note($reason);
+        if($reason){
+            $order->add_order_note($reason);
+        }
     }
 
     public function capture_payment()
