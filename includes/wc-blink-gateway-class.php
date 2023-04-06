@@ -47,38 +47,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $this->accessToken  = '';
         $this->paymentIntent = '';
-        $this->formElements = '';
         $this->elementMap  = [
             'credit-card' => 'ccElement',
             'direct-debit' => 'ddElement',
             'open-banking' => 'obElement',
         ];
-    }
-
-    public function generate_form_element()
-    {
-        $requestData = [
-            'payment_intent' => $this->paymentIntent['payment_intent'],
-        ];
-
-        $url = $this->host_url . '/pay/v1/elements';
-        $response = $response = wp_remote_post(
-            $url,
-            array(
-                'method'      => 'POST',
-                'headers' => array(
-                    'Authorization' => 'Bearer ' . $this->accessToken,
-                ),
-                'body'        => $requestData
-            )
-        );
-        if (!is_wp_error($response)) {
-            $apiBody = json_decode(wp_remote_retrieve_body($response), true);
-            return $apiBody;
-        } else {
-            $error_message = $response->get_error_message();
-            throw new Exception($error_message);
-        }
     }
 
     public function checkAPIException($response, $redirect)
@@ -138,16 +111,18 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         return apply_filters('woocommerce_get_return_url', $return_url, $order);
     }
 
-    public function create_payment_intent($payment_type)
+    public function create_payment_intent()
     {
         global $woocommerce;
         $request = $_GET;
+        $order = wc_get_order($request['blinkPay'] ?? '');
+        $payment_type = $request['p'] ?? '';
 
         $requestData = [
             'amount' => $woocommerce->cart->total,
             'payment_type' => $payment_type,
             'currency' => get_woocommerce_currency(),
-            'return_url' => $this->get_return_url(),
+            'return_url' => $this->get_return_url($order),
             'notification_url' => WC()->api_request_url('wc_blink_gateway'),
         ];
 
@@ -331,7 +306,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         // in most payment processors you have to use API KEY and SECRET KEY to obtain a token
         wp_localize_script('woocommerce_blink_payment', 'blink_params', array(
             'apiKey' => $this->api_key,
-            'secretKey' => $this->secret_key
+            'secretKey' => $this->secret_key,
+            'remoteAddress' => $_SERVER['REMOTE_ADDR']
         ));
 
         if (isset($_GET['blinkPay']) && $_GET['blinkPay'] !== '') {
@@ -356,14 +332,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     public function get_customer_data($order)
     {
         return array(
-            'user_name' => ($a = get_userdata($order->get_user_id())) ? $a->user_email : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-            'user_email' => ($a = get_userdata($order->get_user_id())) ? $a->user_email : $order->get_billing_email(),
             'customer_id' => $order->get_user_id(),
-            'customer_user' => $order->get_user_id(),
             'customer_name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
             'customer_email' => $order->get_billing_email(),
-            'customer_address' => $order->get_billing_address_1() . ',' . $order->get_billing_address_2(),
-            'customer_postcode' => $order->get_billing_postcode(),
             'billing_first_name' => $order->get_billing_first_name(),
             'billing_last_name' => $order->get_billing_last_name(),
             'billing_company' => $order->get_billing_company(),
@@ -384,7 +355,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'order_id' => $order->get_id(),
             'order_number' => $order->get_order_number(),
             'order_date' => date('Y-m-d H:i:s', strtotime(get_post($order->get_id())->post_date)),
-            'status' => $order->get_status(),
             'shipping_total' => $order->get_total_shipping(),
             'shipping_tax_total' => wc_format_decimal($order->get_shipping_tax(), 2),
             'tax_total' => wc_format_decimal($order->get_total_tax(), 2),
@@ -393,61 +363,14 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'discount_total' => wc_format_decimal($order->get_total_discount(), 2),
             'order_total' => wc_format_decimal($order->get_total(), 2),
             'order_currency' => $order->get_currency(),
-            'payment_method' => $order->get_payment_method(),
-            'shipping_method' => $order->get_shipping_method(),
-            'shipping_first_name' => $order->get_shipping_first_name(),
-            'shipping_last_name' => $order->get_shipping_last_name(),
-            'shipping_company' => $order->get_shipping_company(),
-            'shipping_address_1' => $order->get_shipping_address_1(),
-            'shipping_address_2' => $order->get_shipping_address_2(),
-            'shipping_postcode' => $order->get_shipping_postcode(),
-            'shipping_city' => $order->get_shipping_city(),
-            'shipping_state' => $order->get_shipping_state(),
-            'shipping_country' => $order->get_shipping_country(),
             'customer_note' => $order->get_customer_note(),
-            'download_permissions' => $order->is_download_permitted() ? $order->is_download_permitted() : 0,
         );
     }
 
-    public function update_payment_information($order, $request)
+    public function get_payment_information($order_id)
     {
-        $requestData = [
-            'payment_intent' => $request['payment_intent'],
-            'return_url' => $this->get_return_url($order),
-            'notification_url' => WC()->api_request_url('wc_blink_gateway'),
-            'user_metadata' => json_encode(
-                $this->get_customer_data($order)
-            ),
-            'item_metadata' => json_encode(
-                $this->get_order_data($order)
-            ),
-        ];
-
-        $url = $this->host_url . '/pay/v1/intents/' . $request['intent_id'];
-
-        $response = wp_remote_request(
-            $url,
-            array(
-                'method'      => 'PATCH',
-                'headers' => array(
-                    'Authorization' => 'Bearer ' . $this->accessToken,
-                ),
-                'body'        => $requestData
-            )
-        );
-
-        $redirect = trailingslashit(wc_get_checkout_url()) . '?p=' . $request['payment_by'] . '&blinkPay=' . $order->get_id();
-
-        if (!is_wp_error($response)) {
-            $apiBody = json_decode(wp_remote_retrieve_body($response), true);
-            $this->checkAPIException($apiBody, $redirect);
-            return $apiBody['payment_intent'];
-        } else {
-            $error_message = $response->get_error_message();
-            wc_add_notice($error_message, 'error');
-            wp_redirect($redirect, 302);
-            exit();
-        }
+        $order = wc_get_order($order_id);
+        return json_encode(['payer_info' => $this->get_customer_data($order), 'order_info' => $this->get_order_data($order)]);
     }
 
     public function validate_fields($request = [], $order_id = '')
@@ -513,6 +436,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'user_email' => $request['user_email'],
             'customer_address' => $request['customer_address'] ?? $request['billing_address_1'] . ', ' . $request['billing_address_2'],
             'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
+            'merchant_data' => $this->get_payment_information($order_id),
         ];
 
         $url = $this->host_url . '/pay/v1/openbankings';
@@ -531,10 +455,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 'body'        => $requestData
             )
         );
+        
 
         $redirect = trailingslashit(wc_get_checkout_url()) . '?p=open-banking&blinkPay=' . $order_id;
 
-        if (!is_wp_error($response)) {
+        if (wp_remote_retrieve_response_code($response) == 200) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             if ($apiBody['redirect_url']) {
@@ -543,7 +468,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 wc_add_notice('Something Wrong! Please try again', 'error');
             }
         } else {
-            $error_message = $response->get_error_message();
+            $error_message = wp_remote_retrieve_response_message($response);
             wc_add_notice($error_message, 'error');
         }
 
@@ -567,6 +492,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'account_number' => $request['account_number'],
             'customer_address' => $request['customer_address'] ?? $request['billing_address_1'] . ', ' . $request['billing_address_2'],
             'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
+            'merchant_data' => $this->get_payment_information($order_id),
+
         ];
 
         $url = $this->host_url . '/pay/v1/directdebits';
@@ -589,7 +516,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $redirect = trailingslashit(wc_get_checkout_url()) . '?p=direct-debit&blinkPay=' . $order_id;
 
-        if (!is_wp_error($response)) {
+        if (wp_remote_retrieve_response_code($response) == 200) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             if ($apiBody['url']) {
@@ -598,7 +525,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 wc_add_notice('Something Wrong! Please try again', 'error');
             }
         } else {
-            $error_message = $response->get_error_message();
+            $error_message = wp_remote_retrieve_response_message($response);
             wc_add_notice($error_message, 'error');
         }
 
@@ -617,7 +544,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'customer_name' => $request['customer_name'] ?? $request['billing_first_name'] . ' ' . $request['billing_last_name'],
             'customer_address' => $request['customer_address'] ?? $request['billing_address_1'] . ', ' . $request['billing_address_2'],
             'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
-            'transaction_unique' => $request['transaction_unique']
+            'transaction_unique' => $request['transaction_unique'],
+            'merchant_data' => $this->get_payment_information($order_id),
         ];
 
         if (isset($request['remote_address'])) {
@@ -647,7 +575,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $redirect = trailingslashit(wc_get_checkout_url()) . '?p=credit-card&blinkPay=' . $order_id;
 
-        if (!is_wp_error($response)) {
+        if (wp_remote_retrieve_response_code($response) == 200) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             if (isset($apiBody['acsform'])) {
@@ -660,7 +588,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 wc_add_notice('Something Wrong! Please try again', 'error');
             }
         } else {
-            $error_message = $response->get_error_message();
+            $error_message = wp_remote_retrieve_response_message($response);
             wc_add_notice($error_message, 'error');
         }
 
@@ -733,7 +661,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
     public function validate_transaction($transaction)
     {
-        $responseCode = base64_decode($transaction);
+        $responseCode = $transaction ?? '';
 
         $url = $this->host_url . '/pay/v1/transactions/' . $responseCode;
         $response = wp_remote_get($url, array(
@@ -745,12 +673,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $redirect = trailingslashit(wc_get_checkout_url());
 
-        if (!is_wp_error($response)) {
+        if (wp_remote_retrieve_response_code($response) == 200) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             return $apiBody['data'] ?? [];
         } else {
-            $error_message = $response->get_error_message();
+            $error_message = wp_remote_retrieve_response_message($response);
             wc_add_notice($error_message, 'error');
         }
 

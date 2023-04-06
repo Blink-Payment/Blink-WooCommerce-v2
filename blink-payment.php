@@ -50,6 +50,7 @@ function check_order_response($wp)
 
     if ($order_id) {
         $gateWay = new WC_Blink_Gateway();
+        $gateWay->accessToken = $gateWay->generate_access_token();
         $gateWay->check_response_for_order($order_id);
     }
 
@@ -61,11 +62,11 @@ function update_order_response($wp)
     if (isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '') {
         $order_id = apply_filters('woocommerce_thankyou_order_id', absint($wp->query_vars['order-received']));
 
-        if (empty($_REQUEST['res'])) {
+        if (empty($_REQUEST['transaction_id'])) {
             return;
         }
 
-        $transaction = wc_clean(wp_unslash($_REQUEST['res']));
+        $transaction = wc_clean(wp_unslash($_REQUEST['transaction_id']));
         $wc_order = wc_get_order($order_id);
         $wc_order->update_meta_data('blink_res', $transaction);
         $wc_order->update_meta_data('_blink_res_expired', 'false');
@@ -92,7 +93,6 @@ function checkFromSubmission()
         $request = $_POST;
         $order_id = $_POST['order_id'];
         $order = checkOrderPayment($_POST['order_id']);
-        $gateWay->update_payment_information($order, $request);
 
         if ($request['payment_by'] == 'credit-card') {
             $gateWay->processCreditCard($order_id, $request);
@@ -116,9 +116,8 @@ function checkBlinkPaymentMethod($content)
 
         if (isset($_GET['p']) && in_array($_GET['p'], $gateWay->paymentMethods)) {
             $gateWay->accessToken = $gateWay->generate_access_token();
-            $gateWay->paymentIntent = $gateWay->create_payment_intent($_GET['p']);
+            $gateWay->paymentIntent = $gateWay->create_payment_intent();
             if (isset($gateWay->paymentIntent['payment_intent'])) {
-                $gateWay->formElements = $gateWay->generate_form_element();
                 $string = implode(' ', array_map('ucfirst', explode('-', $_GET['p'])));
                 $html =    wc_print_notices();
                 $html .= '<section class="blink-api-section">
@@ -126,36 +125,26 @@ function checkBlinkPaymentMethod($content)
                                 <h2 class="heading-text">Pay with ' . $string . '</h2>
                                 <section class="blink-api-tabs-content">';
 
-                if ($_GET['p'] == 'credit-card' && $gateWay->formElements['element']['ccElement']) {
+                if ($_GET['p'] == 'credit-card' && $gateWay->paymentIntent['element']['ccElement']) {
 
                     $html .= '<div id="tab1" class="tab-contents active">
                                             <form name="blink-card" id="blink-card" method="POST" action="">
-                                                ' . $gateWay->formElements['element']['ccElement'] . '
-                                                <input type="hidden" name="type" value="1">
-                                                <input type="hidden" name="device_timezone" value="0">
-                                                <input type="hidden" name="device_capabilities" value="">
-                                                <input type="hidden" name="device_accept_language" value="">
-                                                <input type="hidden" name="device_screen_resolution" value="">
-                                                <input type="hidden" name="remote_address" value="' . $_SERVER['REMOTE_ADDR'] . '">';
+                                                ' . $gateWay->paymentIntent['element']['ccElement'];
                 }
-                if ($_GET['p'] == 'direct-debit' && $gateWay->formElements['element']['ddElement']) {
+                if ($_GET['p'] == 'direct-debit' && $gateWay->paymentIntent['element']['ddElement']) {
                     $html .= '<div id="tab1" class="tab-contents active">
                                             <form name="blink-debit" id="blink-debit" method="POST" action="">
-                                                ' . $gateWay->formElements['element']['ddElement'] . '
-                                                <input type="hidden" name="type" value="1">
-                                                <input type="hidden" name="remote_address" value="' . $_SERVER['REMOTE_ADDR'] . '">';
+                                                ' . $gateWay->paymentIntent['element']['ddElement'];
                 }
 
-                if ($_GET['p'] == 'open-banking' && $gateWay->formElements['element']['obElement']) {
+                if ($_GET['p'] == 'open-banking' && $gateWay->paymentIntent['element']['obElement']) {
                     $html .= '<div id="tab1" class="tab-contents active">
                                             <form name="blink-open" id="blink-open" method="POST" action="">
-                                                ' . $gateWay->formElements['element']['obElement'] . '
-                                                <input type="hidden" name="type" value="1">
-                                                <input type="hidden" name="remote_address" value="' . $_SERVER['REMOTE_ADDR'] . '">';
+                                                ' . $gateWay->paymentIntent['element']['obElement'];
                 }
 
-                $html .= '<input type="hidden" name="transaction_unique" value="' . $gateWay->formElements['transaction_unique'] . '">
-                                                <input type="hidden" name="amount" value="' . $gateWay->formElements['raw_amount'] . '">
+                $html .= '<input type="hidden" name="transaction_unique" value="' . $gateWay->paymentIntent['transaction_unique'] . '">
+                                                <input type="hidden" name="amount" value="' . $gateWay->paymentIntent['amount'] . '">
                                                 <input type="hidden" name="intent_id" value="' . $gateWay->paymentIntent['id'] . '">
                                                 <input type="hidden" name="intent" value="' . $gateWay->paymentIntent['payment_intent'] . '">
                                                 <input type="hidden" name="access_token" value="' . $gateWay->accessToken . '">

@@ -52,6 +52,8 @@ jQuery(function ($) {
                 $form.find('input[name=device_accept_language]').val(language);
                 $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
                     screen_depth);
+                $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
+    
             } catch (e) {
                 //Add your exception handling code here
             }
