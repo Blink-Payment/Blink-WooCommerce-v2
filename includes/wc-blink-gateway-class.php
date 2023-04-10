@@ -4,14 +4,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 {
     public function __construct()
     {
-        $configs = include(dirname(__FILE__) . '/../config.php');
-
-        $this->id = str_replace(' ', '', strtolower($configs['method_title']));
+        $this->configs = include(dirname(__FILE__) . '/../config.php');
+        $this->id = str_replace(' ', '', strtolower($this->configs['method_title']));
         $this->icon = plugins_url('/../assets/img/logo.png', __FILE__);
         $this->has_fields = true; // in case you need a custom credit card form
-        $this->method_title = $configs['method_title'];
-        $this->method_description = $configs['method_description'];
-        $this->host_url = $configs['host_url'] . '/api';
+        $this->method_title = $this->configs['method_title'];
+        $this->method_description = $this->configs['method_description'];
+        $this->host_url = $this->configs['host_url'] . '/api';
 
         // gateways can support subscriptions, refunds, saved payment methods,
         // but in this tutorial we begin with simple payments
@@ -19,22 +18,28 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             'products'
         );
 
-        // Method with all the options fields
-        $this->init_form_fields();
-
         // Load the settings.
         $this->init_settings();
         $this->title = $this->get_option('title');
         $this->description = $this->get_option('description');
         $this->enabled = $this->get_option('enabled');
         $this->testmode = 'yes' === $this->get_option('testmode');
-        $paymentMethods[] = ('yes' === $this->get_option('credit_card')) ? 'credit-card' : '';
-        $paymentMethods[] = ('yes' === $this->get_option('direct_debit')) ? 'direct-debit' : '';
-        $paymentMethods[] = ('yes' === $this->get_option('open_banking')) ? 'open-banking' : '';
-        $this->paymentMethods = array_filter($paymentMethods);
-
         $this->api_key = $this->testmode ? $this->get_option('test_api_key') : $this->get_option('api_key');
         $this->secret_key = $this->testmode ? $this->get_option('test_secret_key') : $this->get_option('secret_key');
+
+        $payment_types = $this->generate_access_token('payment_types') ?? [];
+        $paymentMethods = [];
+        foreach($payment_types as $type)
+        {
+            $paymentMethods[] = ('yes' === $this->get_option($type)) ? $type : '';
+        }
+        $this->paymentMethods = array_filter($paymentMethods);
+
+        $this->add_error_notices($payment_types);
+
+
+        // Method with all the options fields
+        $this->init_form_fields($payment_types);
 
         // This action hook saves the settings
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
@@ -54,6 +59,34 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         ];
     }
 
+    public function add_error_notices($payment_types = []){
+        if($this->api_key && $this->secret_key)
+        {
+            $adminnotice = new WC_Admin_Notices();
+            if(!empty($payment_types))
+            { 
+                if(empty($this->paymentMethods))
+                {
+                    if(!$adminnotice->has_notice('no-payment-type-selected')){
+                        $adminnotice->add_custom_notice("no-payment-type-selected","<div>Please select the Payment Methods and save the configuration!</div>");
+                        $adminnotice->output_custom_notices();
+                    }
+                }else{
+                    $adminnotice->remove_notice('no-payment-type-selected');
+                }
+                $adminnotice->remove_notice('no-payment-types');
+
+            } else {
+
+                if(!$adminnotice->has_notice('no-payment-types')){
+                $adminnotice->add_custom_notice("no-payment-types","<div>There is no Payment Types Available</div>");
+                $adminnotice->output_custom_notices();
+                }
+
+            }
+        }
+    }
+
     public function checkAPIException($response, $redirect)
     {
         if (isset($response['error'])) {
@@ -65,7 +98,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         return;
     }
 
-    public function generate_access_token()
+    public function generate_access_token($returnVar = 'access_token')
     {
         $request = $_GET;
         $url = $this->host_url . '/pay/v1/tokens';
@@ -82,15 +115,19 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $redirect = trailingslashit(wc_get_checkout_url());
 
-        if (!is_wp_error($response)) {
+        if (wp_remote_retrieve_response_code($response) == 200) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
-            return $apiBody['access_token'] ?: '';
+            return $apiBody[$returnVar] ?: '';
         } else {
-            $error_message = $response->get_error_message();
+            $error_message = wp_remote_retrieve_response_message($response);
+            if(is_admin()){
+                return '';
+            }
             wc_add_notice($error_message, 'error');
             wp_redirect($redirect, 302);
             exit();
+            
         }
     }
 
@@ -155,9 +192,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     /**
      * Plugin options, 
      */
-    public function init_form_fields()
+    public function init_form_fields($payment_types = [])
     {
-        $this->form_fields = array(
+        $fields =  array(
             'enabled' => array(
                 'title'       => 'Enable/Disable',
                 'label'       => 'Enable Blink Gateway',
@@ -177,33 +214,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 'type'        => 'textarea',
                 'description' => 'This controls the description which the user sees during checkout.',
                 'default'     => 'Pay with your credit card or direct debit at your convenience.',
-            ),
-            'pay_methods' => array(
-                'title'       => 'Payment Methods',
-                'label'       => '',
-                'type'        => 'hidden',
-                'description' => '',
-                'default'     => '',
-            ),
-            'credit_card' => array(
-                'title'       => '',
-                'label'       => 'Credit Card',
-                'type'        => 'checkbox',
-                'default'     => 'yes',
-            ),
-            'direct_debit' => array(
-                'title'       => '',
-                'label'       => 'Direct Debit',
-                'type'        => 'checkbox',
-                'description' => '',
-                'default'     => 'yes',
-            ),
-            'open_banking' => array(
-                'title'       => '',
-                'label'       => 'Open Banking',
-                'type'        => 'checkbox',
-                'description' => '',
-                'default'     => 'yes',
             ),
             'testmode' => array(
                 'title'       => 'Test mode',
@@ -235,6 +245,34 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 'description' => 'Do not include style tag',
             )
         );
+        if($this->api_key && $this->secret_key)
+        {
+            if(!empty($payment_types))
+            { 
+                $pay_methods['pay_methods'] = array(
+                    'title'       => 'Payment Methods',
+                    'label'       => '',
+                    'type'        => 'hidden',
+                    'description' => '',
+                    'default'     => '',
+                 );
+                $fields = insertArrayAtPosition($fields, $pay_methods,count($fields)-1);
+                foreach($payment_types as $types)
+                {
+                    $payment[$types] = array(
+                            'title'       => '',
+                            'label'       => ucwords(str_replace('-',' ',$types)),
+                            'type'        => 'checkbox',
+                            'description' => '',
+                            'default'     => 'no',
+                    );
+                    $fields = insertArrayAtPosition($fields, $payment,count($fields)-1);
+                }
+
+            }
+        }
+
+        $this->form_fields = $fields;
     }
 
     /**
@@ -242,9 +280,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
      */
     public function payment_fields()
     {
-        if ($this->description) {
-            echo wpautop(wp_kses_post($this->description));
-        }
+        if (is_array($this->paymentMethods) && empty($this->paymentMethods)) {
+            echo wpautop(wp_kses_post('Unable to process any payment at this moment!'));
+        } else {
+            if ($this->description) {
+                echo wpautop(wp_kses_post($this->description));
+            }
+        } 
 
         if (is_array($this->paymentMethods) && !empty($this->paymentMethods)) { ?>
             <section class="blink-api-section">
@@ -265,12 +307,20 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                                 <a href="javascript:void(0);" onclick="updatePaymentBy('open-banking')"> Pay with Open Banking</a>
                             </div>
                         <?php } ?>
-                        <input type="hidden" name="payment_by" id="payment_by" value="">
+                        <input type="hidden" name="payment_by" id="payment_by" value="" />
                     </section>
                 </div>
             </section>
 
-<?php
+        <?php } else { ?>
+
+            <section class="blink-api-section">
+                <div class="blink-api-form-stracture">
+                   <input type="hidden" name="payment_by" id="payment_by" value="" />
+                </div>
+            </section>
+
+        <?php 
         }
     }
 

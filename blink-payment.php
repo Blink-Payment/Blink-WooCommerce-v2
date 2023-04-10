@@ -224,6 +224,7 @@ function blink_init_gateway_class()
 
     add_filter('plugin_action_links', 'add_wc_blink_payment_action_plugin', 10, 5);
 
+    include(dirname(__FILE__) . '/includes/helper.php');
     include(dirname(__FILE__) . '/includes/wc-blink-gateway-class.php');
 
     add_filter('woocommerce_payment_gateways', 'blink_add_gateway_class');
