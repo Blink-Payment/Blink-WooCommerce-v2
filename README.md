@@ -81,46 +81,44 @@ Following js files need to be added in payment form page
 ## Order status update example"
 
 `````
-Fields:
-
-order_id = int (required)
-status = string (required) e.g: [wc-pending, wc-processing, wc-on-hold, wc-completed, wc-cancelled, wc-refunded, wc-failed]
-note = string (optional)
-action = 'update_order_status' (required)
-
 Headers:
-api-key = Marchant Api Key
-secret-key = Marchant Secret Key
+
+Content-Type string
+Content type is JSON.
+
+Attributes:
+
+'transaction_id' string
+Transaction id.
+
+'status' string
+The new status of the transaction.
+
+'note' string
+Notification note.
+
+'merchant_data' json
+JSON string of all the optional data sent by the merchant.
 
 
 `````
 
 ````
+POST http://my_domain/wc-api/wc_blink_gateway/  HTTP/1.1
+Content-Type: application/json
 
-<?php
+{
+    "transaction_id": "BL-****",
+    "status": "Captured",
+    "note": "Status changes to Captured",
+    "merchant_data": {
+        "order_info":
+        {
+            "order_id":195,
+        }
+    }
+}
 
-$curl = curl_init();
-
-curl_setopt_array($curl, array(
-  CURLOPT_URL => '[Host Url]/wc-api/wc_blink/',
-  CURLOPT_RETURNTRANSFER => true,
-  CURLOPT_ENCODING => '',
-  CURLOPT_MAXREDIRS => 10,
-  CURLOPT_TIMEOUT => 0,
-  CURLOPT_FOLLOWLOCATION => true,
-  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-  CURLOPT_CUSTOMREQUEST => 'POST',
-  CURLOPT_POSTFIELDS => array(,,,),
-  CURLOPT_HTTPHEADER => array(
-    'api-key: *******************************',
-    'secret-key: *******************************'
-  ),
-));
-
-$response = curl_exec($curl);
-
-curl_close($curl);
-echo $response;
 
 `````
 
