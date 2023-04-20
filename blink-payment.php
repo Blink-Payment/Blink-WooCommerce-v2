@@ -90,6 +90,7 @@ function checkFromSubmission()
 {
     if (isset($_POST['action']) && $_POST['action'] == 'blinkSubmitPayment') {
         $gateWay = new WC_Blink_Gateway();
+        $gateWay->accessToken = $gateWay->generate_access_token();
         $request = $_POST;
         $order_id = $_POST['order_id'];
         $order = checkOrderPayment($_POST['order_id']);
