@@ -478,14 +478,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     public function processOpenBanking($order_id, $request)
     {
         $this->validate_fields($request, $order_id);
+        $order = wc_get_order($order_id);
 
         $requestData = [
             'merchant_id' => $request['merchant_id'],
             'payment_intent' => $request['payment_intent'],
-            'user_name' => $request['user_name'],
-            'user_email' => $request['user_email'],
-            'customer_address' => $request['customer_address'] ?? $request['billing_address_1'] . ', ' . $request['billing_address_2'],
-            'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
+            'user_name' => $request['user_name'] ?? $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'user_email' => $request['user_email'] ?? $order->get_billing_email(),
+            'customer_address' => $request['customer_address'] ?? $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(),
+            'customer_postcode' => $request['customer_postcode'] ?? $order->get_billing_postcode(),
             'merchant_data' => $this->get_payment_information($order_id),
         ];
 
@@ -529,19 +530,20 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     public function processDirectDebit($order_id, $request)
     {
         $this->validate_fields($request, $order_id);
+        $order = wc_get_order($order_id);
 
         $requestData = [
             'payment_intent' => $request['payment_intent'],
-            'given_name' => $request['given_name'],
+            'given_name' => $request['given_name'] ?? $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
             'family_name' => $request['family_name'],
             'company_name' => $request['company_name'],
-            'email' => $request['email'],
+            'email' => $request['email'] ?? $order->get_billing_email(),
             'country_code' => 'GB',
             'account_holder_name' => $request['account_holder_name'],
             'branch_code' => $request['branch_code'],
             'account_number' => $request['account_number'],
-            'customer_address' => $request['customer_address'] ?? $request['billing_address_1'] . ', ' . $request['billing_address_2'],
-            'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
+            'customer_address' => $request['customer_address'] ?? $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(),
+            'customer_postcode' => $request['customer_postcode'] ?? $order->get_billing_postcode(),
             'merchant_data' => $this->get_payment_information($order_id),
 
         ];
