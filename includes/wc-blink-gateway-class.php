@@ -585,15 +585,17 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
     public function processCreditCard($order_id, $request)
     {
+        $order = wc_get_order($order_id);
+
         $requestData = [
             'payment_intent' => $request['payment_intent'],
             'paymentToken' => $request['paymentToken'],
             'type' => $request['type'],
             'raw_amount' => $request['amount'],
-            'customer_email' => $request['customer_email'] ?? $request['billing_email'],
-            'customer_name' => $request['customer_name'] ?? $request['billing_first_name'] . ' ' . $request['billing_last_name'],
-            'customer_address' => $request['customer_address'] ?? $request['billing_address_1'] . ', ' . $request['billing_address_2'],
-            'customer_postcode' => $request['customer_postcode'] ?? $request['billing_postcode'],
+            'customer_email' => $request['customer_email'] ?? $order->get_billing_email(),
+            'customer_name' => $request['customer_name'] ?? $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'customer_address' => $request['customer_address'] ?? $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(),
+            'customer_postcode' => $request['customer_postcode'] ?? $order->get_billing_postcode(),
             'transaction_unique' => $request['transaction_unique'],
             'merchant_data' => $this->get_payment_information($order_id),
         ];
