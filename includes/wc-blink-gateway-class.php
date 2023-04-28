@@ -879,4 +879,3 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         return false;
     }
 }
-?>
