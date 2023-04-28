@@ -28,14 +28,12 @@ add_action('parse_request', 'update_order_response', 99);
 add_action('wp', 'check_order_response', 999);
 add_filter('http_request_timeout', 'timeout_extend', 99);
 
-function timeout_extend($time)
-{
+function timeout_extend($time) {
     // Default timeout is 5
     return 10;
 }
 
-function check_order_response($wp)
-{
+function check_order_response($wp) {
     global $wp;
     $order_id = 0;
 
@@ -57,8 +55,7 @@ function check_order_response($wp)
     return $wp;
 }
 
-function update_order_response($wp)
-{
+function update_order_response($wp) {
     if (isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '') {
         $order_id = apply_filters('woocommerce_thankyou_order_id', absint($wp->query_vars['order-received']));
 
@@ -76,8 +73,7 @@ function update_order_response($wp)
     return $wp;
 }
 
-function checkOrderPayment($order_id)
-{
+function checkOrderPayment($order_id) {
     $order = wc_get_order($order_id);
     if (!$order->needs_payment()) {
         wc_add_notice('Something Wrong! Please initate the payment from checkout page', 'error');
@@ -86,8 +82,7 @@ function checkOrderPayment($order_id)
     return $order;
 }
 
-function checkFromSubmission()
-{
+function checkFromSubmission() {
     if (isset($_POST['action']) && $_POST['action'] == 'blinkSubmitPayment') {
         $gateWay = new WC_Blink_Gateway();
         $gateWay->accessToken = $_POST['access_token'] ?? $gateWay->generate_access_token();
@@ -109,8 +104,7 @@ function checkFromSubmission()
     }
 }
 
-function checkBlinkPaymentMethod($content)
-{
+function checkBlinkPaymentMethod($content) {
     if (isset($_GET['blinkPay']) && $_GET['blinkPay'] !== '') {
         checkOrderPayment($_GET['blinkPay']);
         $gateWay = new WC_Blink_Gateway();
@@ -170,8 +164,7 @@ function checkBlinkPaymentMethod($content)
     return $content;
 }
 
-function blink_3d_form_submission($content)
-{
+function blink_3d_form_submission($content) {
     if (isset($_GET['blink3dprocess']) && $_GET['blink3dprocess'] !== '') {
         $token = get_transient('blink3dProcess' . $_GET['blink3dprocess']);
         $html = '<div class="blink-loading">Loading&#8230;</div><div class="3d-content">' . $token . '</div>';
@@ -191,14 +184,12 @@ function blink_3d_form_submission($content)
 /**
  * WooCommerce fallback notice.
  */
-function wc_blink_missing_notice()
-{
+function wc_blink_missing_notice() {
     /* translators: 1. URL link. */
     echo '<div class="error"><p><strong>' . sprintf(esc_html__('Blink requires WooCommerce to be installed and active. You can download %s here.', 'blink'), '<a href="https://woocommerce.com/" target="_blank">WooCommerce</a>') . '</strong></p></div>';
 }
 
-function add_wc_blink_payment_action_plugin($actions, $plugin_file)
-{
+function add_wc_blink_payment_action_plugin($actions, $plugin_file) {
     static $plugin;
 
     if (!isset($plugin)) {
@@ -216,8 +207,7 @@ function add_wc_blink_payment_action_plugin($actions, $plugin_file)
     return $actions;
 }
 
-function blink_init_gateway_class()
-{
+function blink_init_gateway_class() {
     if (!class_exists('WooCommerce')) {
         add_action('admin_notices', 'wc_blink_missing_notice');
         return;
