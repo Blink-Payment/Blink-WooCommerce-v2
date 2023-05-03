@@ -15,6 +15,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         $this->method_title = $this->configs["method_title"];
         $this->method_description = $this->configs["method_description"];
         $this->host_url = $this->configs["host_url"] . "/api";
+        $this->version = $this->configs["version"];
 
         // gateways can support subscriptions, refunds, saved payment methods,
         // but in this tutorial we begin with simple payments
@@ -33,11 +34,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             ? $this->get_option("test_secret_key")
             : $this->get_option("secret_key");
 
-        $payment_types = $this->generate_access_token("payment_types") ?: [];
+        $payment_types = $this->generate_access_token("payment_types");
         $paymentMethods = [];
-        foreach ($payment_types as $type) {
-            $paymentMethods[] = "yes" === $this->get_option($type) ? $type : "";
+        if (is_array($payment_types)) {
+            foreach ($payment_types as $type) {
+                $paymentMethods[] =
+                    "yes" === $this->get_option($type) ? $type : "";
+            }
         }
+
         $this->paymentMethods = array_filter($paymentMethods);
 
         $this->add_error_notices($payment_types);
@@ -130,7 +135,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         if (wp_remote_retrieve_response_code($response) == 200) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
-            return $apiBody[$returnVar] ?: "";
+            return !empty($apiBody[$returnVar]) ? $apiBody[$returnVar] : "";
         } else {
             $error_message = wp_remote_retrieve_response_message($response);
             if (is_admin()) {
@@ -167,8 +172,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
     {
         global $woocommerce;
         $request = $_GET;
-        $order = wc_get_order($request["blinkPay"] ?: "");
-        $payment_type = $request["p"] ?: "";
+        $blinkPid = !empty($request["blinkPay"]) ? $request["blinkPay"] : "";
+        $order = wc_get_order($blinkPid);
+        $payment_type = !empty($request["p"]) ? $request["p"] : "";
 
         $requestData = [
             "amount" => $woocommerce->cart->total,
@@ -340,9 +346,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
 <?php } else { ?>
 
-<section class="blink-api-section">
-    <div class="blink-api-form-stracture">
-        <input type="hidden" name="payment_by" id="payment_by" value="" />
+<section class='blink-api-section'>
+    <div class='blink-api-form-stracture'>
+        <input type='hidden' name='payment_by' id='payment_by' value='' />
     </div>
 </section>
 
@@ -374,30 +380,35 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         // let's suppose it is our payment processor JavaScript that allows to obtain a token
         wp_enqueue_script(
             "blink_js",
-            "https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js"
+            "https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js",
+            [],
+            $this->version
         );
         wp_register_style(
             "woocommerce_blink_payment_style",
             plugins_url("/../assets/css/style.css", __FILE__),
-            []
+            [],
+            $this->version
         );
 
         // and this is our custom JS in your plugin directory that works with token.js
         wp_register_script(
             "woocommerce_blink_payment",
             plugins_url("/../assets/js/custom.js", __FILE__),
-            ["jquery", "blink_js"]
+            ["jquery", "blink_js"],
+            $this->version
         );
 
         // in most payment processors you have to use API KEY and SECRET KEY to obtain a token
         wp_localize_script("woocommerce_blink_payment", "blink_params", [
             "apiKey" => $this->api_key,
             "secretKey" => $this->secret_key,
-            "remoteAddress" => $_SERVER["REMOTE_ADDR"],
+            "remoteAddress" => sanitize_text_field($_SERVER["REMOTE_ADDR"]),
         ]);
 
-        if (isset($_GET["blinkPay"]) && $_GET["blinkPay"] !== "") {
-            $order_id = $_GET["blinkPay"];
+        $blinkPay = sanitize_text_field($_GET["blinkPay"]);
+        if (isset($blinkPay) && $blinkPay !== "") {
+            $order_id = $blinkPay;
             $order = wc_get_order($order_id);
             wp_localize_script(
                 "woocommerce_blink_payment",
@@ -549,20 +560,22 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         $requestData = [
             "merchant_id" => $request["merchant_id"],
             "payment_intent" => $request["payment_intent"],
-            "user_name" =>
-                $request["user_name"] ?:
-                $order->get_billing_first_name() .
+            "user_name" => !empty($request["user_name"])
+                ? $request["user_name"]
+                : $order->get_billing_first_name() .
                     " " .
                     $order->get_billing_last_name(),
-            "user_email" =>
-                $request["user_email"] ?: $order->get_billing_email(),
-            "customer_address" =>
-                $request["customer_address"] ?:
-                $order->get_billing_address_1() .
+            "user_email" => !empty($request["user_email"])
+                ? $request["user_email"]
+                : $order->get_billing_email(),
+            "customer_address" => !empty($request["customer_address"])
+                ? $request["customer_address"]
+                : $order->get_billing_address_1() .
                     ", " .
                     $order->get_billing_address_2(),
-            "customer_postcode" =>
-                $request["customer_postcode"] ?: $order->get_billing_postcode(),
+            "customer_postcode" => !empty($request["customer_postcode"])
+                ? $request["customer_postcode"]
+                : $order->get_billing_postcode(),
             "merchant_data" => $this->get_payment_information($order_id),
         ];
 
@@ -572,8 +585,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             "method" => "POST",
             "headers" => [
                 "Authorization" => "Bearer " . $this->accessToken,
-                "user-agent" => $_SERVER["HTTP_USER_AGENT"],
-                "accept" => $_SERVER["HTTP_ACCEPT"],
+                "user-agent" => !empty($_SERVER["HTTP_USER_AGENT"])
+                    ? sanitize_text_field($_SERVER["HTTP_USER_AGENT"])
+                    : "",
+                "accept" => !empty($_SERVER["HTTP_ACCEPT"])
+                    ? sanitize_text_field($_SERVER["HTTP_ACCEPT"])
+                    : "",
                 "accept-encoding" => "gzip, deflate, br",
                 "accept-charset" => "charset=utf-8",
             ],
@@ -585,7 +602,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             "?p=open-banking&blinkPay=" .
             $order_id;
 
-        if (wp_remote_retrieve_response_code($response) == 200) {
+        if (200 == wp_remote_retrieve_response_code($response)) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             if ($apiBody["redirect_url"]) {
@@ -609,25 +626,28 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $requestData = [
             "payment_intent" => $request["payment_intent"],
-            "given_name" =>
-                $request["given_name"] ?:
-                $order->get_billing_first_name() .
+            "given_name" => !empty($request["given_name"])
+                ? $request["given_name"]
+                : $order->get_billing_first_name() .
                     " " .
                     $order->get_billing_last_name(),
             "family_name" => $request["family_name"],
             "company_name" => $request["company_name"],
-            "email" => $request["email"] ?: $order->get_billing_email(),
+            "email" => !empty($request["email"])
+                ? $request["email"]
+                : $order->get_billing_email(),
             "country_code" => "GB",
             "account_holder_name" => $request["account_holder_name"],
             "branch_code" => $request["branch_code"],
             "account_number" => $request["account_number"],
-            "customer_address" =>
-                $request["customer_address"] ?:
-                $order->get_billing_address_1() .
+            "customer_address" => !empty($request["customer_address"])
+                ? $request["customer_address"]
+                : $order->get_billing_address_1() .
                     ", " .
                     $order->get_billing_address_2(),
-            "customer_postcode" =>
-                $request["customer_postcode"] ?: $order->get_billing_postcode(),
+            "customer_postcode" => !empty($request["customer_postcode"])
+                ? $request["customer_postcode"]
+                : $order->get_billing_postcode(),
             "merchant_data" => $this->get_payment_information($order_id),
         ];
 
@@ -637,8 +657,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             "method" => "POST",
             "headers" => [
                 "Authorization" => "Bearer " . $this->accessToken,
-                "user-agent" => $_SERVER["HTTP_USER_AGENT"],
-                "accept" => $_SERVER["HTTP_ACCEPT"],
+                "user-agent" => !empty($_SERVER["HTTP_USER_AGENT"])
+                    ? sanitize_text_field($_SERVER["HTTP_USER_AGENT"])
+                    : "",
+                "accept" => !empty($_SERVER["HTTP_ACCEPT"])
+                    ? sanitize_text_field($_SERVER["HTTP_ACCEPT"])
+                    : "",
                 "accept-encoding" => "gzip, deflate, br",
                 "accept-charset" => "charset=utf-8",
             ],
@@ -650,7 +674,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             "?p=direct-debit&blinkPay=" .
             $order_id;
 
-        if (wp_remote_retrieve_response_code($response) == 200) {
+        if (200 == wp_remote_retrieve_response_code($response)) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             if ($apiBody["url"]) {
@@ -676,20 +700,22 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             "paymentToken" => $request["paymentToken"],
             "type" => $request["type"],
             "raw_amount" => $request["amount"],
-            "customer_email" =>
-                $request["customer_email"] ?: $order->get_billing_email(),
-            "customer_name" =>
-                $request["customer_name"] ?:
-                $order->get_billing_first_name() .
+            "customer_email" => !empty($request["customer_email"])
+                ? $request["customer_email"]
+                : $order->get_billing_email(),
+            "customer_name" => !empty($request["customer_name"])
+                ? $request["customer_name"]
+                : $order->get_billing_first_name() .
                     " " .
                     $order->get_billing_last_name(),
-            "customer_address" =>
-                $request["customer_address"] ?:
-                $order->get_billing_address_1() .
+            "customer_address" => !empty($request["customer_address"])
+                ? $request["customer_address"]
+                : $order->get_billing_address_1() .
                     ", " .
                     $order->get_billing_address_2(),
-            "customer_postcode" =>
-                $request["customer_postcode"] ?: $order->get_billing_postcode(),
+            "customer_postcode" => !empty($request["customer_postcode"])
+                ? $request["customer_postcode"]
+                : $order->get_billing_postcode(),
             "transaction_unique" => $request["transaction_unique"],
             "merchant_data" => $this->get_payment_information($order_id),
         ];
@@ -710,8 +736,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             "method" => "POST",
             "headers" => [
                 "Authorization" => "Bearer " . $this->accessToken,
-                "user-agent" => $_SERVER["HTTP_USER_AGENT"],
-                "accept" => $_SERVER["HTTP_ACCEPT"],
+                "user-agent" => !empty($_SERVER["HTTP_USER_AGENT"])
+                    ? sanitize_text_field($_SERVER["HTTP_USER_AGENT"])
+                    : "",
+                "accept" => !empty($_SERVER["HTTP_ACCEPT"])
+                    ? sanitize_text_field($_SERVER["HTTP_ACCEPT"])
+                    : "",
                 "accept-encoding" => "gzip, deflate, br",
                 "accept-charset" => "charset=utf-8",
             ],
@@ -723,7 +753,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             "?p=credit-card&blinkPay=" .
             $order_id;
 
-        if (wp_remote_retrieve_response_code($response) == 200) {
+        if (200 == wp_remote_retrieve_response_code($response)) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             if (isset($apiBody["acsform"])) {
@@ -756,7 +786,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         $order = wc_get_order($order_id);
         $request = $_POST;
 
-        if (count(WC()->cart->get_cart()) == 0) {
+        if (0 == count(WC()->cart->get_cart())) {
             $items = $order->get_items();
             foreach ($items as $item) {
                 $quantity = $item["quantity"];
@@ -795,7 +825,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             $this->payment_complete(
                 $wc_order,
                 $transaction_id,
-                $note ?: __("Blink payment completed", "woocommerce")
+                !empty($note)
+                    ? $note
+                    : __("Blink payment completed", "woocommerce")
             );
         } elseif (
             strpos(strtolower($source), "direct debit") !== false ||
@@ -803,20 +835,22 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         ) {
             $this->payment_on_hold(
                 $wc_order,
-                $note ?:
-                sprintf(
-                    __("Payment pending (%s).", "woocommerce"),
-                    "Transaction status - " . $status
-                )
+                !empty($note)
+                    ? $note
+                    : sprintf(
+                        __("Payment pending (%s).", "woocommerce"),
+                        "Transaction status - " . $status
+                    )
             );
         } else {
             $this->payment_failed(
                 $wc_order,
-                $note ?:
-                sprintf(
-                    __("Payment Failed (%s).", "woocommerce"),
-                    "Transaction status - " . $status
-                )
+                !empty($note)
+                    ? $note
+                    : sprintf(
+                        __("Payment Failed (%s).", "woocommerce"),
+                        "Transaction status - " . $status
+                    )
             );
         }
     }
@@ -833,11 +867,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         if ($body) {
             $request = json_decode($body, true);
         }
-        $transaction_id = $request["transaction_id"] ?: "";
+        $transaction_id = !empty($request["transaction_id"])
+            ? $request["transaction_id"]
+            : "";
         if ($transaction_id) {
             $marchant_data = $request["merchant_data"];
             if (!empty($marchant_data)) {
-                $order_id = $marchant_data["order_info"]["order_id"] ?: "";
+                $order_id = !empty($marchant_data["order_info"]["order_id"])
+                    ? $marchant_data["order_info"]["order_id"]
+                    : "";
             }
             if (!$order_id) {
                 $order_id = $wpdb->get_var(
@@ -853,8 +891,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 );
             }
 
-            $status = $request["status"] ?: "";
-            $note = $request["note"] ?: "";
+            $status = !empty($request["status"]) ? $request["status"] : "";
+            $note = !empty($request["note"]) ? $request["note"] : "";
             $order = wc_get_order($order_id);
             if ($order) {
                 $this->change_status(
@@ -875,7 +913,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             }
         }
         $response = [
-            "transaction_id" => $transaction_id ?: null,
+            "transaction_id" => !empty($transaction_id)
+                ? $transaction_id
+                : null,
             "error" => "no order found with this transaction id",
         ];
         echo json_encode($response);
@@ -884,7 +924,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
     public function validate_transaction($transaction)
     {
-        $responseCode = $transaction ?: "";
+        $responseCode = !empty($transaction) ? $transaction : "";
 
         $url = $this->host_url . "/pay/v1/transactions/" . $responseCode;
         $response = wp_remote_get($url, [
@@ -896,10 +936,10 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $redirect = trailingslashit(wc_get_checkout_url());
 
-        if (wp_remote_retrieve_response_code($response) == 200) {
+        if (200 == wp_remote_retrieve_response_code($response)) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
-            return $apiBody["data"] ?: [];
+            return !empty($apiBody["data"]) ? $apiBody["data"] : [];
         } else {
             $error_message = wp_remote_retrieve_response_message($response);
             wc_add_notice($error_message, "error");
@@ -938,9 +978,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
             $transaction_result = $this->validate_transaction($transaction);
 
             if (!empty($transaction_result)) {
-                $status = $transaction_result["status"] ?: "";
-                $source = $transaction_result["payment_source"] ?: "";
-                $message = $transaction_result["message"] ?: "";
+                $status = !empty($transaction_result["status"])
+                    ? $transaction_result["status"]
+                    : "";
+                $source = !empty($transaction_result["payment_source"])
+                    ? $transaction_result["payment_source"]
+                    : "";
+                $message = !empty($transaction_result["message"])
+                    ? $transaction_result["message"]
+                    : "";
 
                 $wc_order->update_meta_data("_blink_status", $status);
                 $wc_order->update_meta_data("payment_type", $source);

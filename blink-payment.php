@@ -108,13 +108,16 @@ function checkOrderPayment($order_id)
 
 function checkFromSubmission()
 {
-    if (isset($_POST["action"]) && $_POST["action"] == "blinkSubmitPayment") {
+    $action = sanitize_text_field($_POST["action"]);
+    if (isset($action) && "blinkSubmitPayment" == $action) {
         $gateWay = new WC_Blink_Gateway();
-        $gateWay->accessToken =
-            $_POST["access_token"] ?? $gateWay->generate_access_token();
+        $accessToken = sanitize_text_field($_POST["access_token"]);
+        $gateWay->accessToken = !empty($accessToken)
+            ? $accessToken
+            : $gateWay->generate_access_token();
         $request = $_POST;
-        $order_id = $_POST["order_id"];
-        $order = checkOrderPayment($_POST["order_id"]);
+        $order_id = sanitize_text_field($request["order_id"]);
+        $order = checkOrderPayment($order_id);
 
         if ($request["payment_by"] == "credit-card") {
             $gateWay->processCreditCard($order_id, $request);
@@ -132,20 +135,19 @@ function checkFromSubmission()
 
 function checkBlinkPaymentMethod($content)
 {
-    if (isset($_GET["blinkPay"]) && $_GET["blinkPay"] !== "") {
-        checkOrderPayment($_GET["blinkPay"]);
+    $blinkPay = sanitize_text_field($_GET["blinkPay"]);
+    $method = sanitize_text_field($_GET["p"]);
+    if (isset($blinkPay) && "" !== $blinkPay) {
+        checkOrderPayment($blinkPay);
         $gateWay = new WC_Blink_Gateway();
 
-        if (
-            isset($_GET["p"]) &&
-            in_array($_GET["p"], $gateWay->paymentMethods)
-        ) {
+        if (!empty($method) && in_array($method, $gateWay->paymentMethods)) {
             $gateWay->accessToken = $gateWay->generate_access_token();
             $gateWay->paymentIntent = $gateWay->create_payment_intent();
             if (isset($gateWay->paymentIntent["payment_intent"])) {
                 $string = implode(
                     " ",
-                    array_map("ucfirst", explode("-", $_GET["p"]))
+                    array_map("ucfirst", explode("-", $method))
                 );
                 $html = wc_print_notices();
                 $html .=
@@ -157,7 +159,7 @@ function checkBlinkPaymentMethod($content)
                                 <section class="blink-api-tabs-content">';
 
                 if (
-                    $_GET["p"] == "credit-card" &&
+                    "credit-card" == $method &&
                     $gateWay->paymentIntent["element"]["ccElement"]
                 ) {
                     $html .=
@@ -167,7 +169,7 @@ function checkBlinkPaymentMethod($content)
                         $gateWay->paymentIntent["element"]["ccElement"];
                 }
                 if (
-                    $_GET["p"] == "direct-debit" &&
+                    "direct-debit" == $method &&
                     $gateWay->paymentIntent["element"]["ddElement"]
                 ) {
                     $html .=
@@ -178,7 +180,7 @@ function checkBlinkPaymentMethod($content)
                 }
 
                 if (
-                    $_GET["p"] == "open-banking" &&
+                    "open-banking" == $method &&
                     $gateWay->paymentIntent["element"]["obElement"]
                 ) {
                     $html .=
@@ -205,11 +207,11 @@ function checkBlinkPaymentMethod($content)
                     $gateWay->accessToken .
                     '">
                                                 <input type="hidden" name="payment_by" id="payment_by" value="' .
-                    $_GET["p"] .
+                    $method .
                     '">
                                                 <input type="hidden" name="action" value="blinkSubmitPayment">
                                                 <input type="hidden" name="order_id" value="' .
-                    $_GET["blinkPay"] .
+                    $blinkPay .
                     '">
                                                 <input type="submit" value="Pay now" name="blink-submit" />
                                             </form>
@@ -235,8 +237,9 @@ function checkBlinkPaymentMethod($content)
 
 function blink_3d_form_submission($content)
 {
-    if (isset($_GET["blink3dprocess"]) && $_GET["blink3dprocess"] !== "") {
-        $token = get_transient("blink3dProcess" . $_GET["blink3dprocess"]);
+    $blink3dprocess = sanitize_text_field($_GET["blink3dprocess"]);
+    if (isset($blink3dprocess) && "" !== $blink3dprocess) {
+        $token = get_transient("blink3dProcess" . $blink3dprocess);
         $html =
             '<div class="blink-loading">Loading&#8230;</div><div class="3d-content">' .
             $token .
