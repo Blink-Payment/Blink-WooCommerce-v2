@@ -120,7 +120,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
     public function generate_access_token($returnVar = "access_token")
     {
-        $request = $_GET;
+
         $url = $this->host_url . "/pay/v1/tokens";
         $response = wp_remote_post($url, [
             "method" => "POST",
@@ -132,7 +132,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $redirect = trailingslashit(wc_get_checkout_url());
 
-        if (wp_remote_retrieve_response_code($response) == 200) {
+        if (201 == wp_remote_retrieve_response_code($response)) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             return !empty($apiBody[$returnVar]) ? $apiBody[$returnVar] : "";
@@ -403,10 +403,10 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         wp_localize_script("woocommerce_blink_payment", "blink_params", [
             "apiKey" => $this->api_key,
             "secretKey" => $this->secret_key,
-            "remoteAddress" => sanitize_text_field($_SERVER["REMOTE_ADDR"]),
+            "remoteAddress" => !empty($_SERVER["REMOTE_ADDR"]) ? sanitize_text_field($_SERVER["REMOTE_ADDR"]) : "",
         ]);
 
-        $blinkPay = sanitize_text_field($_GET["blinkPay"]);
+        $blinkPay = !empty($_GET["blinkPay"]) ? sanitize_text_field($_GET["blinkPay"]) : "";
         if (isset($blinkPay) && $blinkPay !== "") {
             $order_id = $blinkPay;
             $order = wc_get_order($order_id);
@@ -500,7 +500,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
         if (!empty($request) && $order_id != "") {
             $errors = 0;
 
-            if ($request["payment_by"] == "direct-debit") {
+            if ("direct-debit" == $request["payment_by"]) {
                 if (empty($request["given_name"])) {
                     wc_add_notice("Given name is required!", "error");
                     $errors++;
@@ -527,7 +527,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
                 }
             }
 
-            if ($request["payment_by"] == "open-banking") {
+            if ("open-banking" == $request["payment_by"]) {
                 if (empty($request["user_name"])) {
                     wc_add_notice("User name is required!", "error");
                     $errors++;

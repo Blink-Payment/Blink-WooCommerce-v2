@@ -108,8 +108,8 @@ function checkOrderPayment($order_id)
 
 function checkFromSubmission()
 {
-    $action = sanitize_text_field($_POST["action"]);
-    if (isset($action) && "blinkSubmitPayment" == $action) {
+    $action = isset($_POST["action"]) ? sanitize_text_field($_POST["action"]) : "";
+    if (!empty($action) && "blinkSubmitPayment" == $action) {
         $gateWay = new WC_Blink_Gateway();
         $accessToken = sanitize_text_field($_POST["access_token"]);
         $gateWay->accessToken = !empty($accessToken)
@@ -135,9 +135,9 @@ function checkFromSubmission()
 
 function checkBlinkPaymentMethod($content)
 {
-    $blinkPay = sanitize_text_field($_GET["blinkPay"]);
-    $method = sanitize_text_field($_GET["p"]);
-    if (isset($blinkPay) && "" !== $blinkPay) {
+    $blinkPay = isset($_GET["blinkPay"]) ? sanitize_text_field($_GET["blinkPay"]) : "";
+    $method = isset($_GET["p"]) ? sanitize_text_field($_GET["p"]) : "";
+    if (!empty($blinkPay)) {
         checkOrderPayment($blinkPay);
         $gateWay = new WC_Blink_Gateway();
 
@@ -237,8 +237,8 @@ function checkBlinkPaymentMethod($content)
 
 function blink_3d_form_submission($content)
 {
-    $blink3dprocess = sanitize_text_field($_GET["blink3dprocess"]);
-    if (isset($blink3dprocess) && "" !== $blink3dprocess) {
+    $blink3dprocess = isset($_GET["blink3dprocess"]) ? sanitize_text_field($_GET["blink3dprocess"]) : "";
+    if (!empty($blink3dprocess)) {
         $token = get_transient("blink3dProcess" . $blink3dprocess);
         $html =
             '<div class="blink-loading">Loading&#8230;</div><div class="3d-content">' .
