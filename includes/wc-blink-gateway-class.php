@@ -195,12 +195,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway
 
         $redirect = trailingslashit(wc_get_checkout_url());
 
-        if (!is_wp_error($response)) {
+        if (201 == wp_remote_retrieve_response_code($response)) {
             $apiBody = json_decode(wp_remote_retrieve_body($response), true);
             $this->checkAPIException($apiBody, $redirect);
             return $apiBody;
         } else {
-            $error_message = $response->get_error_message();
+            $error_message = wp_remote_retrieve_response_message($response);
             wc_add_notice($error_message, "error");
             wp_redirect($redirect, 302);
             exit();
