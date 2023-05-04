@@ -1,11 +1,11 @@
-jQuery(function ($) {
+jQuery(function($) {
 
     var blink_checkout_form = {
         $form: jQuery('form.woocommerce-checkout'),
-        init: function () {
+        init: function() {
             jQuery(document.body).on('updated_checkout', this.updated_checkout);
         },
-        updated_checkout: function () {
+        updated_checkout: function() {
 
             var paymentMode = jQuery('input[name=payment_method]:checked').val();
             if (paymentMode == 'blink') {
@@ -26,7 +26,7 @@ jQuery(function ($) {
 
     blink_checkout_form.init();
 
-    jQuery(document).ready(function () {
+    jQuery(document).ready(function() {
         if ($('#blink-card').length) {
             var $form = $('#blink-card');
             var auto = {
@@ -53,7 +53,7 @@ jQuery(function ($) {
                 $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
                     screen_depth);
                 $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
-    
+
             } catch (e) {
                 //Add your exception handling code here
             }
@@ -98,7 +98,7 @@ jQuery(function ($) {
     else
         jQuery('.blink-api-section').removeClass('responsive-screen');
 
-    jQuery('form.checkout').on('change', 'input[name="payment_method"]', function () {
+    jQuery('form.checkout').on('change', 'input[name="payment_method"]', function() {
         var paymentMode = jQuery('input[name=payment_method]:checked').val();
         if (paymentMode == 'blink') {
             jQuery('#place_order').hide();
@@ -121,7 +121,7 @@ function blinkfunction() {
 }
 
 var blink_order_review_form = {
-    init: function () {
+    init: function() {
         var paymentMode = jQuery('input[name=payment_method]:checked').val();
         if (paymentMode == 'blink') {
             jQuery('#place_order').hide();
@@ -140,14 +140,13 @@ var blink_order_review_form = {
 };
 
 
-var updatePaymentBy = function (data) {
+var updatePaymentBy = function(data) {
     var $form = jQuery('#payment_by').closest('form');
     jQuery('#payment_by').val(data);
 
     if ($form[0].id == 'order_review') {
         blink_order_review_form.init();
-    }
-    else {
+    } else {
         jQuery(document.body).trigger('update_checkout');
     }
 }
