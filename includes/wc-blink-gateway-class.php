@@ -217,7 +217,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		// in most payment processors you have to use API KEY and SECRET KEY to obtain a token
 		wp_localize_script('woocommerce_blink_payment', 'blink_params', ['apiKey' => $this->api_key, 'secretKey' => $this->secret_key, 'remoteAddress' => !empty($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '', ]);
 		$blinkPay = !empty($_GET['blinkPay']) ? sanitize_text_field($_GET['blinkPay']) : '';
-		if (isset($blinkPay) && $blinkPay !== '') {
+		if (isset($blinkPay) && '' !== $blinkPay) {
 			$order_id = $blinkPay;
 			$order = wc_get_order($order_id);
 			wp_localize_script('woocommerce_blink_payment', 'order_params', $this->get_customer_data($order));
@@ -242,7 +242,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		return json_encode(['payer_info' => $this->get_customer_data($order), 'order_info' => $this->get_order_data($order), ]);
 	}
 	public function validate_fields($request = [], $order_id = '') {
-		if (!empty($request) && $order_id != '') {
+		if (!empty($request) && '' != $order_id) {
 			$errors = 0;
 			if ('direct-debit' == $request['payment_by']) {
 				if (empty($request['given_name'])) {
@@ -460,7 +460,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			if (!$wc_order->needs_payment()) {
 				return;
 			}
-			if ($wc_order->get_meta('_blink_res_expired', true) == 'true') {
+			if ('true' == $wc_order->get_meta('_blink_res_expired', true)) {
 				return;
 			}
 			$transaction = $wc_order->get_meta('blink_res', true);

@@ -31,12 +31,14 @@ function timeout_extend($time) {
 function check_order_response($wp) {
 	global $wp;
 	$order_id = 0;
-	if (isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '') {
+	$order = !empty($_GET['order']) ? sanitize_text_field($_GET['order']) : '';
+
+	if (isset($wp->query_vars['order-received']) && '' !== $wp->query_vars['order-received']) {
 		$order_id = apply_filters('woocommerce_thankyou_order_id', absint($wp->query_vars['order-received']));
 	} else {
 		// Check if the order ID exists.
-		if (!empty($_GET['key']) || !empty($_GET['order'])) {
-			$order_id = absint(apply_filters('woocommerce_thankyou_order_id', absint($_GET['order']??0)));
+		if ( !empty($order) ) {
+			$order_id = absint(apply_filters('woocommerce_thankyou_order_id', absint($order)));
 		}
 	}
 	if ($order_id) {
@@ -47,12 +49,13 @@ function check_order_response($wp) {
 	return $wp;
 }
 function update_order_response($wp) {
+	$transaction_id = !empty($_REQUEST['transaction_id']) ? sanitize_text_field($_REQUEST['transaction_id']) : '';
 	if (isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '') {
 		$order_id = apply_filters('woocommerce_thankyou_order_id', absint($wp->query_vars['order-received']));
-		if (empty($_REQUEST['transaction_id'])) {
+		if (empty($transaction_id)) {
 			return;
 		}
-		$transaction = wc_clean(wp_unslash($_REQUEST['transaction_id']));
+		$transaction = wc_clean(wp_unslash($transaction_id));
 		$wc_order = wc_get_order($order_id);
 		$wc_order->update_meta_data('blink_res', $transaction);
 		$wc_order->update_meta_data('_blink_res_expired', 'false');
@@ -77,13 +80,13 @@ function checkFromSubmission() {
 		$request = $_POST;
 		$order_id = sanitize_text_field($request['order_id']);
 		$order = checkOrderPayment($order_id);
-		if ($request['payment_by'] == 'credit-card') {
+		if ( 'credit-card' == $request['payment_by'] ) {
 			$gateWay->processCreditCard($order_id, $request);
 		}
-		if ($request['payment_by'] == 'direct-debit') {
+		if ('direct-debit' == $request['payment_by'] ) {
 			$gateWay->processDirectDebit($order_id, $request);
 		}
-		if ($request['payment_by'] == 'open-banking') {
+		if ('open-banking' == $request['payment_by'] ) {
 			$gateWay->processOpenBanking($order_id, $request);
 		}
 	}
