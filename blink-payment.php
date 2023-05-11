@@ -11,7 +11,7 @@
  * This action hook registers our PHP class as a WooCommerce payment gateway
 */
 function blink_add_gateway_class($gateways) {
-	$gateways[] = "WC_Blink_Gateway"; // your class name is here
+	$gateways[] = 'WC_Blink_Gateway'; // your class name is here
 	return $gateways;
 }
 /*
