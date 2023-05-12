@@ -15,7 +15,6 @@ jQuery(function($) {
             }
 
             var paymentBy = blink_checkout_form.$form.find('input[name=payment_by]').val();
-            console.log(paymentBy);
 
             if (paymentBy != '') {
                 blink_checkout_form.$form.submit();

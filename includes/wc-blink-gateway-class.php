@@ -43,7 +43,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->paymentIntent = '';
 		$this->elementMap = ['credit-card' => 'ccElement', 'direct-debit' => 'ddElement', 'open-banking' => 'obElement', ];
 	}
-	public function add_error_notices($payment_types = []) {
+	public function add_error_notices($payment_types = []) { 
 		if ($this->api_key && $this->secret_key) {
 			$adminnotice = new WC_Admin_Notices();
 			if (!empty($payment_types)) {
@@ -64,7 +64,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 		}
 	}
-	public function checkAPIException($response, $redirect) {
+	public function checkAPIException($response, $redirect) { 
 		if (isset($response['error'])) {
 			wc_add_notice($response['error'], 'error');
 			wp_redirect($redirect, 302);
@@ -72,7 +72,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 		return;
 	}
-	public function generate_access_token($returnVar = 'access_token') {
+	public function generate_access_token($returnVar = 'access_token') { 
 		$url = $this->host_url . '/pay/v1/tokens';
 		$response = wp_remote_post($url, ['method' => 'POST', 'body' => ['api_key' => $this->api_key, 'secret_key' => $this->secret_key, ], ]);
 		$redirect = trailingslashit(wc_get_checkout_url());
@@ -96,7 +96,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	 * @param WC_Order|null $order Order object.
 	 * @return string
 	 */
-	public function get_return_url($order = null) {
+	public function get_return_url($order = null) { 
 		if ($order) {
 			$return_url = $order->get_checkout_order_received_url();
 		} else {
@@ -128,7 +128,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	/**
 	 * Plugin options,
 	 */
-	public function init_form_fields($payment_types = []) {
+	public function init_form_fields($payment_types = []) { 
 		$fields = ['enabled' => ['title' => 'Enable/Disable', 'label' => 'Enable Blink Gateway', 'type' => 'checkbox', 'description' => '', 'default' => 'no', ], 'title' => ['title' => 'Title', 'type' => 'text', 'description' => 'This controls the title which the user sees during checkout.', 'default' => 'Blink v2', 'desc_tip' => true, ], 'description' => ['title' => 'Description', 'type' => 'textarea', 'description' => 'This controls the description which the user sees during checkout.', 'default' => 'Pay with your credit card or direct debit at your convenience.', ], 'testmode' => ['title' => 'Test mode', 'label' => 'Enable Test Mode', 'type' => 'checkbox', 'description' => 'Place the payment gateway in test mode using test API keys.', 'default' => 'yes', 'desc_tip' => true, ], 'test_api_key' => ['title' => 'Test API Key', 'type' => 'text', ], 'test_secret_key' => ['title' => 'Test Secret Key', 'type' => 'password', ], 'api_key' => ['title' => 'Live API Key', 'type' => 'text', ], 'secret_key' => ['title' => 'Live Secret Key', 'type' => 'password', ], 'custom_style' => ['title' => 'Custom Style', 'type' => 'textarea', 'description' => 'Do not include style tag', ], ];
 		if ($this->api_key && $this->secret_key) {
 			if (!empty($payment_types)) {
@@ -143,14 +143,14 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->form_fields = $fields;
 	}
 	/**
-	 * credit card form
+	 * Credit card form
 	 */
-	public function payment_fields() {
+	public function payment_fields() { 
 		if (is_array($this->paymentMethods) && empty($this->paymentMethods)) {
-			echo wpautop(wp_kses_post('Unable to process any payment at this moment!'));
+			echo '<p> Unable to process any payment at this moment! </p>';
 		} else {
 			if ($this->description) {
-				echo wpautop(wp_kses_post($this->description));
+				echo '<p>' . $this->description .'</p>';
 			}
 		}
 		if (is_array($this->paymentMethods) && !empty($this->paymentMethods)) { ?>
@@ -161,27 +161,24 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			<div class="blink-pay-options">
 				<a href="javascript:void(0);" onclick="updatePaymentBy('credit-card')"> Pay with Credit Card</a>
 			</div>
-			<?php
-			} ?>
+			<?php } ?>
 			<?php if (in_array('direct-debit', $this->paymentMethods)) { ?>
 			<div class="blink-pay-options">
 				<a href="javascript:void(0);" onclick="updatePaymentBy('direct-debit')"> Pay with Direct Debit</a>
 			</div>
-			<?php
-			} ?>
+			<?php } ?>
 			<?php if (in_array('open-banking', $this->paymentMethods)) { ?>
 			<div class="blink-pay-options">
 				<a href="javascript:void(0);" onclick="updatePaymentBy('open-banking')"> Pay with Open Banking</a>
 			</div>
-			<?php
-			} ?>
+			<?php } ?>
 			<input type="hidden" name="payment_by" id="payment_by" value="" />
+			<input type="hidden" name="_initiate_payment" id="_initiate_payment" value="<?php echo wp_create_nonce('initiate-payment'); ?>" />
 		</section>
 	</div>
 </section>
 
-<?php
-		} else { ?>
+<?php } else { ?>
 
 <section class="blink-api-section">
 	<div class="blink-api-form-stracture">
@@ -192,13 +189,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 <?php
 		}
 	}
-	public function payment_scripts() {
+	public function payment_scripts() { 
 		// we need JavaScript to process a token only on cart/checkout pages, right?
 		if (!is_cart() && !is_checkout() && !isset($_GET['pay_for_order'])) {
 			return;
 		}
 		// if our payment gateway is disabled, we do not have to enqueue JS too
-		if ("no" === $this->enabled) {
+		if ('no' === $this->enabled) {
 			return;
 		}
 		// no reason to enqueue JavaScript if API keys are not set
@@ -231,17 +228,17 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		do_action('wc_blink_custom_script');
 		do_action('wc_blink_custom_style');
 	}
-	public function get_customer_data($order) {
+	public function get_customer_data($order) { 
 		return ['customer_id' => $order->get_user_id(), 'customer_name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'customer_email' => $order->get_billing_email(), 'billing_first_name' => $order->get_billing_first_name(), 'billing_last_name' => $order->get_billing_last_name(), 'billing_company' => $order->get_billing_company(), 'billing_email' => $order->get_billing_email(), 'billing_phone' => $order->get_billing_phone(), 'billing_address_1' => $order->get_billing_address_1(), 'billing_address_2' => $order->get_billing_address_2(), 'billing_postcode' => $order->get_billing_postcode(), 'billing_city' => $order->get_billing_city(), 'billing_state' => $order->get_billing_state(), 'billing_country' => $order->get_billing_country(), ];
 	}
-	public function get_order_data($order) {
-		return $order_data = ['order_id' => $order->get_id(), 'order_number' => $order->get_order_number(), 'order_date' => date('Y-m-d H:i:s', strtotime(get_post($order->get_id())->post_date)), 'shipping_total' => $order->get_total_shipping(), 'shipping_tax_total' => wc_format_decimal($order->get_shipping_tax(), 2), 'tax_total' => wc_format_decimal($order->get_total_tax(), 2), 'cart_discount' => defined('WC_VERSION') && WC_VERSION >= 2.3 ? wc_format_decimal($order->get_total_discount(), 2) : wc_format_decimal($order->get_cart_discount(), 2), 'order_discount' => defined('WC_VERSION') && WC_VERSION >= 2.3 ? wc_format_decimal($order->get_total_discount(), 2) : wc_format_decimal($order->get_order_discount(), 2), 'discount_total' => wc_format_decimal($order->get_total_discount(), 2), 'order_total' => wc_format_decimal($order->get_total(), 2), 'order_currency' => $order->get_currency(), 'customer_note' => $order->get_customer_note(), ];
+	public function get_order_data($order) { 
+		return ['order_id' => $order->get_id(), 'order_number' => $order->get_order_number(), 'order_date' => gmdate('Y-m-d H:i:s', strtotime(get_post($order->get_id())->post_date)), 'shipping_total' => $order->get_total_shipping(), 'shipping_tax_total' => wc_format_decimal($order->get_shipping_tax(), 2), 'tax_total' => wc_format_decimal($order->get_total_tax(), 2), 'cart_discount' => defined('WC_VERSION') && WC_VERSION >= 2.3 ? wc_format_decimal($order->get_total_discount(), 2) : wc_format_decimal($order->get_cart_discount(), 2), 'order_discount' => defined('WC_VERSION') && WC_VERSION >= 2.3 ? wc_format_decimal($order->get_total_discount(), 2) : wc_format_decimal($order->get_order_discount(), 2), 'discount_total' => wc_format_decimal($order->get_total_discount(), 2), 'order_total' => wc_format_decimal($order->get_total(), 2), 'order_currency' => $order->get_currency(), 'customer_note' => $order->get_customer_note(), ];
 	}
-	public function get_payment_information($order_id) {
+	public function get_payment_information($order_id) { 
 		$order = wc_get_order($order_id);
 		return json_encode(['payer_info' => $this->get_customer_data($order), 'order_info' => $this->get_order_data($order), ]);
 	}
-	public function validate_fields($request = [], $order_id = '') {
+	public function validate_fields($request = [], $order_id = '') { 
 		if (!empty($request) && '' != $order_id) {
 			$errors = 0;
 			if ('direct-debit' == $request['payment_by']) {
@@ -288,7 +285,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 		return true;
 	}
-	public function processOpenBanking($order_id, $request) {
+	public function processOpenBanking($order_id, $request) { 
 		$this->validate_fields($request, $order_id);
 		$order = wc_get_order($order_id);
 		$requestData = ['merchant_id' => $request['merchant_id'], 'payment_intent' => $request['payment_intent'], 'user_name' => !empty($request['user_name']) ? $request['user_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'user_email' => !empty($request['user_email']) ? $request['user_email'] : $order->get_billing_email(), 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'merchant_data' => $this->get_payment_information($order_id), ];
@@ -310,7 +307,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		wp_redirect($redirect, 302);
 		exit();
 	}
-	public function processDirectDebit($order_id, $request) {
+	public function processDirectDebit($order_id, $request) { 
 		$this->validate_fields($request, $order_id);
 		$order = wc_get_order($order_id);
 		$requestData = ['payment_intent' => $request['payment_intent'], 'given_name' => !empty($request['given_name']) ? $request['given_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'family_name' => $request['family_name'], 'company_name' => $request['company_name'], 'email' => !empty($request['email']) ? $request['email'] : $order->get_billing_email(), 'country_code' => 'GB', 'account_holder_name' => $request['account_holder_name'], 'branch_code' => $request['branch_code'], 'account_number' => $request['account_number'], 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'merchant_data' => $this->get_payment_information($order_id), ];
@@ -332,7 +329,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		wp_redirect($redirect, 302);
 		exit();
 	}
-	public function processCreditCard($order_id, $request) {
+	public function processCreditCard($order_id, $request) { 
 		$order = wc_get_order($order_id);
 		$requestData = ['payment_intent' => $request['payment_intent'], 'paymentToken' => $request['paymentToken'], 'type' => $request['type'], 'raw_amount' => $request['amount'], 'customer_email' => !empty($request['customer_email']) ? $request['customer_email'] : $order->get_billing_email(), 'customer_name' => !empty($request['customer_name']) ? $request['customer_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'transaction_unique' => $request['transaction_unique'], 'merchant_data' => $this->get_payment_information($order_id), ];
 		if (isset($request['remote_address'])) {
@@ -367,23 +364,29 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	/*
 	 * We're processing the payments here
 	*/
-	public function process_payment($order_id) {
-		// we need it to get any order detailes
-		$order = wc_get_order($order_id);
-		$request = $_POST;
-		if (0 == count(WC()->cart->get_cart())) {
-			$items = $order->get_items();
-			foreach ($items as $item) {
-				$quantity = $item['quantity'];
-				$product_id = $item['product_id'];
-				$variation_id = $item['variation_id'];
-				WC()->cart->add_to_cart($product_id, $quantity, $variation_id);
+	public function process_payment($order_id) { 
+		if ( isset( $_POST['_initiate_payment'] ) && wp_verify_nonce( $_POST['_initiate_payment'], 'initiate-payment' ) ) {
+			// we need it to get any order detailes
+			$order = wc_get_order($order_id);
+			$request = $_POST;
+			if (0 == count(WC()->cart->get_cart())) {
+				$items = $order->get_items();
+				foreach ($items as $item) {
+					$quantity = $item['quantity'];
+					$product_id = $item['product_id'];
+					$variation_id = $item['variation_id'];
+					WC()->cart->add_to_cart($product_id, $quantity, $variation_id);
+				}
 			}
+			$result = 'success';
+			$redirect = trailingslashit(wc_get_checkout_url()) . '?p=' . $request['payment_by'] . '&blinkPay=' . $order_id;
+		} else {
+			$result = 'failed';
+			$redirect = trailingslashit(wc_get_checkout_url());
 		}
-		$redirect = trailingslashit(wc_get_checkout_url()) . '?p=' . $request['payment_by'] . '&blinkPay=' . $order_id;
-		return ['result' => 'success', 'redirect' => $redirect, ];
+		return ['result' => $result, 'redirect' => $redirect, ];
 	}
-	public function change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null) {
+	public function change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null) { 
 		if ('captured' === strtolower($status) || 'success' === strtolower($status) || 'accept' === strtolower($status)) {
 			$wc_order->add_order_note('Transaction status - ' . $status);
 			$this->payment_complete($wc_order, $transaction_id, !empty($note) ? $note : 'Blink payment completed');
@@ -396,7 +399,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	/*
 	 * In case we need a webhook, like PayPal IPN etc
 	*/
-	public function webhook() {
+	public function webhook() { 
 		global $wpdb;
 		$order_id = '';
 		$body = file_get_contents('php://input');
@@ -410,9 +413,14 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				$order_id = !empty($marchant_data['order_info']['order_id']) ? $marchant_data['order_info']['order_id'] : '';
 			}
 			if (!$order_id) {
-				$order_id = $wpdb->get_var('SELECT `post_id`
-				FROM ' . $wpdb->postmeta . '
-				WHERE (`meta_key` = \'_transaction_id\' AND `meta_value` = \'' . $transaction_id . '\') OR (`meta_key` = \'blink_res\' AND `meta_value` = \'' . $transaction_id . '\')');
+				$order_id = $wpdb->get_var(
+						$wpdb->prepare(
+						"SELECT `post_id`
+						FROM {$wpdb->postmeta}
+						WHERE (`meta_key` = %s AND `meta_value` = %s) OR (`meta_key` = %s AND `meta_value` = %s)",
+						array( '_transaction_id', $transaction_id, 'blink_res', $transaction_id )
+						)
+					);
 			}
 			$status = !empty($request['status']) ? $request['status'] : '';
 			$note = !empty($request['note']) ? $request['note'] : '';
@@ -429,7 +437,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		echo json_encode($response);
 		exit();
 	}
-	public function validate_transaction($transaction) {
+	public function validate_transaction($transaction) { 
 		$responseCode = !empty($transaction) ? $transaction : '';
 		$url = $this->host_url . '/pay/v1/transactions/' . $responseCode;
 		$response = wp_remote_get($url, ['method' => 'GET', 'headers' => ['Authorization' => 'Bearer ' . $this->accessToken, ], ]);
@@ -445,7 +453,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		wp_redirect($redirect, 302);
 		exit();
 	}
-	public function change_title($title) {
+	public function change_title($title) { 
 		global $wp;
 		$order_id = $wp->query_vars['order-received'];
 		$order = wc_get_order($order_id);
@@ -454,7 +462,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 		return $title;
 	}
-	public function check_response_for_order($order_id) {
+	public function check_response_for_order($order_id) { 
 		if ($order_id) {
 			$wc_order = wc_get_order($order_id);
 			if (!$wc_order->needs_payment()) {
@@ -489,7 +497,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	 * @param  string   $txn_id Transaction ID.
 	 * @param  string   $note Payment note.
 	 */
-	public function payment_complete($order, $txn_id = "", $note = "") {
+	public function payment_complete($order, $txn_id = '', $note = '') { 
 		if (!$order->has_status(['processing', 'completed'])) {
 			if ($note) {
 				$order->add_order_note($note);
@@ -506,7 +514,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	 * @param  WC_Order $order Order object.
 	 * @param  string   $reason Reason why the payment is on hold.
 	 */
-	public function payment_on_hold($order, $reason = '') {
+	public function payment_on_hold($order, $reason = '') { 
 		$order->update_status('on-hold', $reason);
 		if ($reason) {
 			$order->add_order_note($reason);
@@ -521,13 +529,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	 * @param  WC_Order $order Order object.
 	 * @param  string   $reason Reason why the payment is on hold.
 	 */
-	public function payment_failed($order, $reason = '') {
+	public function payment_failed($order, $reason = '') { 
 		$order->update_status('failed', $reason);
 		if ($reason) {
 			$order->add_order_note($reason);
 		}
 	}
-	public function capture_payment() {
+	public function capture_payment() { 
 		return false;
 	}
 }

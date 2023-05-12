@@ -10,7 +10,7 @@
 /*
  * This action hook registers our PHP class as a WooCommerce payment gateway
 */
-function blink_add_gateway_class($gateways) {
+function blink_add_gateway_class($gateways) { 
 	$gateways[] = 'WC_Blink_Gateway'; // your class name is here
 	return $gateways;
 }
@@ -24,11 +24,11 @@ add_action('init', 'checkFromSubmission');
 add_action('parse_request', 'update_order_response', 99);
 add_action('wp', 'check_order_response', 999);
 add_filter('http_request_timeout', 'timeout_extend', 99);
-function timeout_extend($time) {
+function timeout_extend($time) { 
 	// Default timeout is 5
 	return 10;
 }
-function check_order_response($wp) {
+function check_order_response($wp) { 
 	global $wp;
 	$order_id = 0;
 	$order = !empty($_GET['order']) ? sanitize_text_field($_GET['order']) : '';
@@ -48,9 +48,9 @@ function check_order_response($wp) {
 	}
 	return $wp;
 }
-function update_order_response($wp) {
+function update_order_response($wp) { 
 	$transaction_id = !empty($_REQUEST['transaction_id']) ? sanitize_text_field($_REQUEST['transaction_id']) : '';
-	if (isset($wp->query_vars['order-received']) && $wp->query_vars['order-received'] !== '') {
+	if (isset($wp->query_vars['order-received']) && '' !== $wp->query_vars['order-received']) {
 		$order_id = apply_filters('woocommerce_thankyou_order_id', absint($wp->query_vars['order-received']));
 		if (empty($transaction_id)) {
 			return;
@@ -63,7 +63,7 @@ function update_order_response($wp) {
 	}
 	return $wp;
 }
-function checkOrderPayment($order_id) {
+function checkOrderPayment($order_id) { 
 	$order = wc_get_order($order_id);
 	if (!$order->needs_payment()) {
 		wc_add_notice('Something Wrong! Please initate the payment from checkout page', 'error');
@@ -71,27 +71,29 @@ function checkOrderPayment($order_id) {
 	}
 	return $order;
 }
-function checkFromSubmission() {
-	$action = isset($_POST['action']) ? sanitize_text_field($_POST['action']) : '';
-	if (!empty($action) && 'blinkSubmitPayment' == $action) {
-		$gateWay = new WC_Blink_Gateway();
-		$accessToken = sanitize_text_field($_POST['access_token']);
-		$gateWay->accessToken = !empty($accessToken) ? $accessToken : $gateWay->generate_access_token();
-		$request = $_POST;
-		$order_id = sanitize_text_field($request['order_id']);
-		$order = checkOrderPayment($order_id);
-		if ( 'credit-card' == $request['payment_by'] ) {
-			$gateWay->processCreditCard($order_id, $request);
+function checkFromSubmission() { 
+	if ( isset( $_POST['_wpnonce'] ) && wp_verify_nonce( $_POST['_wpnonce'], 'submit-payment' ) ) {
+		$action = isset($_POST['action']) ? sanitize_text_field($_POST['action']) : '';
+		if (!empty($action) && 'blinkSubmitPayment' == $action) {
+			$gateWay = new WC_Blink_Gateway();
+			$accessToken = isset( $_POST['access_token'] ) ? sanitize_text_field($_POST['access_token']) : '';
+			$gateWay->accessToken = !empty($accessToken) ? $accessToken : $gateWay->generate_access_token();
+			$request = $_POST;
+			$order_id = sanitize_text_field($request['order_id']);
+			$order = checkOrderPayment($order_id);
+			if ( 'credit-card' == $request['payment_by'] ) {
+				$gateWay->processCreditCard($order_id, $request);
+			}
+			if ('direct-debit' == $request['payment_by'] ) {
+				$gateWay->processDirectDebit($order_id, $request);
+			}
+			if ('open-banking' == $request['payment_by'] ) {
+				$gateWay->processOpenBanking($order_id, $request);
+			}
 		}
-		if ('direct-debit' == $request['payment_by'] ) {
-			$gateWay->processDirectDebit($order_id, $request);
-		}
-		if ('open-banking' == $request['payment_by'] ) {
-			$gateWay->processOpenBanking($order_id, $request);
-		}
-	}
+	} 
 }
-function checkBlinkPaymentMethod($content) {
+function checkBlinkPaymentMethod($content) { 
 	$blinkPay = isset($_GET['blinkPay']) ? sanitize_text_field($_GET['blinkPay']) : '';
 	$method = isset($_GET['p']) ? sanitize_text_field($_GET['p']) : '';
 	if (!empty($blinkPay)) {
@@ -130,6 +132,7 @@ function checkBlinkPaymentMethod($content) {
 												<input type="hidden" name="payment_by" id="payment_by" value="' . $method . '">
 												<input type="hidden" name="action" value="blinkSubmitPayment">
 												<input type="hidden" name="order_id" value="' . $blinkPay . '">
+												'.wp_nonce_field( 'submit-payment' ).'
 												<input type="submit" value="Pay now" name="blink-submit" />
 											</form>
 										</div>';
@@ -138,18 +141,18 @@ function checkBlinkPaymentMethod($content) {
 						</section>';
 				return $html;
 			} else {
-				wc_add_notice($gateWay->paymentIntent['error']??'Something Wrong! Please initate the payment from checkout page', 'error');
+				wc_add_notice($gateWay->paymentIntent['error'] ? $gateWay->paymentIntent['error'] : 'Something Wrong! Please initate the payment from checkout page', 'error');
 				wp_redirect(wc_get_checkout_url());
 			}
 		}
 	}
 	return $content;
 }
-function blink_3d_form_submission($content) {
+function blink_3d_form_submission($content) { 
 	$blink3dprocess = isset($_GET['blink3dprocess']) ? sanitize_text_field($_GET['blink3dprocess']) : '';
 	if (!empty($blink3dprocess)) {
 		$token = get_transient('blink3dProcess' . $blink3dprocess);
-		$html = '<div class="blink-loading">Loading&#8230;</div><div class="3d-content">' . $token . "</div>";
+		$html = '<div class="blink-loading">Loading&#8230;</div><div class="3d-content">' . $token . '</div>';
 		$script = '<script nonce="2020">
 		jQuery(document).ready(function(){
 	
@@ -164,11 +167,11 @@ function blink_3d_form_submission($content) {
 /**
  * WooCommerce fallback notice.
  */
-function wc_blink_missing_notice() {
+function wc_blink_missing_notice() { 
 	/* translators: 1. URL link. */
 	echo '<div class="error"><p><strong>' . sprintf(esc_html__('Blink requires WooCommerce to be installed and active. You can download %s here.', 'blink'), '<a href="https://woocommerce.com/" target="_blank">WooCommerce</a>') . '</strong></p></div>';
 }
-function add_wc_blink_payment_action_plugin($actions, $plugin_file) {
+function add_wc_blink_payment_action_plugin($actions, $plugin_file) { 
 	static $plugin;
 	if (!isset($plugin)) {
 		$plugin = plugin_basename(__FILE__);
@@ -180,7 +183,7 @@ function add_wc_blink_payment_action_plugin($actions, $plugin_file) {
 	}
 	return $actions;
 }
-function blink_init_gateway_class() {
+function blink_init_gateway_class() { 
 	if (!class_exists('WooCommerce')) {
 		add_action('admin_notices', 'wc_blink_missing_notice');
 		return;

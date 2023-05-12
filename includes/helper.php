@@ -1,5 +1,5 @@
 <?php
-function insertArrayAtPosition($array, $insert, $position) {
+function insertArrayAtPosition($array, $insert, $position) { 
 	/*
 	$array : The initial array i want to modify
 	$insert : the new array i want to add, eg array('key' => 'value') or array('value')
