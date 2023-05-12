@@ -402,15 +402,18 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	public function webhook() { 
 		global $wpdb;
 		$order_id = '';
-		$body = file_get_contents('php://input');
-		if ($body) {
-			$request = json_decode($body, true);
+		$request = isset($_POST['transaction_id']) ? $_POST : file_get_contents('php://input');
+		if (is_array($request)) {
+			$data = isset($request['merchant_data']) ? stripslashes($request['merchant_data']) : '';
+			$request['merchant_data'] = json_decode($data, true);
+		} else {
+			$request = json_decode($request, true);
 		}
-		$transaction_id = !empty($request['transaction_id']) ? $request['transaction_id'] : '';
+		$transaction_id = !empty($request['transaction_id']) ? sanitize_text_field($request['transaction_id']) : '';
 		if ($transaction_id) {
 			$marchant_data = $request['merchant_data'];
 			if (!empty($marchant_data)) {
-				$order_id = !empty($marchant_data['order_info']['order_id']) ? $marchant_data['order_info']['order_id'] : '';
+				$order_id = !empty($marchant_data['order_info']['order_id']) ? sanitize_text_field($marchant_data['order_info']['order_id']) : '';
 			}
 			if (!$order_id) {
 				$order_id = $wpdb->get_var(
@@ -427,7 +430,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			$order = wc_get_order($order_id);
 			if ($order) {
 				$this->change_status($order, $transaction_id, $status, '', $note);
-				$order->update_meta_data('_debug', $body);
+				$order->update_meta_data('_debug', $request);
 				$response = ['order_id' => $order_id, 'order_status' => $status, ];
 				echo json_encode($response);
 				exit();
