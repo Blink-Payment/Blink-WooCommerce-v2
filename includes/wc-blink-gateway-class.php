@@ -153,43 +153,40 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				echo '<p>' . esc_html($this->description) . '</p>';
 			}
 		}
-		$html = '';
-		if (is_array($this->paymentMethods) && !empty($this->paymentMethods)) {
+		if (is_array($this->paymentMethods) && !empty($this->paymentMethods)) { ?>
+<section class="blink-api-section">
+	<div class="blink-api-form-stracture">
+		<section class="blink-api-tabs-content">
+			<?php if (in_array('credit-card', $this->paymentMethods)) { ?>
+			<div class="blink-pay-options">
+				<a href="javascript:void(0);" onclick="updatePaymentBy('credit-card')"> Pay with Credit Card</a>
+			</div>
+			<?php } ?>
+			<?php if (in_array('direct-debit', $this->paymentMethods)) { ?>
+			<div class="blink-pay-options">
+				<a href="javascript:void(0);" onclick="updatePaymentBy('direct-debit')"> Pay with Direct Debit</a>
+			</div>
+			<?php } ?>
+			<?php if (in_array('open-banking', $this->paymentMethods)) { ?>
+			<div class="blink-pay-options">
+				<a href="javascript:void(0);" onclick="updatePaymentBy('open-banking')"> Pay with Open Banking</a>
+			</div>
+			<?php } ?>
+			<input type="hidden" name="payment_by" id="payment_by" value="" />
+			<input type="hidden" name="_initiate_payment" id="_initiate_payment" value="<?php echo esc_html(wp_create_nonce('initiate-payment')); ?>" />
+		</section>
+	</div>
+</section>
+<?php } else { ?>
 
-			$html = '<section class="blink-api-section">
-				<div class="blink-api-form-stracture">
-					<section class="blink-api-tabs-content">';
+<section class="blink-api-section">
+	<div class="blink-api-form-stracture">
+		<input type="hidden" name="payment_by" id="payment_by" value="" />
+	</div>
+</section>
 
-			if (in_array('credit-card', $this->paymentMethods)) { 
-				$html .= '<div class="blink-pay-options">
-					<a href="javascript:void(0);" onclick="updatePaymentBy(\'credit-card\')"> Pay with Credit Card</a>
-				</div>';
-			}
-			if (in_array('direct-debit', $this->paymentMethods)) {
-				$html .= '<div class="blink-pay-options">
-					<a href="javascript:void(0);" onclick="updatePaymentBy(\'direct-debit\')"> Pay with Direct Debit</a>
-				</div>';
-			}
-			if (in_array('open-banking', $this->paymentMethods)) {
-				$html .= '<div class="blink-pay-options">
-					<a href="javascript:void(0);" onclick="updatePaymentBy(\'open-banking\')"> Pay with Open Banking</a>
-				</div>';
-			}
-			$html .= '<input type="hidden" name="payment_by" id="payment_by" value="" />
-				<input type="hidden" name="_initiate_payment" id="_initiate_payment" value="' .esc_html(wp_create_nonce('initiate-payment')) .'" />';
-
-			$html .= '</section></div></section>';
-
-		} else { 
-
-			$html .= '<section class="blink-api-section">
-				<div class="blink-api-form-stracture">
-					<input type="hidden" name="payment_by" id="payment_by" value="" />
-				</div>
-			</section>';
-
-		}
-		echo $html;
+<?php
+}
 	}
 	public function payment_scripts() { 
 		// we need JavaScript to process a token only on cart/checkout pages, right?
