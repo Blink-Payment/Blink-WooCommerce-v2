@@ -72,7 +72,7 @@ function checkOrderPayment( $order_id ) {
 	return $order;
 }
 function checkFromSubmission() { 
-	$wpnonce = sanitize_text_field($_POST['_wpnonce']);
+	$wpnonce = !empty($_POST['_wpnonce']) ? sanitize_text_field($_POST['_wpnonce']) : '';
 	if ( isset( $wpnonce ) && wp_verify_nonce( $wpnonce, 'submit-payment' ) ) {
 		$action = isset($_POST['action']) ? sanitize_text_field($_POST['action']) : '';
 		if (!empty($action) && 'blinkSubmitPayment' == $action) {
