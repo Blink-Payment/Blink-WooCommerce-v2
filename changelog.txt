@@ -1,5 +1,5 @@
-*** WooCommerce - Blink Plugin Changelog ***
+*** WooCommerce - Blink Changelog ***
 
-2012.12.13 - version 1.0.10
+2012-12-13 - version 1.0.11
 
 * Initial release
