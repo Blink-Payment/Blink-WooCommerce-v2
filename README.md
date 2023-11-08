@@ -3,6 +3,8 @@
 ## Description
 
 This module enables the use og the Blink Payment Gateway, utilising the Blink REST API, using the [Woocommerce project](https://woo.com/).
+The documentation for the Blink API cna be found [here](https://docs.blinkpayment.co.uk/docs/category/authentication).
+The API credentials can be found on your [Blink Portal](https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages)
 
 ## Install
 1. Download [the plugin](https://github.com/Blink-Payment/plugin-woocommerce/archive/refs/heads/master.zip)
