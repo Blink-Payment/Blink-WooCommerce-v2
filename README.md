@@ -1,4 +1,4 @@
-# Blink woocommerce plugin -NEW
+# Blink-WooCommerce-v2
 
 ## Description
 
