@@ -7,11 +7,11 @@ The documentation for the Blink API cna be found [here](https://docs.blinkpaymen
 The API credentials can be found on your [Blink Portal](https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages)
 
 ## Install
-1. Download [the plugin](https://github.com/Blink-Payment/plugin-woocommerce/archive/refs/heads/master.zip)
-2. On your Wordpress admin panel, go to the plugins section of the admin panel
-3. Click "Add New"
-4. Click "Upload plugin" (Near the top left of the page nexto the menu)
-5. Click the "Choose File" button and select the module (which will be the whole zip file this readme is in)
+1. Download [the plugin](https://github.com/Blink-Payment/Blink-WooCommerce-v2).
+2. On your Wordpress admin panel, go to the plugins section of the admin panel.
+3. Click "Add New".
+4. Click "Upload plugin" (Near the top left of the page nexto the menu).
+5. Click the "Choose File" button and select the module (which will be the whole zip file this readme is in).
 6. Click the "Install Now" button and then click the "Activate" button.
 
 ## Setup 
