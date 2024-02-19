@@ -49,12 +49,12 @@ function blink_cancel_transaction() {
 	// Call cancel API
 	$data = $gateWay->cancel_transaction($transaction_id);
 	$success  = isset($data['success']) ? $data['success'] : false;
-	
+
 	if ($success) {
 		// Cancel WooCommerce order
 		$order = wc_get_order($order_id);
 		$order->update_status('cancelled');
-		wc_add_notice('Transaction cancelled successfully: ' . $transaction_id, 'error');
+		//wc_add_notice('Transaction cancelled successfully: ' . $transaction_id, 'error');
 		wp_send_json_success('Transaction cancelled successfully.');
 	} else {
 		wp_send_json_error('Failed to cancel transaction: ['.$data['message'].']');
