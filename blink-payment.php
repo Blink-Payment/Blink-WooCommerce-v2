@@ -24,6 +24,43 @@ add_action('init', 'checkFromSubmission');
 add_action('parse_request', 'update_order_response', 99);
 add_action('wp', 'check_order_response', 999);
 add_filter('http_request_timeout', 'timeout_extend', 99);
+add_action('wp_ajax_cancel_transaction', 'blink_cancel_transaction');
+
+function blink_cancel_transaction() {
+
+	if(!check_ajax_referer('cancel_order_nonce', 'cancel_order'))
+	{
+		wp_send_json_error('Failed to cancel transaction: [security not matched]');
+	}
+
+	$order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+
+	if (!$order_id) {
+		wp_send_json_error('Invalid order ID.');
+	}
+
+	$transaction_id = get_post_meta($order_id, 'blink_res', true);
+
+	if (!$transaction_id) {
+		wp_send_json_error('Transaction ID not found.');
+	}
+
+	$gateWay = new WC_Blink_Gateway();
+	// Call cancel API
+	$data = $gateWay->cancel_transaction($transaction_id);
+	$success  = isset($data['success']) ? $data['success'] : false;
+	
+	if ($success) {
+		// Cancel WooCommerce order
+		$order = wc_get_order($order_id);
+		$order->update_status('cancelled');
+		wc_add_notice('Transaction cancelled successfully: ' . $transaction_id, 'error');
+		wp_send_json_success('Transaction cancelled successfully.');
+	} else {
+		wp_send_json_error('Failed to cancel transaction: ['.$data['message'].']');
+	}
+}
+
 function timeout_extend( $time ) { 
 	// Default timeout is 5
 	return 10;

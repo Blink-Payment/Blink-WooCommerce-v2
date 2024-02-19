@@ -9,9 +9,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->method_description = $this->configs['method_description'];
 		$this->host_url = $this->configs['host_url'] . '/api';
 		$this->version = $this->configs['version'];
-		// gateways can support subscriptions, refunds, saved payment methods,
-		// but in this tutorial we begin with simple payments
-		$this->supports = ['products'];
+		// gateways can support subscriptions, saved payment methods,
+		// but in this tutorial we begin with simple payments and refunds
+		$this->supports    = [
+			'products',
+			'refunds',
+		];
 		// Load the settings.
 		$this->init_settings();
 		$this->title = $this->get_option('title');
@@ -37,12 +40,120 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		add_action('woocommerce_api_wc_blink_gateway', [$this, 'webhook']);
 		add_action('woocommerce_thankyou_blink', [$this, 'check_response_for_order', ]);
 		add_filter('woocommerce_endpoint_order-received_title', [$this, 'change_title'], 99);
+
+		add_filter('woocommerce_admin_order_should_render_refunds', array($this, 'should_render_refunds'), 10, 3);
+		add_filter('woocommerce_order_item_add_action_buttons', array($this, 'add_cancel_button'), 10);
+		add_action('admin_enqueue_scripts',  array($this,'blink_enqueue_scripts'), 10);
+		//add_action('wp_ajax_cancel_transaction', array($this,'blink_cancel_transaction'));
+		
 		// We need custom JavaScript to obtain a token
 		add_action('wp_enqueue_scripts', [$this, 'payment_scripts']);
 		$this->accessToken = '';
 		$this->paymentIntent = '';
 		$this->elementMap = ['credit-card' => 'ccElement', 'direct-debit' => 'ddElement', 'open-banking' => 'obElement', ];
+		$this->paymentSource = '';
+		$this->paymentStatus = '';
+
 	}
+
+	public function cancel_transaction($transaction_id) {
+        $url = $this->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
+
+        $headers = ['Authorization' => 'Bearer ' . $this->generate_access_token()];
+
+        $response = wp_remote_post($url, ['headers' => $headers]);
+
+        if (is_wp_error($response)) {
+            wc_add_notice('Error fetching transaction status: ' . $response->get_error_message(), 'error');
+            return;
+        }
+
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+
+        return $data;
+    }
+
+
+	public function blink_enqueue_scripts($hook) {
+		if ($hook === 'post.php') {
+			wp_enqueue_script('woocommerce_blink_payment_admin_scripts', plugins_url('/../assets/js/admin-scripts.js', __FILE__), ['jquery'], $this->version, true);
+			wp_localize_script('woocommerce_blink_payment_admin_scripts', 'blinkOrders', array(
+				'ajaxurl' => admin_url('admin-ajax.php'),
+				'cancel_order' => wp_create_nonce('cancel_order_nonce'),
+				'spin_gif' => plugins_url('/../assets/img/wpspin.gif', __FILE__)
+			));
+		}
+	}
+
+	public function add_cancel_button($order) {
+
+		$transaction_id = $order->get_meta('blink_res');
+
+		if (!$transaction_id) {
+			return; // Exit if transaction ID is not found
+		}
+		
+		if (strtolower($this->paymentStatus) === 'captured' && $this->checkCCPayment($this->paymentSource)) {
+			// If status is captured, display cancel button
+			echo '<button type="button" class="button cancel-order" data-order-id="' . $order->get_id() . '">Cancel Order</button>';
+		}
+	
+		return $actions;
+	}
+
+	// New function to fetch transaction status
+    private function get_transaction_status($transaction_id) {
+		$url = $this->host_url . '/pay/v1/transactions/'.$transaction_id;
+        $headers = ['Authorization' => 'Bearer ' . $this->generate_access_token()];
+
+        $response = wp_remote_get($url, ['headers' => $headers]);
+
+        if (is_wp_error($response)) {
+            wc_add_notice('Error fetching transaction status: ' . $response->get_error_message(), 'error');
+            return;
+        }
+
+        $data = json_decode(wp_remote_retrieve_body($response));
+		$this->paymentSource = $data->data->payment_source;
+		$this->paymentStatus = $data->data->status;
+
+    }
+
+	public function should_render_refunds($render_refunds, $order, $wc_order) {
+		$transaction_id = get_post_meta($order, 'blink_res', true);
+
+		if (!$transaction_id) {
+			return $render_refunds; // No Blink transaction, use default behavior
+		}
+
+		$this->transactionID = $transaction_id;
+
+	
+		$this->get_transaction_status($transaction_id);
+	
+		if (strtolower($this->paymentStatus) === 'captured' && $this->checkCCPayment($data->paymentSource)) {
+			$render_refunds = false; // Hide default refund if captured
+		}
+		$WCOrder = wc_get_order($order);
+		if ($WCOrder->has_status(['cancelled'])) {
+			$render_refunds = false;
+		}
+	
+		return $render_refunds;
+	}
+	private function checkCCPayment($source)
+	{
+		$payment_types = ['direct debit', 'open banking'];
+		foreach ($payment_types as $type) {
+			if (preg_match('/\b' . strtolower($type) . '\b/i', $source)) {
+				// Payment method matches one of the specified types
+				return false; // Or handle the case here and break the loop
+			}
+		}
+
+		return true;
+	}
+
 	public function add_error_notices( $payment_types = [] ) { 
 		if ($this->api_key && $this->secret_key) {
 			$adminnotice = new WC_Admin_Notices();
