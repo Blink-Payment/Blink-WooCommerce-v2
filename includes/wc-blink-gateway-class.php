@@ -56,6 +56,88 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 	}
 
+	public function process_refund($order_id, $amount = null, $reason = '') {
+		$order = wc_get_order($order_id);
+	
+		// Get the transaction ID from order meta
+		$transaction_id = $order->get_meta('blink_res');
+	
+		// Exit if transaction ID is not found
+		if (!$transaction_id) {
+			$order->add_order_note('Transaction ID not found.');
+            return new WP_Error('invalid_order', __('Transaction ID not found.', 'woocommerce'));
+		}
+	
+		// Determine if restocking items is required
+		//$restock_refunded_items = isset($_POST['restock_refunded_items']) && $_POST['restock_refunded_items'] === 'true' ? true : false;
+	
+		// Check if there were previous partial refunds
+		$previous_refund_amount = isset($_POST['refunded_amount']) ? wc_format_decimal($_POST['refunded_amount']) : 0;
+	
+		// Determine if it's a partial refund
+		$partial_refund = ($amount < ($order->get_total() - $previous_refund_amount)) ? true : false;
+	
+		// Prepare refund request data
+		$requestData = array(
+			'partial_refund' => $partial_refund,
+			'amount' => $amount,
+			'reference' => $reason
+		);
+	
+		// Prepare request headers
+		$headers = array('Authorization' => 'Bearer ' . $this->generate_access_token());
+	
+		// Send refund request
+		$url = $this->host_url . '/pay/v1/transactions/' . $transaction_id . '/refunds';
+		$response = wp_remote_post($url, array(
+			'headers' => $headers,
+			'body' => $requestData,
+		));
+
+	
+		// Check if the refund request was successful
+		if (is_wp_error($response)) {
+			$order->add_order_note('Refund request failed: ' . $response->get_error_message());
+            return new WP_Error('refund_failed', __('Refund request failed.', 'woocommerce'));
+		}
+	
+		$data = json_decode(wp_remote_retrieve_body($response), true);
+	
+		// Add refund notes to the order
+		if ($data['success']) {
+			$refund_note = $data['message'] . ' (Transaction ID: ' . $data['transaction_id'] . ')';
+			$order->add_order_note($refund_note);
+			if ($partial_refund) {
+				$order->add_order_note('Partial refund processed successfully.');
+			} else {
+				$order->update_status('refunded');
+				$order->add_order_note('Full refund processed successfully.');
+	
+				// if ($restock_refunded_items) {
+				// 	// Restock refunded items
+				// 	foreach ($order->get_items() as $item_id => $item) {
+				// 		$product = $item->get_product();
+				// 		if ($product && $product->get_manage_stock() === 'yes') {
+				// 			$stock_quantity = $product->get_stock_quantity();
+				// 			$item_quantity = $item->get_quantity();
+				// 			$product->set_stock_quantity($stock_quantity + $item_quantity);
+				// 			$product->save();
+				// 		}
+				// 	}
+				// }
+			}
+		} else {
+			$message = $data['error'] ? $data['error'] : $data['message'];
+			$order->add_order_note('Refund request failed: ' . $message);
+			return new WP_Error('refund_failed', __('Refund request failed.' . $message, 'woocommerce'));
+
+		}
+	
+		// Return true on successful refund
+		return true;
+	}
+	
+
 	public function cancel_transaction($transaction_id) {
         $url = $this->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
 
@@ -92,10 +174,55 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if (!$transaction_id) {
 			return; // Exit if transaction ID is not found
 		}
+
+		if($this->checkCCPayment($this->paymentSource))
+		{
+			echo '<style>
+			.cancel-order-container {
+				position: relative;
+				display: inline-block;
+				float: left;
+			}
+			
+			.cancel-order-tooltip {
+				position: absolute;
+				top: -30px; /* Adjust as needed */
+				left: 100%; /* Adjust as needed */
+				width: auto;
+				background-color: #555;
+				color: #fff;
+				padding: 5px;
+				border-radius: 5px;
+				font-size: 12px;
+				white-space: nowrap;
+				z-index: 999;
+				display: none;
+			}
+			
+			.cancel-order-container:hover .cancel-order-tooltip {
+				display: block;
+			}
+			
+
+			</style>
+			';
 		
-		if (strtolower($this->paymentStatus) === 'captured' && $this->checkCCPayment($this->paymentSource)) {
-			// If status is captured, display cancel button
-			echo '<button type="button" class="button cancel-order" data-order-id="' . $order->get_id() . '">Cancel Order</button>';
+			if (strtolower($this->paymentStatus) === 'captured') {
+				// If status is captured, display cancel button
+				
+				echo '<div class="cancel-order-container">';
+				echo '<button type="button" class="button cancel-order" data-order-id="' . $order->get_id() . '">' . __('Cancel Order', 'woocommerce') . '</button>';
+				echo '<span class="cancel-order-tooltip" data-tip="' . __('It will cancel the transaction.', 'woocommerce') . '">' . __('It will cancel the transaction.', 'woocommerce') . '</span>';
+				echo '</div>';
+				
+			}
+			if (empty($this->paymentStatus)){
+				echo '<div class="cancel-order-container">';
+				echo '<button type="button" class="button" data-order-id="' . $order->get_id() . '">' . __('No Transaction info available', 'woocommerce') . '</button>';
+				echo '<span class="cancel-order-tooltip" data-tip="' . __('Please check your API details.', 'woocommerce') . '">' . __('Please check your API details.', 'woocommerce') . '</span>';
+				echo '</div>';
+				
+			}
 		}
 	
 		return $actions;
@@ -107,6 +234,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         $headers = ['Authorization' => 'Bearer ' . $this->generate_access_token()];
 
         $response = wp_remote_get($url, ['headers' => $headers]);
+		
 
         if (is_wp_error($response)) {
             wc_add_notice('Error fetching transaction status: ' . $response->get_error_message(), 'error');
@@ -114,8 +242,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
         }
 
         $data = json_decode(wp_remote_retrieve_body($response));
-		$this->paymentSource = $data->data->payment_source;
-		$this->paymentStatus = $data->data->status;
+
+		$this->paymentSource = $data->data->payment_source ? $data->data->payment_source : '';
+		$this->paymentStatus = $data->data->status ? $data->data->status : '';
 
     }
 
@@ -131,8 +260,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	
 		$this->get_transaction_status($transaction_id);
 	
-		if (strtolower($this->paymentStatus) === 'captured' && $this->checkCCPayment($data->paymentSource)) {
-			$render_refunds = false; // Hide default refund if captured
+		if ($this->checkCCPayment($data->paymentSource)) {
+			if(strtolower($this->paymentStatus) === 'captured' || empty($this->paymentStatus))
+			{
+				$render_refunds = false; // Hide default refund if captured
+
+			}
 		}
 		$WCOrder = wc_get_order($order);
 		if ($WCOrder->has_status(['cancelled'])) {

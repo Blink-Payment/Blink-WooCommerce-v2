@@ -30,7 +30,7 @@ function blink_cancel_transaction() {
 
 	if(!check_ajax_referer('cancel_order_nonce', 'cancel_order'))
 	{
-		wp_send_json_error('Failed to cancel transaction: [security not matched]');
+		wp_send_json_error('[security not matched]');
 	}
 
 	$order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
@@ -49,15 +49,19 @@ function blink_cancel_transaction() {
 	// Call cancel API
 	$data = $gateWay->cancel_transaction($transaction_id);
 	$success  = isset($data['success']) ? $data['success'] : false;
+	$order = wc_get_order($order_id);
 
 	if ($success) {
 		// Cancel WooCommerce order
-		$order = wc_get_order($order_id);
 		$order->update_status('cancelled');
+		$order->add_order_note('Transaction cancelled successfully.');
+
 		//wc_add_notice('Transaction cancelled successfully: ' . $transaction_id, 'error');
 		wp_send_json_success('Transaction cancelled successfully.');
 	} else {
-		wp_send_json_error('Failed to cancel transaction: ['.$data['message'].']');
+		
+		$order->add_order_note('Failed to cancel Transaction:['.$data['message'].']');
+		wp_send_json_error('['.$data['message'].']');
 	}
 }
 

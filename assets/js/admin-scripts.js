@@ -173,8 +173,8 @@ jQuery(document).ready(function($) {
                 location.reload();
             } else {
                 // Handle error
-                alert('Failed to cancel Transaction: ' + response.data.message);
-            }
+                console.log(response);
+                alert(response.data.message ? 'Failed to cancel Transaction: ' + response.data.message : response.data);            }
         });
     });
 });
