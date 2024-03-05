@@ -56,7 +56,23 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 	}
 
-	public function process_refund($order_id, $amount = null, $reason = '') {
+	public function get_time_diff($order)
+	{
+
+		$order_date_time = new DateTime($order->get_date_created()->date('Y-m-d H:i:s'));
+		$current_date_time = new DateTime();
+		$time_difference = $current_date_time->diff($order_date_time);
+
+
+
+		if ($time_difference->days > 0 || $time_difference->h >= 24) {
+			return true;
+		} 
+
+		return false;
+	}
+
+	public function process_refund($order_id, $amount = null, $reason = '__') {
 		$order = wc_get_order($order_id);
 	
 		// Get the transaction ID from order meta
@@ -65,17 +81,14 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		// Exit if transaction ID is not found
 		if (!$transaction_id) {
 			$order->add_order_note('Transaction ID not found.');
-            return new WP_Error('invalid_order', __('Transaction ID not found.', 'woocommerce'));
+			return new WP_Error('invalid_order', __('Transaction ID not found.', 'woocommerce'));
 		}
-	
-		// Determine if restocking items is required
-		//$restock_refunded_items = isset($_POST['restock_refunded_items']) && $_POST['restock_refunded_items'] === 'true' ? true : false;
 	
 		// Check if there were previous partial refunds
 		$previous_refund_amount = isset($_POST['refunded_amount']) ? wc_format_decimal($_POST['refunded_amount']) : 0;
 	
 		// Determine if it's a partial refund
-		$partial_refund = ($amount < ($order->get_total() - $previous_refund_amount)) ? true : false;
+		$partial_refund = !empty($previous_refund_amount) ? true : !empty($amount < $order->get_total());
 	
 		// Prepare refund request data
 		$requestData = array(
@@ -93,12 +106,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			'headers' => $headers,
 			'body' => $requestData,
 		));
-
 	
 		// Check if the refund request was successful
 		if (is_wp_error($response)) {
 			$order->add_order_note('Refund request failed: ' . $response->get_error_message());
-            return new WP_Error('refund_failed', __('Refund request failed.', 'woocommerce'));
+			return new WP_Error('refund_failed', __('Refund request failed.', 'woocommerce'));
 		}
 	
 		$data = json_decode(wp_remote_retrieve_body($response), true);
@@ -107,30 +119,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if ($data['success']) {
 			$refund_note = $data['message'] . ' (Transaction ID: ' . $data['transaction_id'] . ')';
 			$order->add_order_note($refund_note);
-			if ($partial_refund) {
-				$order->add_order_note('Partial refund processed successfully.');
-			} else {
+			$refund_type = $partial_refund ? 'Partial' : 'Full';
+			$order->add_order_note($refund_type . ' refund of ' . wc_price($amount) . ' processed successfully. Reason:'.$reason);
+			if(($amount + $previous_refund_amount) >= $order->get_total()){
 				$order->update_status('refunded');
-				$order->add_order_note('Full refund processed successfully.');
-	
-				// if ($restock_refunded_items) {
-				// 	// Restock refunded items
-				// 	foreach ($order->get_items() as $item_id => $item) {
-				// 		$product = $item->get_product();
-				// 		if ($product && $product->get_manage_stock() === 'yes') {
-				// 			$stock_quantity = $product->get_stock_quantity();
-				// 			$item_quantity = $item->get_quantity();
-				// 			$product->set_stock_quantity($stock_quantity + $item_quantity);
-				// 			$product->save();
-				// 		}
-				// 	}
-				// }
 			}
 		} else {
 			$message = $data['error'] ? $data['error'] : $data['message'];
 			$order->add_order_note('Refund request failed: ' . $message);
 			return new WP_Error('refund_failed', __('Refund request failed.' . $message, 'woocommerce'));
-
 		}
 	
 		// Return true on successful refund
@@ -175,6 +172,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			return; // Exit if transaction ID is not found
 		}
 
+
 		if($this->checkCCPayment($this->paymentSource))
 		{
 			echo '<style>
@@ -206,20 +204,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 			</style>
 			';
-		
-			if (strtolower($this->paymentStatus) === 'captured') {
+		//
+			if (strtolower($this->paymentStatus) === 'captured' && $this->get_time_diff($order) !== true) {
 				// If status is captured, display cancel button
 				
 				echo '<div class="cancel-order-container">';
 				echo '<button type="button" class="button cancel-order" data-order-id="' . $order->get_id() . '">' . __('Cancel Order', 'woocommerce') . '</button>';
 				echo '<span class="cancel-order-tooltip" data-tip="' . __('It will cancel the transaction.', 'woocommerce') . '">' . __('It will cancel the transaction.', 'woocommerce') . '</span>';
-				echo '</div>';
-				
-			}
-			if (empty($this->paymentStatus)){
-				echo '<div class="cancel-order-container">';
-				echo '<button type="button" class="button" data-order-id="' . $order->get_id() . '">' . __('No Transaction info available', 'woocommerce') . '</button>';
-				echo '<span class="cancel-order-tooltip" data-tip="' . __('Please check your API details.', 'woocommerce') . '">' . __('Please check your API details.', 'woocommerce') . '</span>';
 				echo '</div>';
 				
 			}
@@ -250,6 +241,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 	public function should_render_refunds($render_refunds, $order, $wc_order) {
 		$transaction_id = get_post_meta($order, 'blink_res', true);
+		$WCOrder = wc_get_order($order);
 
 		if (!$transaction_id) {
 			return $render_refunds; // No Blink transaction, use default behavior
@@ -261,13 +253,21 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->get_transaction_status($transaction_id);
 	
 		if ($this->checkCCPayment($data->paymentSource)) {
-			if(strtolower($this->paymentStatus) === 'captured' || empty($this->paymentStatus))
+			if(strtolower($this->paymentStatus) === 'captured')
 			{
 				$render_refunds = false; // Hide default refund if captured
 
 			}
+			if($this->get_time_diff($WCOrder) === true)
+			{
+				$render_refunds = true;
+			}
+			if(empty($this->paymentStatus))
+			{
+				$render_refunds = false;
+			}
 		}
-		$WCOrder = wc_get_order($order);
+
 		if ($WCOrder->has_status(['cancelled'])) {
 			$render_refunds = false;
 		}
