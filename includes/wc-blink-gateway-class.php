@@ -88,7 +88,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$previous_refund_amount = isset($_POST['refunded_amount']) ? wc_format_decimal($_POST['refunded_amount']) : 0;
 	
 		// Determine if it's a partial refund
-		$partial_refund = !empty($previous_refund_amount) ? true : !empty($amount < $order->get_total());
+		$partial_refund = !empty($previous_refund_amount) ? true : ($amount < $order->get_total());
 	
 		// Prepare refund request data
 		$requestData = array(
