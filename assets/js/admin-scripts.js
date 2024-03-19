@@ -5,7 +5,7 @@ jQuery(function ($) {
         $(".cancel-order").on("click", function (e) {
             e.preventDefault();
             $(this).after(
-                `<div class="loader-container"><img src="${blinkOrders.spin_gif}" alt="Processing.."></div>`
+                `<div class="loader-container"><img src="${blinkOrders.spin_gif}" alt="Processing..."></div>`
             );
             var orderId = $(this).data("order-id");
             var data = {
