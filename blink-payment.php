@@ -30,7 +30,7 @@ function blink_cancel_transaction() {
 
 	if(!check_ajax_referer('cancel_order_nonce', 'cancel_order'))
 	{
-		wp_send_json_error('[security not matched]');
+		wp_send_json_error('[Security mismatch]');
 	}
 
 	$order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
@@ -59,8 +59,7 @@ function blink_cancel_transaction() {
 		//wc_add_notice('Transaction cancelled successfully: ' . $transaction_id, 'error');
 		wp_send_json_success('Transaction cancelled successfully.');
 	} else {
-		
-		$order->add_order_note('Failed to cancel Transaction:['.$data['message'].']');
+		$order->add_order_note('Failed to cancel transaction: ['.$data['message'].']');
 		wp_send_json_error('['.$data['message'].']');
 	}
 }
@@ -183,7 +182,7 @@ function checkBlinkPaymentMethod( $content ) {
 						</section>';
 				return $html;
 			} else {
-				wc_add_notice($gateWay->paymentIntent['error'] ? $gateWay->paymentIntent['error'] : 'Something Wrong! Please initate the payment from checkout page', 'error');
+				wc_add_notice($gateWay->paymentIntent['error'] ? $gateWay->paymentIntent['error'] : 'Something is wrong! Please start the payment from checkout page.', 'error');
 				wp_redirect(wc_get_checkout_url());
 			}
 		}
