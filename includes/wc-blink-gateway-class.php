@@ -55,15 +55,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->paymentStatus = '';
 
 	}
-
 	public function get_time_diff($order)
 	{
-
 		$order_date_time = new DateTime($order->get_date_created()->date('Y-m-d H:i:s'));
 		$current_date_time = new DateTime();
 		$time_difference = $current_date_time->diff($order_date_time);
-
-
 
 		if ($time_difference->days > 0 || $time_difference->h >= 24) {
 			return true;
@@ -71,7 +67,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 		return false;
 	}
-
 	public function process_refund($order_id, $amount = null, $reason = '__') {
 		$order = wc_get_order($order_id);
 	
@@ -120,7 +115,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			$refund_note = $data['message'] . ' (Transaction ID: ' . $data['transaction_id'] . ')';
 			$order->add_order_note($refund_note);
 			$refund_type = $partial_refund ? 'Partial' : 'Full';
-			$order->add_order_note($refund_type . ' refund of ' . wc_price($amount) . ' processed successfully. Reason:'.$reason);
+			$order->add_order_note($refund_type . ' refund of ' . wc_price($amount) . ' processed successfully. Reason: '.$reason);
 			if(($amount + $previous_refund_amount) >= $order->get_total()){
 				$order->update_status('refunded');
 			}
@@ -133,26 +128,20 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		// Return true on successful refund
 		return true;
 	}
-	
-
 	public function cancel_transaction($transaction_id) {
-        $url = $this->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
+                $url = $this->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
+                $headers = ['Authorization' => 'Bearer ' . $this->generate_access_token()];
+                $response = wp_remote_post($url, ['headers' => $headers]);
 
-        $headers = ['Authorization' => 'Bearer ' . $this->generate_access_token()];
+                if (is_wp_error($response)) {
+                        wc_add_notice('Error fetching transaction status: ' . $response->get_error_message(), 'error');
+                        return;
+                }
 
-        $response = wp_remote_post($url, ['headers' => $headers]);
+                $data = json_decode(wp_remote_retrieve_body($response), true);
 
-        if (is_wp_error($response)) {
-            wc_add_notice('Error fetching transaction status: ' . $response->get_error_message(), 'error');
-            return;
-        }
-
-        $data = json_decode(wp_remote_retrieve_body($response), true);
-
-        return $data;
-    }
-
-
+                return $data;
+	}
 	public function blink_enqueue_scripts($hook) {
 		if ($hook === 'post.php') {
 			wp_enqueue_script('woocommerce_blink_payment_admin_scripts', plugins_url('/../assets/js/admin-scripts.js', __FILE__), ['jquery'], $this->version, true);
@@ -163,7 +152,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			));
 		}
 	}
-
 	public function add_cancel_button($order) {
 
 		$transaction_id = $order->get_meta('blink_res');
@@ -171,7 +159,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if (!$transaction_id) {
 			return; // Exit if transaction ID is not found
 		}
-
 
 		if($this->checkCCPayment($this->paymentSource))
 		{
@@ -204,7 +191,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 			</style>
 			';
-		//
+
 			if (strtolower($this->paymentStatus) === 'captured' && $this->get_time_diff($order) !== true) {
 				// If status is captured, display cancel button
 				
@@ -218,27 +205,22 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	
 		return $actions;
 	}
-
 	// New function to fetch transaction status
-    private function get_transaction_status($transaction_id) {
+        private function get_transaction_status($transaction_id) {
 		$url = $this->host_url . '/pay/v1/transactions/'.$transaction_id;
-        $headers = ['Authorization' => 'Bearer ' . $this->generate_access_token()];
-
-        $response = wp_remote_get($url, ['headers' => $headers]);
+                $headers = ['Authorization' => 'Bearer ' . $this->generate_access_token()];
+                $response = wp_remote_get($url, ['headers' => $headers]);
 		
+                if (is_wp_error($response)) {
+                        wc_add_notice('Error fetching transaction status: ' . $response->get_error_message(), 'error');
+                        return;
+                }
 
-        if (is_wp_error($response)) {
-            wc_add_notice('Error fetching transaction status: ' . $response->get_error_message(), 'error');
-            return;
-        }
-
-        $data = json_decode(wp_remote_retrieve_body($response));
+                $data = json_decode(wp_remote_retrieve_body($response));
 
 		$this->paymentSource = $data->data->payment_source ? $data->data->payment_source : '';
 		$this->paymentStatus = $data->data->status ? $data->data->status : '';
-
-    }
-
+        }
 	public function should_render_refunds($render_refunds, $order, $wc_order) {
 		$transaction_id = get_post_meta($order, 'blink_res', true);
 		$WCOrder = wc_get_order($order);
@@ -286,7 +268,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 		return true;
 	}
-
 	public function add_error_notices( $payment_types = [] ) { 
 		if ($this->api_key && $this->secret_key) {
 			$adminnotice = new WC_Admin_Notices();
@@ -494,7 +475,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 					$errors++;
 				}
 				if (empty($request['email'])) {
-					wc_add_notice('email is required!', 'error');
+					wc_add_notice('Email is required!', 'error');
 					$errors++;
 				}
 				if (empty($request['account_holder_name'])) {
@@ -541,7 +522,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			if ($apiBody['redirect_url']) {
 				$redirect = $apiBody['redirect_url'];
 			} else {
-				wc_add_notice('Something Wrong! Please try again', 'error');
+				wc_add_notice('Something is wrong! Please try again', 'error');
 			}
 		} else {
 			$error_message = wp_remote_retrieve_response_message($response);
@@ -563,7 +544,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			if ($apiBody['url']) {
 				$redirect = $apiBody['url'];
 			} else {
-				wc_add_notice('Something Wrong! Please try again', 'error');
+				wc_add_notice('Something is wrong! Please try again', 'error');
 			}
 		} else {
 			$error_message = wp_remote_retrieve_response_message($response);
@@ -595,7 +576,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			} elseif ($apiBody['url']) {
 				$redirect = $apiBody['url'];
 			} else {
-				wc_add_notice('Something Wrong! Please try again', 'error');
+				wc_add_notice('Something is wrong! Please try again', 'error');
 			}
 		} else {
 			$error_message = wp_remote_retrieve_response_message($response);
@@ -680,7 +661,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				exit();
 			}
 		}
-		$response = ['transaction_id' => !empty($transaction_id) ? $transaction_id : null, 'error' => 'no order found with this transaction id', ];
+		$response = ['transaction_id' => !empty($transaction_id) ? $transaction_id : null, 'error' => 'No order found with this transaction ID', ];
 		echo json_encode($response);
 		exit();
 	}
