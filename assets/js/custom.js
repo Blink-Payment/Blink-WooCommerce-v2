@@ -8,31 +8,18 @@ jQuery(function ($) {
         updated_checkout: function () {
 
             var paymentMode = jQuery('input[name=payment_method]:checked').val();
-            if (paymentMode == 'blink') {
-                jQuery('#place_order').hide();
-            } else {
-                jQuery('#place_order').show();
-            }
-
             var paymentBy = blink_checkout_form.$form.find('input[name=payment_by]').val();
 
-            if (paymentBy != '') {
-                blink_checkout_form.$form.submit();
-                return;
-            }
-        }
-    };
-
-    blink_checkout_form.init();
-
-    jQuery(document).ready(function () {
-        if ($('#blink-card').length) {
-            var $form = $('#blink-card');
-            var auto = {
-                autoSetup: true,
-                autoSubmit: true,
-            };
-            try {
+            console.log(paymentBy);
+            console.log('i m here now');
+            var $form = jQuery('form[name="checkout"]');
+            console.log($form.length);
+            if ($form.length && paymentBy == 'credit-card') {
+                console.log('hit2');
+                var auto = {
+                    autoSetup: true,
+                    autoSubmit: true,
+                };
                 var hf = $form.hostedForm(auto);
                 var screen_width = (window && window.screen ? window.screen.width : '0');
                 var screen_height = (window && window.screen ? window.screen.height : '0');
@@ -42,55 +29,92 @@ jQuery(function ($) {
                 var java = (window && window.navigator ? navigator.javaEnabled() : false);
                 var timezone = (new Date()).getTimezoneOffset();
 
-                $form.find('input[name=customer_name]').val(order_params.customer_name);
-                $form.find('input[name=customer_email]').val(order_params.customer_email);
-                $form.find('input[name=customer_address]').val(order_params.billing_address_1 + ', ' + order_params.billing_address_2);
-                $form.find('input[name=customer_postcode]').val(order_params.billing_postcode);
+                $form.find('input[name=customer_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
+                $form.find('input[name=customer_email]').val(jQuery('input[name="billing_email"]').val());
+                $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
+                $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
                 $form.find('input[name=device_timezone]').val(timezone);
                 $form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
                 $form.find('input[name=device_accept_language]').val(language);
                 $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
                     screen_depth);
                 $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
-
-            } catch (e) {
-                //Add your exception handling code here
             }
-        }
 
-        if ($('#blink-debit').length) {
-            try {
-                var $form = $('#blink-debit');
+            if($form.length && paymentBy == 'open-banking'){
 
-                $form.find('input[name=given_name]').val(order_params.billing_first_name);
-                $form.find('input[name=family_name]').val(order_params.billing_last_name);
-                $form.find('input[name=email]').val(order_params.billing_email);
-                $form.find('input[name=account_holder_name]').val(order_params.customer_name);
-                $form.find('input[name=customer_address]').val(order_params.billing_address_1 + ', ' + order_params.billing_address_2);
-                $form.find('input[name=customer_postcode]').val(order_params.billing_postcode);
-            } catch (e) {
-                //Add your exception handling code here
+                $form.find('input[name=user_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
+                $form.find('input[name=user_email]').val(jQuery('input[name="billing_email"]').val());
+                $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
+                $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
             }
-        }
-        if ($('#blink-open').length) {
-            try {
-                var $form = $('#blink-open');
-                $form.find('input[name=user_name]').val(order_params.customer_name);
-                $form.find('input[name=user_email]').val(order_params.customer_email);
-                $form.find('input[name=customer_address]').val(order_params.billing_address_1 + ', ' + order_params.billing_address_2);
-                $form.find('input[name=customer_postcode]').val(order_params.billing_postcode);
-            } catch (e) {
-                //Add your exception handling code here
-            }
-        }
 
-        var paymentMode = jQuery('input[name=payment_method]:checked').val();
-        if (paymentMode == 'blink') {
-            jQuery('#place_order').hide();
-        } else {
-            jQuery('#place_order').show();
+            if($form.length && paymentBy == 'direct-debit'){
+                $form.find('input[name=given_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
+                $form.find('input[name=email]').val(jQuery('input[name="billing_email"]').val());
+                $form.find('input[name=family_name]').val();
+                $form.find('input[name=account_holder_name]').val();
+                $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
+                $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
+            }
+
         }
+    };
+
+    var $form1 = jQuery('form[name="checkout"]');
+    $form1.on('checkout_place_order', function(event, checkoutForm) {
+        var activeTab = jQuery('.blink-pay-options.active');
+        var isCreditCard = activeTab.data('tab') === 'credit-card';
+        console.log('check',isCreditCard);
+
+        if(isCreditCard){
+
+            if ($form1.find('[name="paymentToken"]').length > 0) {
+                // If paymentToken is present, allow the form submission to proceed
+                return true;
+            } else {
+                // If paymentToken is not present, trigger the check_payment_token event
+                console.log('gourab', checkoutForm);
+                jQuery(document.body).trigger('check_payment_token');
+                return false;
+            }
+
+        }
+            
+       
     });
+
+    
+    jQuery(document).ready(function($) {
+        var $form = jQuery('form[name="checkout"]');
+        var paymentTokenChecked = false; // Flag to track if paymentToken has been checked
+    
+        // Define a custom asynchronous event handler to check for paymentToken
+        jQuery(document.body).on('check_payment_token', async function() {
+            // Check if paymentToken has already been checked
+            if (paymentTokenChecked) {
+                return; // If already checked, exit the function to prevent rechecking
+            }
+    
+            // Simulate an asynchronous operation to check for paymentToken
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Example: Wait for 2 seconds
+    
+            // Check if the form contains paymentToken
+            if ($form.find('[name="paymentToken"]').length > 0) {
+                // If paymentToken is found, submit the form
+                $form.trigger('submit');
+            } else {
+                // If paymentToken is not found, log a message (you can customize this)
+                console.log('PaymentToken not found. Waiting for it to be added...');
+            }
+    
+            // Set the flag to true to indicate paymentToken has been checked
+            paymentTokenChecked = true;
+        });
+    });
+    
+
+    blink_checkout_form.init();
 
     if (jQuery(".blink-api-section").width() < 500)
         jQuery('.blink-api-section').addClass('responsive-screen');
@@ -99,53 +123,22 @@ jQuery(function ($) {
 
     jQuery('form.checkout').on('change', 'input[name="payment_method"]', function () {
         var paymentMode = jQuery('input[name=payment_method]:checked').val();
-        if (paymentMode == 'blink') {
-            jQuery('#place_order').hide();
-        } else {
-            jQuery('#place_order').show();
-        }
+        // can call other method or remove
     });
 });
 
-// Resize Function 
-jQuery(document).ready(blinkfunction);
-jQuery(window).on('resize', blinkfunction);
 
-function blinkfunction() {
-    // do whatever
-    if (jQuery(".blink-api-section").width() < 500)
-        jQuery('.blink-api-section').addClass('responsive-screen');
-    else
-        jQuery('.blink-api-section').removeClass('responsive-screen');
+var updatePaymentBy = function (method) {
+    if(blink_params.card === '1'){
+        var redirectURL = blink_params.checkout_url;
+        redirectURL += '&payment_by=' + method;
+        window.location.href = redirectURL;
+    }else{
+
+        jQuery('#payment_by').val(method);
+        jQuery( 'form.checkout' ).trigger('update');
+    }
+
 }
 
-var blink_order_review_form = {
-    init: function () {
-        var paymentMode = jQuery('input[name=payment_method]:checked').val();
-        if (paymentMode == 'blink') {
-            jQuery('#place_order').hide();
-        } else {
-            jQuery('#place_order').show();
-        }
 
-        var paymentBy = jQuery('input[name=payment_by]').val();
-        console.log(paymentBy);
-
-        if (paymentBy != '') {
-            jQuery('#order_review').submit();
-            return;
-        }
-    }
-};
-
-
-var updatePaymentBy = function (data) {
-    var $form = jQuery('#payment_by').closest('form');
-    jQuery('#payment_by').val(data);
-
-    if ($form[0].id == 'order_review') {
-        blink_order_review_form.init();
-    } else {
-        jQuery(document.body).trigger('update_checkout');
-    }
-}

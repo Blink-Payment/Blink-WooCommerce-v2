@@ -16,12 +16,12 @@ header.blink-api-tabs-nav ul {
   padding-left: 0;
 }
 
-header.blink-api-tabs-nav ul li.active a {
+.blink-pay-options a.active {
   background: #3fb0ff;
   color: #fff;
 }
 
-header.blink-api-tabs-nav ul li a {
+.blink-pay-options a {
   background: #f9f9f9;
   color: #636363;
   font-size: 14px;
@@ -136,6 +136,8 @@ button:hover,
   color: #fff;
   border-color: #024dff;
 }
+
+
 
 /* ul.blink-api-responsive-tab-heading {
     display: none !important;
@@ -379,3 +381,57 @@ button:focus {
     transform: rotate(360deg);
   }
 }
+
+
+.blink-api-form-stracture {
+  max-width: fit-content;
+  margin: 0 auto;
+  background: #ffffff;
+  box-shadow: 0px 0px 30px rgb(0 0 0 / 10%);
+  border-radius: 10px;
+  position: relative;
+}
+
+.blink-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* Center tabs horizontally */
+}
+
+.blink-pay-options {
+  flex: 1; /* Allow tabs to grow and occupy available space */
+  margin: 0 2px; /* Add a little margin around each tab */
+}
+
+/* .blink-pay-options:last-child {
+  margin-right: 0;
+} */
+
+.blink-pay-options a {
+  padding: 10px 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  text-decoration: none;
+  color: #636363;
+  font-size: 14px;
+}
+
+.blink-pay-options.active a {
+  background-color: #3fb0ff;
+  color: #fff;
+}
+
+.blink-api-tabs-content {
+  width: 100%; /* Take full width of container */
+  box-sizing: border-box; /* Include padding in width calculation */
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+
