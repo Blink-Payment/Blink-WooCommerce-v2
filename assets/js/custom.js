@@ -15,6 +15,15 @@ jQuery(function ($) {
             var $form = jQuery('form[name="checkout"]');
             console.log($form.length);
             if ($form.length && paymentBy == 'credit-card') {
+                jQuery('#cc_customer_email').hide();
+                jQuery(".blink-form__label.field-label").each(function(){
+                    // Check if the label contains the text "Email"
+                    if (jQuery(this).text().trim() === "Email") {
+                        // Hide the label
+                        jQuery(this).hide();
+                    }
+                });
+                cc_customer_email
                 console.log('hit2');
                 var auto = {
                     autoSetup: true,
@@ -45,6 +54,9 @@ jQuery(function ($) {
 
                 $form.find('input[name=user_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
                 $form.find('input[name=user_email]').val(jQuery('input[name="billing_email"]').val());
+                $form.find('input[name=customer_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
+                $form.find('input[name=customer_email]').val(jQuery('input[name="billing_email"]').val());
+
                 $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
                 $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
             }
