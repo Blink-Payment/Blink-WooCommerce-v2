@@ -14,7 +14,7 @@ jQuery(function ($) {
             console.log('i m here now');
             var $form = jQuery('form[name="checkout"]');
             console.log($form.length);
-            if ($form.length && paymentBy == 'credit-card') {
+            if ($form.length && paymentBy == 'google-pay') {
                 jQuery('#cc_customer_email').hide();
                 jQuery(".blink-form__label.field-label").each(function(){
                     // Check if the label contains the text "Email"
@@ -23,13 +23,13 @@ jQuery(function ($) {
                         jQuery(this).hide();
                     }
                 });
-                cc_customer_email
+                //cc_customer_email
                 console.log('hit2');
-                var auto = {
-                    autoSetup: true,
-                    autoSubmit: true,
-                };
-                var hf = $form.hostedForm(auto);
+                // var auto = {
+                //     autoSetup: true,
+                //     autoSubmit: true,
+                // };
+                // var hf = $form.hostedForm(auto);
                 var screen_width = (window && window.screen ? window.screen.width : '0');
                 var screen_height = (window && window.screen ? window.screen.height : '0');
                 var screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
@@ -69,6 +69,10 @@ jQuery(function ($) {
                 $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
                 $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
             }
+
+            console.log('dasdasdsadasdsads');
+            onGooglePayLoaded('TEST','140841','BCR2DN4TYCZ6ZYTD','wpdev.local','Product','eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJtZXJjaGFudE9yaWdpbiI6IndwZGV2LmxvY2FsIiwibWVyY2hhbnRJZCI6IkJDUjJETjRUWUNaNlpZVEQiLCJpYXQiOjE3MTUwNzI1MTl9.zYmnNGXleH7uqaRUjqT8LxqnsrZpj0uk_aPyYorz9Ojnj4kZgURHY6AYiSQQOAmTYyIuc9dy4X0lGijTnAIMAQ','GBP','18');
+
 
         }
     };
@@ -152,5 +156,19 @@ var updatePaymentBy = function (method) {
     }
 
 }
+
+$("#googlePayToken").closest("form").submit(function(event) {
+    // Prevent the default form submission behavior
+    event.preventDefault();
+
+    // Perform any necessary actions before submitting the form
+    // For example, you might want to validate the form fields or display a loading spinner
+
+    // Then submit the form
+    //$(this).submit();
+    alert('hit');
+
+    return false;
+});
 
 

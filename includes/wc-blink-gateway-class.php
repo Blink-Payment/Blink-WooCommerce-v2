@@ -367,8 +367,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	}
 	public function create_payment_intent($method = '', $site = true, $order = null) {
 		
-		$amount = $order ? $order->get_total() : '0.1';
-		$requestData = ['card_layout' => 'single-line', 'amount' => $amount, 'payment_type' => $method, 'currency' => get_woocommerce_currency(), 'return_url' => $this->get_return_url($order), 'notification_url' => WC()->api_request_url('wc_blink_gateway'), ];
+		$amount = $order ? $order->get_total() : '1.0';
+		$requestData = ['card_layout' => 'single-line', 'amount' => $amount, 'payment_type' => 'credit-card', 'currency' => get_woocommerce_currency(), 'return_url' => $this->get_return_url($order), 'notification_url' => WC()->api_request_url('wc_blink_gateway'), ];
+		print_r($requestData); die;
 		$url = $this->host_url . '/pay/v1/intents';
 		$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'] ], 'body' => $requestData, ]);
 		$redirect = trailingslashit(wc_get_checkout_url());
@@ -378,6 +379,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				{
 					update_option('blink_element', $apiBody['element']);
 				}
+				//print_r($apiBody); die;
 			return $apiBody;
 		}
 
@@ -427,7 +429,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	/**
 	 * Plugin options,
 	 */
-	public function init_form_fields( $payment_types = [] ) { 
+	public function init_form_fields( $payment_types = [] ) { // call in front end
 		$fields = ['enabled' => ['title' => 'Enable/Disable', 'label' => 'Enable Blink Gateway', 'type' => 'checkbox', 'description' => '', 'default' => 'no', ], 'title' => ['title' => 'Title', 'type' => 'text', 'description' => 'This controls the title which the user sees during checkout.', 'default' => 'Blink v2', 'desc_tip' => true, ], 'description' => ['title' => 'Description', 'type' => 'textarea', 'description' => 'This controls the description which the user sees during checkout.', 'default' => 'Pay with your credit card or direct debit at your convenience.', ], 'testmode' => ['title' => 'Test mode', 'label' => 'Enable Test Mode', 'type' => 'checkbox', 'description' => 'Place the payment gateway in test mode using test API keys.', 'default' => 'yes', 'desc_tip' => true, ], 'test_api_key' => ['title' => 'Test API Key', 'type' => 'text', ], 'test_secret_key' => ['title' => 'Test Secret Key', 'type' => 'password', ], 'api_key' => ['title' => 'Live API Key', 'type' => 'text', ], 'secret_key' => ['title' => 'Live Secret Key', 'type' => 'password', ], 'custom_style' => ['title' => 'Custom Style', 'type' => 'textarea', 'description' => 'Do not include style tag', ], ];
 		if ($this->api_key && $this->secret_key) {
 
@@ -436,6 +438,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			//print_r($this->token); die; 
 			if(!empty($this->token['payment_types'])){
 				$this->intent = $this->create_payment_intent(current($this->token['payment_types']), true, null);
+				//print_r($this->token);
+				//print_r($this->intent);
 				update_option('blink_element',$this->intent['element']);
 			}
 
@@ -518,7 +522,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 							<div id="tab-<?php echo $method; ?> " class="tab-content <?php if ($method == $payment_by) echo 'active';?>">
 							<?php 
 								if ($method == $payment_by && 'credit-card' == $payment_by && !empty($element['ccElement'])) {
-									echo $element['ccElement'];
+									//echo $element['ccElement'];
 								}
 								if ($method == $payment_by && 'direct-debit' == $payment_by && !empty($element['ddElement'])) {
 									echo $element['ddElement'];
@@ -533,8 +537,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 							</div>
 							<?php endforeach; ?>		
-							<input type="hidden" name="payment_by" id="payment_by" value="<?php echo $payment_by; ?>">
+							<input type="hidden" name="payment_by" id="payment_by" value="<?php //echo $payment_by; ?>google-pay">
 						</section>
+						<?php //print 'gourab';?>
+						<!-- <form id="form-gp" method="POST" action="">
+							<input type="hidden" name="intent_id" value=""> -->
+							<?php
+								echo $element['gpElement'];
+							?>
+                    	<!-- </form> -->
 				</section>
 				
 			<?php
@@ -569,10 +580,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		// 	return;
 		// }
 		// let's suppose it is our payment processor JavaScript that allows to obtain a token
-		wp_enqueue_script('blink_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', [], $this->version);
+		wp_enqueue_script('blink_l', 'https://code.jquery.com/jquery-3.6.3.min.js', [], $this->version);
+		//wp_enqueue_script('blink_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', [], $this->version);
 		wp_register_style('woocommerce_blink_payment_style', plugins_url('/../assets/css/style.css', __FILE__), [], $this->version);
 		// and this is our custom JS in your plugin directory that works with token.js
-		wp_register_script('woocommerce_blink_payment', plugins_url('/../assets/js/custom.js', __FILE__), ['jquery', 'blink_js'], $this->version);
+		wp_register_script('woocommerce_blink_payment', plugins_url('/../assets/js/custom.js', __FILE__), ['jquery'], $this->version); //
 		// in most payment processors you have to use API KEY and SECRET KEY to obtain a token
 		wp_localize_script('woocommerce_blink_payment', 'blink_params', ['card'=>in_array('credit-card',$this->paymentMethods),'checkout_url'=> esc_url(add_query_arg(array('method' => 'blink'), wc_get_checkout_url())),'ajaxurl' => admin_url('admin-ajax.php'), 'apiKey' => $this->api_key, 'secretKey' => $this->secret_key, 'remoteAddress' => !empty($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '', ]);
 		$blinkPay = !empty($_GET['blinkPay']) ? sanitize_text_field($_GET['blinkPay']) : '';
@@ -702,11 +714,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 		$order_id = $order->get_id();
 		$this->token = $this->generate_access_token(false, $order);
-		$this->intent = $this->create_payment_intent($request['payment_by'], false, $order);
+		$intent = $this->create_payment_intent($request['payment_by'], false, $order);
 
-		if(!empty($this->token['access_token']) && !empty($this->intent['payment_intent'])){
+		//$this->intent = $intent;
+		//print_r($intent); die;
+		//print_r($this->token);
 
-			$requestData = ['payment_intent' => $this->intent['payment_intent'], 'paymentToken' => $request['paymentToken'], 'type' => $request['type'], 'raw_amount' => $request['amount'], 'customer_email' => !empty($request['customer_email']) ? $request['customer_email'] : $order->get_billing_email(), 'customer_name' => !empty($request['customer_name']) ? $request['customer_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'transaction_unique' => $request['transaction_unique'], 'merchant_data' => $this->get_payment_information($order_id), ];
+		if(!empty($this->token['access_token']) && !empty($intent['payment_intent'])){
+
+			$requestData = ['payment_intent' => $intent['payment_intent'], 'paymentToken' => $request['paymentToken'], 'type' => $request['type'], 'raw_amount' => $request['amount'], 'customer_email' => !empty($request['customer_email']) ? $request['customer_email'] : $order->get_billing_email(), 'customer_name' => !empty($request['customer_name']) ? $request['customer_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'transaction_unique' => $request['transaction_unique'], 'merchant_data' => $this->get_payment_information($order_id), ];
 			if (isset($request['remote_address'])) {
 				$requestData['device_timezone'] = $request['device_timezone'];
 				$requestData['device_capabilities'] = $request['device_capabilities'];
@@ -714,10 +730,10 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				$requestData['device_screen_resolution'] = $request['device_screen_resolution'];
 				$requestData['remote_address'] = $request['remote_address'];
 			}
-			//print_r($requestData);
-			$url = $this->host_url . '/pay/v1/creditcards';
+			//sprint_r($requestData);
+			$url = $this->host_url . '/pay/v1/googlepay';
 			$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'], 'user-agent' => !empty($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '', 'accept' => !empty($_SERVER['HTTP_ACCEPT']) ? sanitize_text_field($_SERVER['HTTP_ACCEPT']) : '', 'accept-encoding' => 'gzip, deflate, br', 'accept-charset' => 'charset=utf-8', ], 'body' => $requestData, ]);
-			//print_r($response); die;
+			print_r($response); die;
 			$redirect = trailingslashit(wc_get_checkout_url()) . '?p=credit-card&blinkPay=' . $order_id;
 			if (200 == wp_remote_retrieve_response_code($response)) {
 				$apiBody = json_decode(wp_remote_retrieve_body($response), true);
@@ -790,7 +806,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 			$redirect = '';
 
-			if($request['payment_by'] == 'credit-card')
+			if($request['payment_by'] == 'google-pay')
 			{
 				$redirect = $this->processCreditCard( $order, $request );
 
