@@ -369,7 +369,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		
 		$amount = $order ? $order->get_total() : '1.0';
 		$requestData = ['card_layout' => 'single-line', 'amount' => $amount, 'payment_type' => 'credit-card', 'currency' => get_woocommerce_currency(), 'return_url' => $this->get_return_url($order), 'notification_url' => WC()->api_request_url('wc_blink_gateway'), ];
-		print_r($requestData); die;
+		//print_r($requestData); die;
 		$url = $this->host_url . '/pay/v1/intents';
 		$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'] ], 'body' => $requestData, ]);
 		$redirect = trailingslashit(wc_get_checkout_url());
@@ -497,6 +497,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				}
                 $payment_by = !empty($parsed_data['payment_by']) ? $parsed_data['payment_by'] : current($this->paymentMethods);
 				$element = get_option('blink_element');
+				//print_r($element); die;
 			?>
 				<section class="blink-api-section">
 					<div class="blink-api-form-stracture">
@@ -522,7 +523,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 							<div id="tab-<?php echo $method; ?> " class="tab-content <?php if ($method == $payment_by) echo 'active';?>">
 							<?php 
 								if ($method == $payment_by && 'credit-card' == $payment_by && !empty($element['ccElement'])) {
-									//echo $element['ccElement'];
+									echo '<form name="blink-credit" action="" method="">'.$element['ccElement'].'
+									<input type="submit" name="submit" value="check" />
+									</form>
+									<input type="hidden" name="credit-card-data" id="credit-card-data" value="" />
+									';
 								}
 								if ($method == $payment_by && 'direct-debit' == $payment_by && !empty($element['ddElement'])) {
 									echo $element['ddElement'];
@@ -537,13 +542,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 							</div>
 							<?php endforeach; ?>		
-							<input type="hidden" name="payment_by" id="payment_by" value="<?php //echo $payment_by; ?>google-pay">
+							<input type="hidden" name="payment_by" id="payment_by" value="<?php echo $payment_by; ?>">
 						</section>
 						<?php //print 'gourab';?>
 						<!-- <form id="form-gp" method="POST" action="">
 							<input type="hidden" name="intent_id" value=""> -->
 							<?php
-								echo $element['gpElement'];
+								//echo $element['gpElement'];
 							?>
                     	<!-- </form> -->
 				</section>
@@ -580,8 +585,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		// 	return;
 		// }
 		// let's suppose it is our payment processor JavaScript that allows to obtain a token
-		wp_enqueue_script('blink_l', 'https://code.jquery.com/jquery-3.6.3.min.js', [], $this->version);
-		//wp_enqueue_script('blink_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', [], $this->version);
+		//wp_enqueue_script('blink_l', 'https://code.jquery.com/jquery-3.6.3.min.js', [], $this->version);
+		wp_enqueue_script('blink_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', [], $this->version);
 		wp_register_style('woocommerce_blink_payment_style', plugins_url('/../assets/css/style.css', __FILE__), [], $this->version);
 		// and this is our custom JS in your plugin directory that works with token.js
 		wp_register_script('woocommerce_blink_payment', plugins_url('/../assets/js/custom.js', __FILE__), ['jquery'], $this->version); //
@@ -710,7 +715,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		
 		return $redirect;
 	}
-	public function processCreditCard( $order, $request ) { 
+
+	public function processCreditCard( $order, $request, $endpoint = 'creditcards' ) { 
 
 		$order_id = $order->get_id();
 		$this->token = $this->generate_access_token(false, $order);
@@ -731,9 +737,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				$requestData['remote_address'] = $request['remote_address'];
 			}
 			//sprint_r($requestData);
-			$url = $this->host_url . '/pay/v1/googlepay';
+			$url = $this->host_url . '/pay/v1/'.$endpoint;
 			$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'], 'user-agent' => !empty($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '', 'accept' => !empty($_SERVER['HTTP_ACCEPT']) ? sanitize_text_field($_SERVER['HTTP_ACCEPT']) : '', 'accept-encoding' => 'gzip, deflate, br', 'accept-charset' => 'charset=utf-8', ], 'body' => $requestData, ]);
-			print_r($response); die;
+			//print_r($response); die;
 			$redirect = trailingslashit(wc_get_checkout_url()) . '?p=credit-card&blinkPay=' . $order_id;
 			if (200 == wp_remote_retrieve_response_code($response)) {
 				$apiBody = json_decode(wp_remote_retrieve_body($response), true);
@@ -806,9 +812,16 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 			$redirect = '';
 
+			if($request['payment_by'] == 'credit-card')
+			{
+				parse_str($_REQUEST['credit-card-data'], $parsed_data);	
+
+				$redirect = $this->processCreditCard( $order, array_merge($request,$parsed_data));
+
+			}
 			if($request['payment_by'] == 'google-pay')
 			{
-				$redirect = $this->processCreditCard( $order, $request );
+				$redirect = $this->processCreditCard( $order, $request, 'googlepay' );
 
 			}
 			if($request['payment_by'] == 'direct-debit')

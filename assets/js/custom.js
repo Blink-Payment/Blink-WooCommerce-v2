@@ -14,7 +14,10 @@ jQuery(function ($) {
             console.log('i m here now');
             var $form = jQuery('form[name="checkout"]');
             console.log($form.length);
-            if ($form.length && paymentBy == 'google-pay') {
+            if ($form.length && paymentBy == 'credit-card') {
+                var $form = jQuery('form[name="blink-credit"]');
+
+                
                 jQuery('#cc_customer_email').hide();
                 jQuery(".blink-form__label.field-label").each(function(){
                     // Check if the label contains the text "Email"
@@ -25,11 +28,22 @@ jQuery(function ($) {
                 });
                 //cc_customer_email
                 console.log('hit2');
-                // var auto = {
-                //     autoSetup: true,
-                //     autoSubmit: true,
-                // };
-                // var hf = $form.hostedForm(auto);
+                var auto = {
+                    autoSetup: true,
+                    autoSubmit: true,
+                };
+                try{
+                    var hf = $form.hostedForm(auto);
+                    console.log(hf);
+                    //var hfs = $form.hostedForm('destroy');
+
+                    //var hf = $form.hostedForm(auto);
+
+
+                }catch (error) {
+                    // Handle any errors that occur during the execution of the try block
+                    console.error("An error occurred:", error);
+                }
                 var screen_width = (window && window.screen ? window.screen.width : '0');
                 var screen_height = (window && window.screen ? window.screen.height : '0');
                 var screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
@@ -71,7 +85,7 @@ jQuery(function ($) {
             }
 
             console.log('dasdasdsadasdsads');
-            onGooglePayLoaded('TEST','140841','BCR2DN4TYCZ6ZYTD','wpdev.local','Product','eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJtZXJjaGFudE9yaWdpbiI6IndwZGV2LmxvY2FsIiwibWVyY2hhbnRJZCI6IkJDUjJETjRUWUNaNlpZVEQiLCJpYXQiOjE3MTUwNzI1MTl9.zYmnNGXleH7uqaRUjqT8LxqnsrZpj0uk_aPyYorz9Ojnj4kZgURHY6AYiSQQOAmTYyIuc9dy4X0lGijTnAIMAQ','GBP','18');
+            //onGooglePayLoaded('TEST','140841','BCR2DN4TYCZ6ZYTD','wpdev.local','Product','eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJtZXJjaGFudE9yaWdpbiI6IndwZGV2LmxvY2FsIiwibWVyY2hhbnRJZCI6IkJDUjJETjRUWUNaNlpZVEQiLCJpYXQiOjE3MTUwNzI1MTl9.zYmnNGXleH7uqaRUjqT8LxqnsrZpj0uk_aPyYorz9Ojnj4kZgURHY6AYiSQQOAmTYyIuc9dy4X0lGijTnAIMAQ','GBP','18');
 
 
         }
@@ -81,11 +95,19 @@ jQuery(function ($) {
     $form1.on('checkout_place_order', function(event, checkoutForm) {
         var activeTab = jQuery('.blink-pay-options.active');
         var isCreditCard = activeTab.data('tab') === 'credit-card';
+
         console.log('check',isCreditCard);
 
         if(isCreditCard){
 
+
             if ($form1.find('[name="paymentToken"]').length > 0) {
+                console.log('get payment token');
+                $childform = jQuery('form[name="blink-credit"]');
+                $paymentData = $childform.serialize();
+                jQuery('#credit-card-data').val($paymentData);
+                console.log($paymentData);
+                console.log($form1.serialize());
                 // If paymentToken is present, allow the form submission to proceed
                 return true;
             } else {
@@ -117,12 +139,13 @@ jQuery(function ($) {
     
             // Check if the form contains paymentToken
             if ($form.find('[name="paymentToken"]').length > 0) {
+                console.log($form.find('[name="paymentToken"]').val());
                 // If paymentToken is found, submit the form
                 $form.trigger('submit');
             } else {
                 // If paymentToken is not found, log a message (you can customize this)
                 console.log('PaymentToken not found. Waiting for it to be added...');
-            }
+                
     
             // Set the flag to true to indicate paymentToken has been checked
             paymentTokenChecked = true;
@@ -145,30 +168,30 @@ jQuery(function ($) {
 
 
 var updatePaymentBy = function (method) {
-    if(blink_params.card === '1'){
-        var redirectURL = blink_params.checkout_url;
-        redirectURL += '&payment_by=' + method;
-        window.location.href = redirectURL;
-    }else{
+    // if( blink_params.card === '1'){
+    //     var redirectURL = blink_params.checkout_url;
+    //     redirectURL += '&payment_by=' + method;
+    //     window.location.href = redirectURL;
+    // }else{
 
         jQuery('#payment_by').val(method);
         jQuery( 'form.checkout' ).trigger('update');
-    }
+    //}
 
 }
 
-$("#googlePayToken").closest("form").submit(function(event) {
-    // Prevent the default form submission behavior
-    event.preventDefault();
+// $("#googlePayToken").closest("form").submit(function(event) {
+//     // Prevent the default form submission behavior
+//     event.preventDefault();
 
-    // Perform any necessary actions before submitting the form
-    // For example, you might want to validate the form fields or display a loading spinner
+//     // Perform any necessary actions before submitting the form
+//     // For example, you might want to validate the form fields or display a loading spinner
 
-    // Then submit the form
-    //$(this).submit();
-    alert('hit');
+//     // Then submit the form
+//     //$(this).submit();
+//     alert('hit');
 
-    return false;
-});
+//     return false;
+// });
 
 
