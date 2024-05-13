@@ -247,8 +247,11 @@ jQuery(document).on('click', '#gpay-button-online-api-id', function() {
 jQuery(document).on('click', '#place_order', function() {
     // Your click event handling code goes here
     // For example, you can set the value of another element when this button is clicked
-    jQuery('form[name="checkout"]').find('[id="payment_by"]').val('credit-card');
+    var payment_by = jQuery('form[name="checkout"]').find('[id="payment_by"]').val();
     //jQuery('form[name="blink-credit"]').submit();
-    jQuery('#blink-credit-submit').click();
+    if('credit-card' === payment_by){
+        jQuery('#blink-credit-submit').click();
+
+    }
 });
 
