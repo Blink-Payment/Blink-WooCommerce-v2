@@ -34,11 +34,6 @@ jQuery(function ($) {
                 };
                 try{
                     var hf = $form.hostedForm(auto);
-                    //console.log(hf);
-                    //var hfs = $form.hostedForm('destroy');
-
-                    //var hf = $form.hostedForm(auto);
-
 
                 }catch (error) {
                     // Handle any errors that occur during the execution of the try block
@@ -99,22 +94,34 @@ jQuery(function ($) {
                 $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
                     screen_depth);
                 $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
-                onGooglePayLoaded('TEST','140841','BCR2DN4TYCZ6ZYTD','wpdev.local','Doggies','eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJtZXJjaGFudE9yaWdpbiI6ImRlbW8tYXBwLmJsaW5rcGF5bWVudC5jby51ayIsIm1lcmNoYW50SWQiOiJCQ1IyRE40VFlDWjZaWVREIiwiaWF0IjoxNzE1MjM5ODE4fQ.EIJy7cpWRvGZ_gLF904BOXs9fw5Y73hmlCK29GOZIXf1Fj6-cI2dHVf3kxzktVZgjqMznKPlHxnRFPdzoa8s-g','GBP','2.00');
+                window.configValuesGlob={};
+                var scriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
+                var totalAmountWithSymbol = $('.order-total .woocommerce-Price-amount').text().trim();
+                var currencySymbol = $('.order-total .woocommerce-Price-currencySymbol').text();
+                var totalAmount = totalAmountWithSymbol.replace(currencySymbol, '').trim();
+        
+                    if (scriptElement) {
+                        // Extract the onload attribute value
+                        var onloadValue = scriptElement.getAttribute('onload');
+
+                        var functionCall = onloadValue.match(/onGooglePayLoaded\(.*?\)/)[0];
+    
+                        // Modify the price parameter in the function call
+                        var modifiedFunctionCall = functionCall.replace(/'[\d.]+'/g, "'"+totalAmount+"'");
+                        
+                        // Execute the onload function call
+                        setTimeout(function() {
+                            eval(modifiedFunctionCall);
+                        }, 1000);
+                    } else {
+                        console.error('Script element not found.');
+                    }
                 
                 console.log('length', $form.find('[id="gpay-button-online-api-id"]').length);
             }
 
-
         }
     };
-
-    // var googleButton = jQuery('form[name="checkout"]').find('[id="gpay-button-online-api-id"]');
-    // if(googleButton)
-    // {
-    //     googleButton.on('click', function(event, checkoutForm) {
-    //         jQuery('form[name="checkout"]').find('[id="payment_by"]').value('google-pay');
-    //     });
-    // }
     
 
 
@@ -210,15 +217,10 @@ jQuery(function ($) {
 
 
 var updatePaymentBy = function (method) {
-    // if( blink_params.card === '1'){
-    //     var redirectURL = blink_params.checkout_url;
-    //     redirectURL += '&payment_by=' + method;
-    //     window.location.href = redirectURL;
-    // }else{
+
 
         jQuery('#payment_by').val(method);
         jQuery( 'form.checkout' ).trigger('update');
-    //}
 
 }
 
@@ -249,6 +251,4 @@ jQuery(document).on('click', '#place_order', function() {
     //jQuery('form[name="blink-credit"]').submit();
     jQuery('#blink-credit-submit').click();
 });
-
-
 
