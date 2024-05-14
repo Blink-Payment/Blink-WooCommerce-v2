@@ -58,6 +58,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		//add_action('wp_ajax_cancel_transaction', array($this,'blink_cancel_transaction'));
 		// We need custom JavaScript to obtain a token
 		add_action('wp_enqueue_scripts', [$this, 'payment_scripts']);
+		delete_transient('blink_token');
+		delete_transient('blink_element');
 
 	}
 
