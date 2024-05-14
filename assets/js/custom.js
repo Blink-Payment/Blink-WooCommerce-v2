@@ -10,10 +10,7 @@ jQuery(function ($) {
             var paymentMode = jQuery('input[name=payment_method]:checked').val();
             var paymentBy = blink_checkout_form.$form.find('input[name=payment_by]').val();
 
-            console.log(paymentBy);
-            console.log('i m here now');
             var $form = jQuery('form[name="checkout"]');
-            console.log($form.length);
             if ($form.length && paymentBy == 'credit-card') {
                 var $form = jQuery('form[name="blink-credit"]');
 
@@ -26,8 +23,6 @@ jQuery(function ($) {
                         jQuery(this).hide();
                     }
                 });
-                //cc_customer_email
-                console.log('hit2');
                 var auto = {
                     autoSetup: true,
                     autoSubmit: true,
@@ -96,28 +91,17 @@ jQuery(function ($) {
                 $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
                 window.configValuesGlob={};
                 var scriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
-                var totalAmountWithSymbol = $('.order-total .woocommerce-Price-amount').text().trim();
-                var currencySymbol = $('.order-total .woocommerce-Price-currencySymbol').text();
-                var totalAmount = totalAmountWithSymbol.replace(currencySymbol, '').trim();
         
                     if (scriptElement) {
                         // Extract the onload attribute value
-                        var onloadValue = scriptElement.getAttribute('onload');
-
-                        var functionCall = onloadValue.match(/onGooglePayLoaded\(.*?\)/)[0];
-    
-                        // Modify the price parameter in the function call
-                        var modifiedFunctionCall = functionCall.replace(/'[\d.]+'/g, "'"+totalAmount+"'");
-                        
+                        var onloadValue = scriptElement.getAttribute('onload');                        
                         // Execute the onload function call
                         setTimeout(function() {
-                            eval(modifiedFunctionCall);
+                            eval(onloadValue);
                         }, 1000);
                     } else {
                         console.error('Script element not found.');
                     }
-                
-                console.log('length', $form.find('[id="gpay-button-online-api-id"]').length);
             }
 
         }
@@ -131,22 +115,16 @@ jQuery(function ($) {
         var isCreditCard = activeTab === 'credit-card';
         $childform = jQuery('form[name="blink-credit"]');
 
-        console.log('check', isCreditCard);
-
         if(isCreditCard){
             
 
             if ($childform.find('[name="paymentToken"]').length > 0) {
-                console.log('get payment token');
                 $paymentData = $childform.serialize();
                 jQuery('#credit-card-data').val($paymentData);
-                console.log($paymentData);
-                console.log($form1.serialize());
                 // If paymentToken is present, allow the form submission to proceed
                 return true;
             } else {
                 // If paymentToken is not present, trigger the check_payment_token event
-                console.log('gourab', checkoutForm);
                 jQuery(document.body).trigger('check_payment_token');
                 return false;
             }
@@ -155,21 +133,6 @@ jQuery(function ($) {
             
        
     });
-
-    // var googleButton = jQuery('form[name="checkout"]').find('[id="gpay-button-online-api-id"]');
-    // if(googleButton)
-    // {   console.log('ffffffsdf');
-    // jQuery('form[name="checkout"]').find('[id="gpay-button-online-api-id"]').click(function() {
-    //         jQuery('form[name="checkout"]').find('[id="payment_by"]').val('google-pay');
-    //     });
-        
-    // //}
-
-    // jQuery(document).on('click', 'input[id="gpay-button-online-api-id"]', function () {
-    //     alert('test');
-    //     jQuery('input[name=payment_by]').val('google-pay');
-    //     // can call other method or remove
-    // });
 
     
     jQuery(document).ready(function($) {
@@ -188,7 +151,6 @@ jQuery(function ($) {
     
             // Check if the form contains paymentToken
             if ($form.find('[name="paymentToken"]').length > 0) {
-                console.log($form.find('[name="paymentToken"]').val());
                 // If paymentToken is found, submit the form
                 $form.trigger('submit');
             } else {
@@ -209,10 +171,6 @@ jQuery(function ($) {
     else
         jQuery('.blink-api-section').removeClass('responsive-screen');
 
-    jQuery('form.checkout').on('change', 'input[name="payment_method"]', function () {
-        var paymentMode = jQuery('input[name=payment_method]:checked').val();
-        // can call other method or remove
-    });
 });
 
 
@@ -224,20 +182,6 @@ var updatePaymentBy = function (method) {
 
 }
 
-// $("#googlePayToken").closest("form").submit(function(event) {
-//     // Prevent the default form submission behavior
-//     event.preventDefault();
-
-//     // Perform any necessary actions before submitting the form
-//     // For example, you might want to validate the form fields or display a loading spinner
-
-//     // Then submit the form
-//     //$(this).submit();
-//     alert('hit');
-
-//     return false;
-// });
-
 jQuery(document).on('click', '#gpay-button-online-api-id', function() {
     // Your click event handling code goes here
     // For example, you can set the value of another element when this button is clicked
@@ -248,10 +192,17 @@ jQuery(document).on('click', '#place_order', function() {
     // Your click event handling code goes here
     // For example, you can set the value of another element when this button is clicked
     var payment_by = jQuery('form[name="checkout"]').find('[id="payment_by"]').val();
-    //jQuery('form[name="blink-credit"]').submit();
     if('credit-card' === payment_by){
         jQuery('#blink-credit-submit').click();
 
     }
 });
+
+jQuery(document).on('change', 'input[name="payment_method"]', function() {
+
+    jQuery('form.checkout').trigger('update');
+});
+
+
+
 
