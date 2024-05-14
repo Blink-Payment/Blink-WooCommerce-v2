@@ -133,61 +133,6 @@ function checkFromSubmission() {
 		}
 	} 
 }
-function checkBlinkPaymentMethod( $content ) { 
-	$blinkPay = isset($_GET['blinkPay']) ? sanitize_text_field($_GET['blinkPay']) : '';
-	$method = isset($_GET['p']) ? sanitize_text_field($_GET['p']) : '';
-	if (!empty($blinkPay)) {
-		checkOrderPayment($blinkPay);
-		$gateWay = new WC_Blink_Gateway();
-		if (!empty($method) && in_array($method, $gateWay->paymentMethods)) {
-			$gateWay->accessToken = $gateWay->generate_access_token();
-			$gateWay->paymentIntent = $gateWay->create_payment_intent();
-			if (isset($gateWay->paymentIntent['payment_intent'])) {
-				$string = implode(' ', array_map('ucfirst', explode('-', $method)));
-				$html = wc_print_notices();
-				$html.= '<section class="blink-api-section">
-							<div class="blink-api-form-stracture">
-								<h2 class="heading-text">Pay with ' . $string . '</h2>
-								<section class="blink-api-tabs-content">';
-				if ('credit-card' == $method && $gateWay->paymentIntent['element']['ccElement']) {
-					$html.= '<div id="tab1" class="tab-contents active">
-											<form name="blink-card" id="blink-card" method="POST" action="">
-												' . $gateWay->paymentIntent['element']['ccElement'];
-				}
-				if ('direct-debit' == $method && $gateWay->paymentIntent['element']['ddElement']) {
-					$html.= '<div id="tab1" class="tab-contents active">
-											<form name="blink-debit" id="blink-debit" method="POST" action="">
-												' . $gateWay->paymentIntent['element']['ddElement'];
-				}
-				if ('open-banking' == $method && $gateWay->paymentIntent['element']['obElement']) {
-					$html.= '<div id="tab1" class="tab-contents active">
-											<form name="blink-open" id="blink-open" method="POST" action="">
-												' . $gateWay->paymentIntent['element']['obElement'];
-				}
-				$html.= '<input type="hidden" name="transaction_unique" value="' . $gateWay->paymentIntent['transaction_unique'] . '">
-												<input type="hidden" name="amount" value="' . $gateWay->paymentIntent['amount'] . '">
-												<input type="hidden" name="intent_id" value="' . $gateWay->paymentIntent['id'] . '">
-												<input type="hidden" name="intent" value="' . $gateWay->paymentIntent['payment_intent'] . '">
-												<input type="hidden" name="access_token" value="' . $gateWay->accessToken . '">
-												<input type="hidden" name="payment_by" id="payment_by" value="' . $method . '">
-												<input type="hidden" name="action" value="blinkSubmitPayment">
-												<input type="hidden" name="order_id" value="' . $blinkPay . '">
-												' . wp_nonce_field( 'submit-payment' ) . '
-												<input type="submit" value="Pay now" name="blink-submit" />
-											</form>
-										</div>';
-				$html.= '</section>
-							</div>
-						</section>';
-				return $html;
-			} else {
-				wc_add_notice($gateWay->paymentIntent['error'] ? $gateWay->paymentIntent['error'] : 'Something is wrong! Please start the payment from checkout page.', 'error');
-				wp_redirect(wc_get_checkout_url());
-			}
-		}
-	}
-	return $content;
-}
 function blink_3d_form_submission( $content ) { 
 	$blink3dprocess = isset($_GET['blink3dprocess']) ? sanitize_text_field($_GET['blink3dprocess']) : '';
 	if (!empty($blink3dprocess)) {
