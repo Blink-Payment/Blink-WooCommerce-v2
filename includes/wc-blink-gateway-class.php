@@ -32,8 +32,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->api_key = $this->testmode ? $this->get_option('test_api_key') : $this->get_option('api_key');
 		$this->secret_key = $this->testmode ? $this->get_option('test_secret_key') : $this->get_option('secret_key');
 		$this->token = get_option('blink_token');
-		$this->add_error_notices();
-
+		
 		$selectedMethods = [];
 		if (is_array($this->token) && isset($this->token['payment_types'])) {
 			foreach ($this->token['payment_types'] as $type) {
@@ -41,7 +40,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 		}
 		$this->paymentMethods = array_filter($selectedMethods);
-
+  $this->add_error_notices();
+		
 		// Method with all the options fields
 		$this->init_form_fields();
 		// This action hook saves the settings
@@ -305,14 +305,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		return true;
 	}
 	public function add_error_notices( $payment_types = [] ) { 
-		$adminnotice = new WC_Admin_Notices();
-		$selectedMethods = [];
-		if (is_array($this->token) && isset($this->token['payment_types'])) {
-			foreach ($this->token['payment_types'] as $type) {
-				$selectedMethods[] = ('yes' === $this->get_option($type)) ? $type : '';
-			}
+		
+		if ( !is_admin() && !wp_doing_ajax() ) {
+			return;
 		}
-		$this->paymentMethods = array_filter($selectedMethods);
+		
+		$adminnotice = new WC_Admin_Notices();
+		
 		if ( isset( $_GET['page'] ) && $_GET['page'] === 'wc-settings' && isset( $_GET['tab'] ) && $_GET['tab'] === 'checkout' && isset( $_GET['section'] ) && $_GET['section'] === $this->id ) {
 
 			if (empty($this->api_key) || empty($this->secret_key))
@@ -475,7 +474,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if(empty($element))
 		{
 			$token = get_transient('blink_token');
-			$expired = false;
+			$expired = true;
 			if(!empty($token))
 			{
 				$expired = $this->isTimestampExpired($token['expired_on']);
@@ -483,7 +482,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			if($expired){
 				$token = $this->generate_access_token(true, null);
 				set_transient( 'blink_token', $token, 15 * MINUTE_IN_SECONDS );
-
 			}
 			$intent = $this->create_payment_intent();
 			if(!empty($intent))
