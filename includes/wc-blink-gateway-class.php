@@ -40,7 +40,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 		}
 		$this->paymentMethods = array_filter($selectedMethods);
-  $this->add_error_notices();
+		$this->add_error_notices();
 		
 		// Method with all the options fields
 		$this->init_form_fields();
@@ -425,7 +425,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if ($this->api_key && $this->secret_key) {
 
 			$this->token = get_option('blink_token');
-			$expired = false;
 
 			if (!empty($this->token) && !empty($this->token['payment_types'])) {
 				$pay_methods['pay_methods'] = ['title' => 'Payment Methods', 'label' => '', 'type' => 'hidden', 'description' => '', 'default' => '', ];
@@ -462,11 +461,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	
 	 public function payment_fields() {
 
-		if(empty($_REQUEST['wc-ajax']) && empty($_REQUEST['payment_method'])){
-			return;
-		}
-
-		if($_REQUEST['wc-ajax'] != 'update_order_review' && $_REQUEST['payment_method'] != $this->id){
+		if(empty($_REQUEST['payment_method']) || $_REQUEST['payment_method'] != $this->id){
 			return;
 		}
 
@@ -577,7 +572,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	
 	public function payment_scripts() { 
 		// we need JavaScript to process a token only on cart/checkout pages, right?
-		if (!is_cart() && !is_checkout()) {
+		if (!is_cart() && !is_checkout() && !isset($_GET['pay_for_order'])) {
 			return;
 		}
 		// if our payment gateway is disabled, we do not have to enqueue JS too
