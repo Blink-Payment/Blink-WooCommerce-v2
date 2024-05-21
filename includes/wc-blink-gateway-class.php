@@ -31,11 +31,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->testmode = 'yes' === $this->get_option('testmode');
 		$this->api_key = $this->testmode ? $this->get_option('test_api_key') : $this->get_option('api_key');
 		$this->secret_key = $this->testmode ? $this->get_option('test_secret_key') : $this->get_option('secret_key');
-		$this->token = get_option('blink_token');
+		$token = get_option('blink_admin_token');
 		
 		$selectedMethods = [];
-		if (is_array($this->token) && isset($this->token['payment_types'])) {
-			foreach ($this->token['payment_types'] as $type) {
+		if (is_array($token) && isset($token['payment_types'])) {
+			foreach ($token['payment_types'] as $type) {
 				$selectedMethods[] = ('yes' === $this->get_option($type)) ? $type : '';
 			}
 		}
@@ -55,11 +55,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		add_filter('woocommerce_admin_order_should_render_refunds', array($this, 'should_render_refunds'), 10, 3);
 		add_filter('woocommerce_order_item_add_action_buttons', array($this, 'add_cancel_button'), 10);
 		add_action('admin_enqueue_scripts',  array($this,'blink_enqueue_scripts'), 10);
-		//add_action('wp_ajax_cancel_transaction', array($this,'blink_cancel_transaction'));
+		add_action('wp_ajax_cancel_transaction', array($this,'blink_cancel_transaction'));
 		// We need custom JavaScript to obtain a token
 		add_action('wp_enqueue_scripts', [$this, 'payment_scripts']);
 		delete_transient('blink_token');
-		delete_transient('blink_element');
+		delete_transient('blink_intent');
 
 	}
 
@@ -74,10 +74,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			$this->api_key = $_POST['woocommerce_blink_api_key'];
 			$this->secret_key = $_POST['woocommerce_blink_secret_key'];
 		}
-		delete_transient('blink_token');
-		delete_transient('blink_element');
-		$token = $this->generate_access_token(true, null);
-		update_option('blink_token',$token);
+		$token = $this->generate_access_token();
+		update_option('blink_admin_token',$token);
 	}
 
 	public function get_time_diff($order)
@@ -117,7 +115,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			'reference' => $reason
 		);
 	
-		$this->token = $this->generate_access_token(false, $order);
+		$this->token = $this->generate_access_token();
 		// Prepare request headers
 		$headers = array('Authorization' => 'Bearer ' . $this->token['access_token']);
 	
@@ -157,7 +155,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	public function cancel_transaction($transaction_id) {
                 $url = $this->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
 
-				$this->token = $this->generate_access_token(false, null);
+				$this->token = $this->generate_access_token();
 				// Prepare request headers
 				$headers = array('Authorization' => 'Bearer ' . $this->token['access_token']);
 		
@@ -239,7 +237,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	private function get_transaction_status($transaction_id, $order = null) {
 		$url = $this->host_url . '/pay/v1/transactions/'.$transaction_id;
 
-		$this->token = $this->generate_access_token(false, $order);
+		$this->token = $this->generate_access_token();
 		// Prepare request headers
 		$headers = array('Authorization' => 'Bearer ' . $this->token['access_token']);
 
@@ -311,6 +309,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 		
 		$adminnotice = new WC_Admin_Notices();
+		$token = get_option('blink_admin_token');
 		
 		if ( isset( $_GET['page'] ) && $_GET['page'] === 'wc-settings' && isset( $_GET['tab'] ) && $_GET['tab'] === 'checkout' && isset( $_GET['section'] ) && $_GET['section'] === $this->id ) {
 
@@ -324,15 +323,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 			if (!empty($this->api_key) && !empty($this->secret_key)){
 				$adminnotice->remove_notice('no-api');
-				if (!empty($this->token['payment_types'])) {
+				if (!empty($token['payment_types'])) {
 					if (empty($this->paymentMethods)) {
-						$adminnotice->remove_notice('no-payment-types');
 						if (!$adminnotice->has_notice('no-payment-type-selected')) {
 							$adminnotice->add_custom_notice('no-payment-type-selected', '<div>Please select the Payment Methods and save the configuration!</div>');
 						}
 					} else {
 						$adminnotice->remove_notice('no-payment-type-selected');
 					}
+					$adminnotice->remove_notice('no-payment-types');
 				} else {
 					if (!$adminnotice->has_notice('no-payment-types')) {
 						$adminnotice->add_custom_notice('no-payment-types', '<div>There is no Payment Types Available.</div>');
@@ -355,17 +354,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 		return;
 	}
-	public function generate_access_token( $site = true, $order = null ) { 
+	public function generate_access_token() { 
 		    
 		$url = $this->host_url . '/pay/v1/tokens';
 		$response = wp_remote_post($url, ['method' => 'POST', 'body' => ['api_key' => $this->api_key, 'secret_key' => $this->secret_key, ], ]);
 		if (201 == wp_remote_retrieve_response_code($response)) {
 			$apiBody = json_decode(wp_remote_retrieve_body($response), true);
-			if($site)
-			{
-				update_option('blink_token', $apiBody);
-			}
-
 			return $apiBody;
 		}
 
@@ -386,7 +380,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 		return apply_filters('woocommerce_get_return_url', $return_url, $order);
 	}
-	public function create_payment_intent($method = '', $order = null) {
+	public function create_payment_intent($access_token='', $method = '', $order = null) {
 
         $cartAmount = WC()->cart->get_total('raw');
         $cartAmount = !empty($cartAmount) ? $cartAmount : '1.0';
@@ -394,7 +388,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$amount = !empty($order) ? $order->get_total() : $cartAmount;
 		$requestData = ['card_layout' => 'single-line', 'amount' => $amount, 'payment_type' => 'credit-card', 'currency' => get_woocommerce_currency(), 'return_url' => $this->get_return_url($order), 'notification_url' => WC()->api_request_url('wc_blink_gateway'), ];
 		$url = $this->host_url . '/pay/v1/intents';
-		$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'] ], 'body' => $requestData, ]);
+		$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $access_token ], 'body' => $requestData, ]);
 		$redirect = trailingslashit(wc_get_checkout_url());
 		if (201 == wp_remote_retrieve_response_code($response)) {
 			$apiBody = json_decode(wp_remote_retrieve_body($response), true);
@@ -402,6 +396,24 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 
 		return [];
+	}
+
+	public function update_payment_intent($access_token='', $method = '', $order = null, $id = null)
+	{
+		$this->token = $this->generate_access_token();
+		
+		$requestData = ['amount' => $order->get_total(), 'return_url' => $this->get_return_url($order) ];
+		if($id){
+			$url = $this->host_url . '/pay/v1/intents/'.$id;
+			$response = wp_remote_post($url, ['method' => 'PATCH', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'], ], 'body' => $requestData, ]);
+			if (200 == wp_remote_retrieve_response_code($response)) {
+				$apiBody = json_decode(wp_remote_retrieve_body($response), true);
+				return $apiBody;
+			}
+		}
+
+		return [];
+
 	}
 
 	public function isTimestampExpired($timestamp) {
@@ -424,12 +436,13 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$fields = ['enabled' => ['title' => 'Enable/Disable', 'label' => 'Enable Blink Gateway', 'type' => 'checkbox', 'description' => '', 'default' => 'no', ], 'title' => ['title' => 'Title', 'type' => 'text', 'description' => 'This controls the title which the user sees during checkout.', 'default' => 'Blink v2', 'desc_tip' => true, ], 'description' => ['title' => 'Description', 'type' => 'textarea', 'description' => 'This controls the description which the user sees during checkout.', 'default' => 'Pay with your credit card or direct debit at your convenience.', ], 'testmode' => ['title' => 'Test mode', 'label' => 'Enable Test Mode', 'type' => 'checkbox', 'description' => 'Place the payment gateway in test mode using test API keys.', 'default' => 'yes', 'desc_tip' => true, ], 'test_api_key' => ['title' => 'Test API Key', 'type' => 'text', ], 'test_secret_key' => ['title' => 'Test Secret Key', 'type' => 'password', ], 'api_key' => ['title' => 'Live API Key', 'type' => 'text', ], 'secret_key' => ['title' => 'Live Secret Key', 'type' => 'password', ], 'custom_style' => ['title' => 'Custom Style', 'type' => 'textarea', 'description' => 'Do not include style tag', ], ];
 		if ($this->api_key && $this->secret_key) {
 
-			$this->token = get_option('blink_token');
+			$token = get_option('blink_admin_token');
 
-			if (!empty($this->token) && !empty($this->token['payment_types'])) {
+
+			if (!empty($token) && !empty($token['payment_types'])) {
 				$pay_methods['pay_methods'] = ['title' => 'Payment Methods', 'label' => '', 'type' => 'hidden', 'description' => '', 'default' => '', ];
 				$fields = insertArrayAtPosition($fields, $pay_methods, count($fields) - 1);
-				foreach ($this->token['payment_types'] as $types) {
+				foreach ($token['payment_types'] as $types) {
 					$payment[$types] = ['title' => '', 'label' => ucwords(str_replace('-', ' ', $types)), 'type' => 'checkbox', 'description' => '', 'default' => 'no', ];
 					$fields = insertArrayAtPosition($fields, $payment, count($fields) - 1);
 				}
@@ -465,7 +478,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			return;
 		}
 
-		$element = get_transient('blink_element');
+		$intent = get_transient('blink_intent');
+		$element = !empty($intent) ? $intent['element'] : [];
 		if(empty($element))
 		{
 			$token = get_transient('blink_token');
@@ -475,15 +489,12 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				$expired = $this->isTimestampExpired($token['expired_on']);
 			}
 			if($expired){
-				$token = $this->generate_access_token(true, null);
+				$token = $this->generate_access_token();
 				set_transient( 'blink_token', $token, 15 * MINUTE_IN_SECONDS );
 			}
-			$intent = $this->create_payment_intent();
-			if(!empty($intent))
-			{
-				$element = $intent['element'];
-				set_transient( 'blink_element', $element, 15 * MINUTE_IN_SECONDS );
-			}
+			$intent = $this->create_payment_intent($token['access_token']);
+			set_transient( 'blink_intent', $intent, 15 * MINUTE_IN_SECONDS );
+			$element = !empty($intent) ? $intent['element'] : [];
 
 		}
 
@@ -744,26 +755,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 		return $redirect;
 	}
-
-	public function update_payment_intent($order, $id)
-	{
-		$this->token = $this->generate_access_token(false, $order);
-		
-		$requestData = ['amount' => $order->get_total(), 'return_url' => $this->get_return_url($order) ];
-		$url = $this->host_url . '/pay/v1/intents/'.$id;
-		$response = wp_remote_post($url, ['method' => 'PATCH', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'], ], 'body' => $requestData, ]);
-		if (200 == wp_remote_retrieve_response_code($response)) {
-			$apiBody = json_decode(wp_remote_retrieve_body($response), true);
-			return $apiBody;
-		} else {
-			$error_message = wp_remote_retrieve_response_message($response);
-			wc_add_notice($error_message, 'error');
-			
-		}
-
-		return $response;
-
-	}
 	/*
 	 * We're processing the payments here
 	*/
@@ -774,8 +765,31 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			
 			$request = $_POST;
 			$result = 'success';
-			$this->token = $this->generate_access_token();
-		    $this->intent = $this->create_payment_intent($request['payment_by'], $order);
+
+			$this->token = get_transient('blink_token');
+			$expired = true;
+			if(!empty($this->token))
+			{
+				$expired = $this->isTimestampExpired($this->token['expired_on']);
+			}
+			if($expired){
+				$this->token = $this->generate_access_token();
+			}
+			set_transient( 'blink_token', $this->token, 15 * MINUTE_IN_SECONDS );
+
+			$this->intent = get_transient('blink_intent');
+			$intent_expired = true;
+			if(!empty($this->intent))
+			{
+				$intent_expired = $this->isTimestampExpired($this->intent['expiry_date']);
+			}
+			if($intent_expired){
+				$this->intent = $this->create_payment_intent($this->token['access_token'], $request['payment_by'], $order);
+			}
+			else{
+				$this->intent = $this->update_payment_intent($this->token['access_token'], $request['payment_by'], $order, $this->intent['id']);
+			}
+			set_transient( 'blink_intent', $this->intent, 15 * MINUTE_IN_SECONDS );
 
 
 			$redirect = '';
@@ -861,7 +875,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	}
 	public function validate_transaction( $order, $transaction ) { 
 
-		$this->token = $this->generate_access_token(false, $order);
+		$this->token = $this->generate_access_token();
 		$responseCode = !empty($transaction) ? $transaction : '';
 		$url = $this->host_url . '/pay/v1/transactions/' . $responseCode;
 		$response = wp_remote_get($url, ['method' => 'GET', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'], ], ]);
