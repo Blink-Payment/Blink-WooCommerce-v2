@@ -24,6 +24,33 @@ add_action('parse_request', 'update_order_response', 99);
 add_action('wp', 'check_order_response', 999);
 add_filter('http_request_timeout', 'timeout_extend', 99);
 add_action('wp_ajax_cancel_transaction', 'blink_cancel_transaction');
+add_action( 'template_redirect', 'handle_payorder_request' );
+function handle_payorder_request() {
+    if ( isset( $_GET['pay_for_order'] ) && $_GET['pay_for_order'] == 'true') {
+        $order_id = get_query_var('order-pay');
+        add_order_items_to_cart_again( $order_id );
+
+        // Redirect to the checkout page
+        wp_safe_redirect( wc_get_checkout_url() );
+        exit;
+    }
+}
+
+function add_order_items_to_cart_again( $order_id ) {
+    if ( ! $order_id ) return;
+
+    $order = wc_get_order( $order_id );
+
+    if ( ! $order ) return;
+
+    foreach ( $order->get_items() as $item_id => $item ) {
+        $product_id = $item->get_product_id();
+        $quantity = $item->get_quantity();
+
+        WC()->cart->add_to_cart( $product_id, $quantity );
+    }
+}
+
 
 function blink_cancel_transaction() {
 

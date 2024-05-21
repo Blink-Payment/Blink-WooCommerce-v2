@@ -8,6 +8,9 @@ jQuery(function ($) {
         updated_checkout: function () {
 
             var paymentMode = jQuery('input[name=payment_method]:checked').val();
+            if(paymentMode !== 'blink'){
+                return;
+            }
             var paymentBy = blink_checkout_form.$form.find('input[name=payment_by]').val();
 
             var $form = jQuery('form[name="checkout"]');
@@ -90,6 +93,7 @@ jQuery(function ($) {
                     screen_depth);
                 $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
                 window.configValuesGlob={};
+                configValuesGlob = {};
                 var scriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
         
                     if (scriptElement) {
@@ -165,6 +169,7 @@ jQuery(function ($) {
     
 
     blink_checkout_form.init();
+    
 
     if (jQuery(".blink-api-section").width() < 500)
         jQuery('.blink-api-section').addClass('responsive-screen');
@@ -173,36 +178,38 @@ jQuery(function ($) {
 
 });
 
+    jQuery(document).on('click', '#gpay-button-online-api-id', function() {
+        // Your click event handling code goes here
+        // For example, you can set the value of another element when this button is clicked
+        jQuery('form[name="checkout"]').find('[id="payment_by"]').val('google-pay');
+    });
 
-var updatePaymentBy = function (method) {
+    jQuery(document).on('click', '#place_order', function() {
+        // Your click event handling code goes here
+        // For example, you can set the value of another element when this button is clicked
+        var payment_by = jQuery('form[name="checkout"]').find('[id="payment_by"]').val();
+        if('credit-card' === payment_by){
+            jQuery('#blink-credit-submit').click();
 
+        }
+    });
 
-        jQuery('#payment_by').val(method);
-        jQuery( 'form.checkout' ).trigger('update');
+    jQuery(document).on('change', 'input[name="payment_method"]', function() {
+        jQuery('form.checkout').trigger('update');
+    });
 
-}
-
-jQuery(document).on('click', '#gpay-button-online-api-id', function() {
-    // Your click event handling code goes here
-    // For example, you can set the value of another element when this button is clicked
-    jQuery('form[name="checkout"]').find('[id="payment_by"]').val('google-pay');
-});
-
-jQuery(document).on('click', '#place_order', function() {
-    // Your click event handling code goes here
-    // For example, you can set the value of another element when this button is clicked
-    var payment_by = jQuery('form[name="checkout"]').find('[id="payment_by"]').val();
-    if('credit-card' === payment_by){
-        jQuery('#blink-credit-submit').click();
-
-    }
-});
-
-jQuery(document).on('change', 'input[name="payment_method"]', function() {
-
-    jQuery('form.checkout').trigger('update');
-});
-
+    jQuery(document).on('click', '#selectBatch', function() {
+            if ($('input#credit-card').is(':checked')) {
+                jQuery('#payment_by').val('credit-card');
+            }
+            if ($('input#direct-debit').is(':checked')) {
+                jQuery('#payment_by').val('direct-debit');
+            }
+            if ($('input#open-banking').is(':checked')) {
+                jQuery('#payment_by').val('open-banking');
+            }
+        jQuery('form.checkout').trigger('update');
+    });
 
 
 

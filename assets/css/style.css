@@ -1,246 +1,395 @@
-.blink-api-form-stracture {
-  /* max-width: 100%; */
-  width: 100%;
-  margin: 0 auto;
-  background: #ffffff;
-  box-shadow: 0px 0px 30px rgb(0 0 0 / 10%);
-  border-radius: 10px;
-  position: relative;
+@import url("https://fonts.googleapis.com/css2?family=Cabin:wght@400;500;600;700&display=swap");
+
+:root {
+  --body-background: #f3f4fa;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --input-text-color: #495057;
+  --heading-color: #616161;
+  --button-color: #3fb0ff;
+  --button-hover-color: #0151f0;
+  --body-font-size: 16px;
+  --para-font-size: 16px;
+  --para-color: #212529;
+  --input-font-size: 16px;
+  --font-family: "Cabin", sans-serif;
+  --outline-color: 0, 0, 0;
+  --input-outline-color-1: 60, 66, 87;
+  --input-outline-color-2: 58, 151, 212;
+  --input-outline-color-3: #e0e0e0;
+  --radio-btn-color: #8b8b8b;
+  --radio-btn-background: #f9f9f9;
+  --radio-btn-font-size: 14px;
+  --border-color: #888888;
+  --border-radius: 6px;
 }
 
-header.blink-api-tabs-nav ul {
-  display: flex;
-  list-style: none;
-  flex-wrap: wrap;
-  justify-content: center;
-  padding-left: 0;
+* {
+  margin: 0;
+  padding: 0;
 }
 
-.blink-pay-options a.active {
-  background: #3fb0ff;
-  color: #fff;
+*,
+:after,
+:before {
+  box-sizing: border-box;
 }
 
-.blink-pay-options a {
-  background: #f9f9f9;
-  color: #636363;
-  font-size: 14px;
-  line-height: 16px;
-  position: relative;
-  margin-bottom: 0;
-  padding: 13px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+
+.text-center {
   text-align: center;
-  font-weight: 600;
-  border: none;
-  text-decoration: none;
 }
 
-.heading-text {
-  font-weight: 700;
-  font-size: 20px;
-  line-height: 23px;
-  padding: 2%;
-  margin-bottom: 2%;
-  border-bottom: 1px solid rgba(238, 238, 238, 1);
+/***********************/
+.payment_method_blink {
+  background-color: var(--body-background);
+  font-family: var(--font-family);
+  font-weight: 400;
+  font-size: var(--body-font-size);
+  font-weight: normal;
+  line-height: 1.5;
 }
 
-header.blink-api-tabs-nav,
-.blink-api-tabs-content {
-  padding-left: 2%;
-  padding-right: 2%;
-  padding-bottom: 2%;
+.payment_method_blink p {
+  line-height: normal;
+  font-weight: 400;
+  margin: 0 0 15px 0;
+  font-size: var(--para-font-size);
+  font-family: var(--font-family);
+  line-height: 1.5;
+  color: var(--para-color);
 }
 
-.blink-api-tabs-content label {
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 16px;
-  margin-bottom: 10px;
-  color: #666666;
-  text-transform: uppercase;
+.payment_method_blink .d-flex-center {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
 }
 
-.blink-api-tabs-content input {
+.payment_method_blink .field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--input-text-color);
+  font-size: var(--input-font-size);
+}
+
+.payment_method_blink .fieldgroup-container {
+  position: relative;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.payment_method_blink .relative {
+  position: relative;
+}
+
+.payment_method_blink .fieldgroup-child--width-12 {
+  width: 100%;
+}
+
+.payment_method_blink .fieldgroup-child--width-8 {
+  width: 75%;
+}
+
+.payment_method_blink .fieldgroup-child--width-6 {
+  width: 48%;
+}
+
+.payment_method_blink .fieldgroup-child--width-4 {
+  width: 25%;
+}
+
+.payment_method_blink .fieldgroup-child--width-12 .hostedfield-wrapper {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.payment_method_blink .fieldgroup-child--width-6 .hostedfield-wrapper {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.payment_method_blink .fieldgroup-child--width-6.child-left .hostedfield-wrapper {
+  border-bottom-right-radius: 0;
+}
+
+.payment_method_blink .fieldgroup-child--width-6.child-right .hostedfield-wrapper {
+  border-bottom-left-radius: 0;
+}
+
+.payment_method_blink .fieldgroup-child--width-8 input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.payment_method_blink .fieldgroup-child--width-4 input {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.payment_method_blink .cards_icons {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-white);
+  min-height: 20px;
+  gap: 3px;
+  z-index: 5;
+}
+
+.payment_method_blink .cards_icons img {
+  width: 24px;
+}
+
+.payment_method_blink input {
+  position: relative;
   display: block;
   width: 100%;
-  height: calc(1.5em + 0.75rem + 2px);
+  height: 48px;
   padding: 0.375rem 0.75rem;
-  font-size: 1rem;
+  font-size: var(--input-font-size);
   font-weight: 400;
   line-height: 1.5;
-  color: #495057;
-  background-color: #fff;
+  color: var(--input-text-color);
+  font-family: var(--font-family);
+  background-color: var(--color-white);
   background-clip: padding-box;
+
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 0 1px var(--input-outline-color-3),
+    0 2px 4px 0 rgba(var(--outline-color), 0.07),
+    0 1px 1.5px 0 rgba(var(--outline-color), 0.05);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-  margin-bottom: 10px;
-  height: 55px;
-  border: 1px solid #dbdbdb;
-  box-shadow: 0px 1px 0px #dbdbdb;
-  border-radius: 5px;
-}
-
-.blink-api-tabs-content {
-  /*height: 65vh;
-    overflow-y: scroll;*/
-  padding-top: 20px;
-}
-
-/* .blink-api-tabs-content div:not(:first-child) {
-    display: none;
-} */
-
-.blink-api-tabs-content::-webkit-scrollbar-track {
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  background-color: #f5f5f5;
-}
-
-.blink-api-tabs-content::-webkit-scrollbar {
-  width: 2px;
-  background-color: #f5f5f5;
-}
-
-.blink-api-tabs-content::-webkit-scrollbar-thumb {
-  background-color: #000000;
-  border: 2px solid #555555;
-}
-
-.blink-api-tabs-content input[type="submit"],
-button,
-.blink-pay-options a {
-  width: 100%;
-  text-transform: capitalize;
-  height: 55px;
-  border-radius: 6px;
-  background-color: #3eb0ff;
-  line-height: 100%;
-  font-size: 16px;
-  color: #ffffff;
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: 0.5px;
-  margin-top: 0px;
-  border-color: #3eb0ff;
-}
-
-header.blink-api-tabs-nav ul li a:hover,
-.blink-api-tabs-content input[type="submit"]:hover,
-button:hover,
-.blink-pay-options a:hover {
-  background: #024dff;
-  color: #fff;
-  border-color: #024dff;
-}
-
-
-
-/* ul.blink-api-responsive-tab-heading {
-    display: none !important;
-} */
-
-.responsive-screen ul.blink-api-responsive-tab-heading {
-  display: flex !important;
-  padding-left: 0;
-}
-
-.blink-api-normals-heading {
-  display: flex !important;
-}
-
-/* .responsive-screen .blink-api-normals-heading {
-    display: none !important;
-} */
-
-.responsive-screen ul.blink-api-normals-heading li a {
-  padding: 7px;
-  font-size: 12px;
-}
-
-.responsive-screen .blink-api-tabs-content input {
-  height: 44px;
-  font-size: 14px;
 }
 
 .hostedfield-wrapper {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  position: relative;
   display: block;
   width: 100%;
-  height: calc(1.5em + 0.75rem + 2px);
+  height: 48px;
   padding: 0.375rem 0.75rem;
-  font-size: 1rem;
+  font-size: var(--input-font-size);
   font-weight: 400;
   line-height: 1.5;
-  color: #495057;
-  background-color: #fff;
+  color: var(--input-text-color);
+  font-family: var(--font-family);
+  background-color: var(--color-white);
   background-clip: padding-box;
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 0 1px var(--input-outline-color-3),
+    0 2px 4px 0 rgba(var(--outline-color), 0.07),
+    0 1px 1.5px 0 rgba(var(--outline-color), 0.05);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-  margin-bottom: 10px;
-  height: 55px;
-  border: 1px solid #dbdbdb !important;
-  box-shadow: 0px 1px 0px #dbdbdb;
-  border-radius: 5px;
 }
 
-.responsive-screen .blink-api-tabs-content br {
-  display: none;
-}
-.blink-api-tabs-content br {
-  display: none;
-}
-
-.tab-contents {
-  display: none;
-}
-
-.tab-contents.active {
-  display: block;
-}
-
-a:focus,
-button:focus,
-.button.alt:focus,
-input:focus,
-textarea:focus,
-input[type="button"]:focus,
-input[type="reset"]:focus,
-input[type="submit"]:focus,
-input[type="email"]:focus,
-input[type="tel"]:focus,
-input[type="url"]:focus,
-input[type="password"]:focus,
-input[type="search"]:focus {
-  outline-color: #80bdff;
-}
-
-a:focus,
-input:focus,
-textarea:focus,
-button:focus {
-  outline: 1px solid #80bdff;
-}
-
-.hostedfield-wrapper:focus,
-.hostedfield-wrapper:focus-visible,
-.hostedfield-wrapper:focus-within,
-.hostedfield-wrapper:hover,
-.hostedfield-wrapper:active {
-  outline: 1px solid #80bdff;
-}
-
-.blink-pay-options a {
+.hostedfield-wrapper>div {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
   display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
   align-items: center;
-  justify-content: center;
-  text-decoration: none !important;
-  margin-bottom: 15px;
+  width: 100%;
 }
 
-.3d-content {
-  display: none;
+.hostedfield-wrapper:hover,
+input:hover,
+.hostedfield-wrapper:focus,
+input:focus,
+.input:focus-visible {
+  border: none;
+  outline: 0;
+  box-shadow: rgba(var(--input-outline-color-2), 0.36) 0px 0px 0px 4px,
+    rgba(var(--input-outline-color-1), 0.16) 0px 0px 0px 1px;
+  z-index: 1;
+}
+
+.payment_method_blink .btn {
+  border-radius: var(--border-radius);
+  background-color: var(--button-color);
+  font-size: 18px;
+  line-height: 21px;
+  color: var(--color-white);
+  font-weight: 700;
+  font-family: var(--font-family);
+  padding: 15px;
+  border: 0;
+  width: 100%;
+  height: 55px;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.payment_method_blink .btn:hover,
+.payment_method_blink .btn:focus {
+  background-color: var(--button-hover-color);
+  color: var(--color-white);
+}
+
+/*****21-05-24************/
+.payment_method_blink .form-group .mb-4 {
+  margin-bottom: 20px;
+}
+
+.fieldgroup-container.mb-4:empty {
+  margin: 0;
+}
+
+.payment_method_blink .form-container {
+  box-sizing: border-box;
+  box-shadow: 0px 0px 8px 6px rgba(var(--outline-color), 0.02);
+  background-color: var(--color-white);
+  padding: 30px;
+  border-radius: 10px;
+  max-width: 500px;
+}
+
+.payment_method_blink .switches-container {
+  position: relative;
+  display: flex;
+  padding: 0;
+  background: #fff;
+  line-height: 3rem;
+  border-radius: 10px;
+  border: 2px solid #ced4da;
+}
+
+.payment_method_blink .switches-container input {
+  visibility: hidden;
+  position: absolute;
+  top: 0;
+}
+
+.payment_method_blink .switches-container label {
+  width: 33%;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  cursor: pointer;
+  color: #000;
+}
+
+#container button {
+  width:100%;
+}
+
+.payment_method_blink .switch-wrapper {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 33%;
+  padding: 0;
+  z-index: 3;
+  transition: transform 0.5s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.payment_method_blink .switch {
+  border-radius: 8px;
+  background: #2196f3;
+  height: 100%;
+}
+
+.payment_method_blink .switch div {
+  width: 100%;
+  text-align: center;
+  opacity: 0;
+  display: block;
+  color: #fff;
+  transition: opacity 0.2s cubic-bezier(0.77, 0, 0.175, 1) 0.125s;
+  will-change: opacity;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.payment_method_blink .switches-container input:nth-of-type(1):checked~.switch-wrapper {
+  transform: translateX(0%);
+}
+
+.payment_method_blink .switches-container input:nth-of-type(2):checked~.switch-wrapper {
+  transform: translateX(100%);
+}
+
+.payment_method_blink .switches-container input:nth-of-type(3):checked~.switch-wrapper {
+  transform: translateX(204%);
+}
+
+.payment_method_blink .switches-container input:nth-of-type(1):checked~.switch-wrapper .switch div:nth-of-type(1),
+.payment_method_blink .switches-container input:nth-of-type(2):checked~.switch-wrapper .switch div:nth-of-type(2),
+.payment_method_blink .switches-container input:nth-of-type(3):checked~.switch-wrapper .switch div:nth-of-type(3) {
+  opacity: 1;
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  .payment_method_blink .mb-4 {
+    margin-bottom: 15px;
+  }
+}
+
+@media (max-width: 575px) {
+  .payment_method_blink .form-container {
+    max-width: 100%;
+    padding: 30px 15px;
+  }
+
+  .hostedfield-wrapper,
+  input {
+    height: 36px;
+    font-size: 14px;
+  }
+
+  .payment_method_blink .cards_icons {
+    gap: 0;
+  }
+
+  .payment_method_blink .cards_icons img {
+    width: 20px;
+  }
+
+  .btn {
+    line-height: 1;
+    height: 45px;
+    font-size: 16px;
+  }
+
+  .payment_method_blink .switches-container {
+    line-height: 2.5rem;
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+  }
+
+  .payment_method_blink .switches-container label,
+  .payment_method_blink .switch div {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 414px) {
+  .payment_method_blink .cards_icons {
+    top: -5px;
+    right: 5px;
+    border: 1px solid rgba(var(--input-outline-color-1), 0.16);
+    border-radius: 4px;
+  }
 }
 
 /* Absolute Center Spinner */
@@ -381,64 +530,3 @@ button:focus {
     transform: rotate(360deg);
   }
 }
-
-
-.blink-api-form-stracture {
-  /* max-width: fit-content; */
-  margin: 0 auto;
-  background: #ffffff;
-  box-shadow: 0px 0px 30px rgb(0 0 0 / 10%);
-  border-radius: 10px;
-  position: relative;
-}
-
-.blink-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center; /* Center tabs horizontally */
-}
-
-.blink-pay-options {
-  flex: 1; /* Allow tabs to grow and occupy available space */
-  margin: 0 2px; /* Add a little margin around each tab */
-}
-
-/* .blink-pay-options:last-child {
-  margin-right: 0;
-} */
-
-.blink-pay-options a {
-  padding: 10px 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  text-decoration: none;
-  color: #636363;
-  font-size: 14px;
-}
-
-.blink-pay-options.active a {
-  background-color: #3fb0ff;
-  color: #fff;
-}
-
-.blink-api-tabs-content {
-  width: 100%; /* Take full width of container */
-  box-sizing: border-box; /* Include padding in width calculation */
-}
-
-.tab-content {
-  display: none;
-}
-
-.tab-content.active {
-  display: block;
-}
-
-
-.hostedfield {
-
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-
-                 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue';
-
-               }
