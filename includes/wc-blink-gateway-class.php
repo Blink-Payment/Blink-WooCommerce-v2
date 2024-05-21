@@ -492,7 +492,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			$intent = $this->create_payment_intent($token['access_token']);
 			set_transient( 'blink_intent', $intent, 15 * MINUTE_IN_SECONDS );
 			$element = !empty($intent) ? $intent['element'] : [];
-
 		}
 
 		if (is_array($this->paymentMethods) && empty($this->paymentMethods)) {
@@ -527,13 +526,16 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 												
 											<input type="radio" id="<?php echo $method; ?>" name="switchPayment" value="<?php echo $method; ?>" <?php if ($method == $payment_by) echo 'checked="checked"';?>>
 					
-										<?php endforeach; ?>
-										<?php foreach ($this->paymentMethods as $method) : ?>
+										<?php endforeach; 
+										$count = count($this->paymentMethods);
+										$class = $count == 1 ? 'one' : ($count == 2 ? 'two' : '');
+										
+										foreach ($this->paymentMethods as $method) : ?>
 												
-											<label for="<?php echo $method; ?>"><?php echo $this->transformWord($method); ?></label>
+											<label class="<?php echo  $class; ?>" for="<?php echo $method; ?>"><?php echo $this->transformWord($method); ?></label>
 						
 										<?php endforeach; ?>
-										<div class="switch-wrapper">
+										<div class="switch-wrapper <?php echo  $class; ?>">
 											<div class="switch">
 											<?php foreach ($this->paymentMethods as $method) : ?>
 												
@@ -757,7 +759,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'], 'user-agent' => !empty($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '', 'accept' => !empty($_SERVER['HTTP_ACCEPT']) ? sanitize_text_field($_SERVER['HTTP_ACCEPT']) : '', 'accept-encoding' => 'gzip, deflate, br', 'accept-charset' => 'charset=utf-8', ], 'body' => $requestData, ]);
 			$redirect = trailingslashit(wc_get_checkout_url()) . '?p=credit-card&blinkPay=' . $order_id;
 			$apiBody = json_decode(wp_remote_retrieve_body($response), true);
-
 			if (200 == wp_remote_retrieve_response_code($response)) {
 				if (isset($apiBody['acsform'])) {
 					$threedToken = $apiBody['acsform'];

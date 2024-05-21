@@ -286,6 +286,12 @@ input:focus,
   cursor: pointer;
   color: #000;
 }
+.payment_method_blink .switches-container label.two {
+  width: 50%;
+}
+.payment_method_blink .switches-container label.one {
+  width: 100%;
+}
 
 #container button {
   width:100%;
@@ -299,6 +305,14 @@ input:focus,
   padding: 0;
   z-index: 3;
   transition: transform 0.5s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.payment_method_blink .switch-wrapper.two {
+  width: 50%; 
+}
+
+.payment_method_blink .switch-wrapper.one {
+  width: 100%; 
 }
 
 .payment_method_blink .switch {
