@@ -286,11 +286,11 @@ input:focus,
   cursor: pointer;
   color: #000;
 }
-.payment_method_blink .switches-container label.two {
+.payment_method_blink .switches-container.two label {
   width: 50%;
 }
-.payment_method_blink .switches-container label.one {
-  width: 100%;
+.payment_method_blink .switches-container.one {
+  display: none;
 }
 
 #container button {

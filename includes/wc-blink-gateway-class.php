@@ -513,6 +513,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				if(!empty($element['gpElement'])){
 					echo $element['gpElement'];
 				}
+				$count = count($this->paymentMethods);
+				$class = $count == 1 ? 'one' : ($count == 2 ? 'two' : '');
+
 			?>
 			
 			<div class="form-container">
@@ -521,18 +524,15 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 						<div class="form-group mb-4">
 							<div class="form-group mb-4">
 								<div class="select-batch" style="width:100%;">
-									<div class="switches-container" id="selectBatch">
+									<div class="switches-container <?php echo  $class; ?>" id="selectBatch">
 										<?php foreach ($this->paymentMethods as $method) : ?>
 												
 											<input type="radio" id="<?php echo $method; ?>" name="switchPayment" value="<?php echo $method; ?>" <?php if ($method == $payment_by) echo 'checked="checked"';?>>
 					
-										<?php endforeach; 
-										$count = count($this->paymentMethods);
-										$class = $count == 1 ? 'one' : ($count == 2 ? 'two' : '');
-										
+										<?php endforeach; 										
 										foreach ($this->paymentMethods as $method) : ?>
 												
-											<label class="<?php echo  $class; ?>" for="<?php echo $method; ?>"><?php echo $this->transformWord($method); ?></label>
+											<label for="<?php echo $method; ?>"><?php echo $this->transformWord($method); ?></label>
 						
 										<?php endforeach; ?>
 										<div class="switch-wrapper <?php echo  $class; ?>">
