@@ -7,6 +7,7 @@ jQuery(function ($) {
         },
         updated_checkout: function () {
 
+
             var paymentMode = jQuery('input[name=payment_method]:checked').val();
             if(paymentMode !== 'blink'){
                 return;
@@ -53,16 +54,18 @@ jQuery(function ($) {
             }
 
             if($form.find('[id="blinkGooglePay"]').length){
-                window.configValuesGlob={};
-                configValuesGlob = {};
                 var scriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
         
-                    if (scriptElement) {
+                    if (scriptElement) {  
                         // Extract the onload attribute value
                         var onloadValue = scriptElement.getAttribute('onload');                        
                         // Execute the onload function call
                         setTimeout(function() {
-                            eval(onloadValue);
+                            try{
+                                eval(onloadValue);
+                            }catch(err){
+                                
+                            }
                         }, 1000);
                     } else {
                         console.error('Script element not found.');
@@ -87,6 +90,8 @@ jQuery(function ($) {
             $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
                 screen_depth);
             $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
+
+            setupApplePayButtonObserver();
 
         }
     };
@@ -170,6 +175,12 @@ jQuery(function ($) {
         jQuery('form[name="checkout"]').find('[id="payment_by"]').val('apple-pay');
     });
 
+    jQuery(document).on('click', '.apple-pay-btn', function() {
+        // Your click event handling code goes here
+        // For example, you can set the value of another element when this button is clicked
+        jQuery('form[name="checkout"]').find('[id="payment_by"]').val('apple-pay');
+    });
+
     jQuery(document).on('click', '#place_order', function() {
         // Your click event handling code goes here
         // For example, you can set the value of another element when this button is clicked
@@ -193,9 +204,55 @@ jQuery(function ($) {
             }
             if ($('input#open-banking').is(':checked')) {
                 jQuery('#payment_by').val('open-banking');
-            }
+            }  
         jQuery('form.checkout').trigger('update');
     });
+    
 
+// Define a function to set up the observer and check for the Apple Pay button
+function setupApplePayButtonObserver() {
 
+    function overrideApplePayButtonClicked() {
+        // Save a reference to the original onApplePayButtonClicked function
+        const originalOnApplePayButtonClicked = window.onApplePayButtonClicked;
+
+        // Override the onApplePayButtonClicked function
+        window.onApplePayButtonClicked = function(...args) {
+            // Set the value of the hidden input
+            jQuery('form[name="checkout"]').find('[id="payment_by"]').val('apple-pay');
+
+            // Call the original function with the provided arguments
+            if (typeof originalOnApplePayButtonClicked === 'function') {
+                originalOnApplePayButtonClicked.apply(this, args);
+            }
+        };
+    }
+
+    // Function to check if the Apple Pay button script is loaded and the button is present
+    function checkApplePayButton() {
+        if (typeof window.onApplePayButtonClicked === 'function') {
+            overrideApplePayButtonClicked();
+            // Disconnect the observer once the button is found
+            observer.disconnect();
+        }
+    }
+
+    // Observe for changes in the document to detect when the Apple Pay button script is loaded
+    const observer = new MutationObserver(() => {
+        checkApplePayButton();
+    });
+
+    // Start observing the document
+    observer.observe(document, { childList: true, subtree: true });
+
+    // Check for the Apple Pay button immediately in case it's already present
+    checkApplePayButton();
+
+    // If the Apple Pay button is not found after a certain time, disconnect the observer
+    setTimeout(() => {
+        if (typeof window.onApplePayButtonClicked !== 'function') {
+            observer.disconnect();
+        }
+    }, 2000); // Adjust the timeout value as needed
+}
 
