@@ -12,10 +12,10 @@ jQuery(function ($) {
                 return;
             }
             var paymentBy = blink_checkout_form.$form.find('input[name=payment_by]').val();
-
             var $form = jQuery('form[name="checkout"]');
+
             if ($form.length && paymentBy == 'credit-card') {
-                var $form = jQuery('form[name="blink-credit"]');
+                var $formCard = jQuery('form[name="blink-credit"]');
 
                 
                 jQuery('#cc_customer_email').hide();
@@ -31,41 +31,18 @@ jQuery(function ($) {
                     autoSubmit: true,
                 };
                 try{
-                    var hf = $form.hostedForm(auto);
+                    var hf = $formCard.hostedForm(auto);
 
                 }catch (error) {
                     // Handle any errors that occur during the execution of the try block
                     console.error("An error occurred:", error);
                 }
-                var screen_width = (window && window.screen ? window.screen.width : '0');
-                var screen_height = (window && window.screen ? window.screen.height : '0');
-                var screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
-                var language = (window && window.navigator ? (window.navigator.language ? window.navigator
-                    .language : window.navigator.browserLanguage) : '');
-                var java = (window && window.navigator ? navigator.javaEnabled() : false);
-                var timezone = (new Date()).getTimezoneOffset();
-
-                $form.find('input[name=customer_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
-                $form.find('input[name=customer_email]').val(jQuery('input[name="billing_email"]').val());
-                $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
-                $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
-                $form.find('input[name=device_timezone]').val(timezone);
-                $form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
-                $form.find('input[name=device_accept_language]').val(language);
-                $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
-                    screen_depth);
-                $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
+                
             }
 
             if($form.length && paymentBy == 'open-banking'){
-
                 $form.find('input[name=user_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
                 $form.find('input[name=user_email]').val(jQuery('input[name="billing_email"]').val());
-                $form.find('input[name=customer_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
-                $form.find('input[name=customer_email]').val(jQuery('input[name="billing_email"]').val());
-
-                $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
-                $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
             }
 
             if($form.length && paymentBy == 'direct-debit'){
@@ -73,25 +50,9 @@ jQuery(function ($) {
                 $form.find('input[name=email]').val(jQuery('input[name="billing_email"]').val());
                 $form.find('input[name=family_name]').val();
                 $form.find('input[name=account_holder_name]').val();
-                $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
-                $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
             }
 
-            if(jQuery('form[name="checkout"]').find('[id="blinkGooglePay"]').length){
-                var $form = jQuery('form[name="checkout"]');
-                $payment_intent = jQuery('form[name="checkout"]').find('[id="payment_intent"]').length ?  jQuery('form[name="checkout"]').find('[id="payment_intent"]').val() : "";
-                $transaction_unique = jQuery('form[name="checkout"]').find('[id="transaction_unique"]').length ?  jQuery('form[name="checkout"]').find('[id="transaction_unique"]').val() : "";
-
-                $form.find('input[name=customer_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
-                $form.find('input[name=customer_email]').val(jQuery('input[name="billing_email"]').val());
-                $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
-                $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
-                $form.find('input[name=device_timezone]').val(timezone);
-                $form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
-                $form.find('input[name=device_accept_language]').val(language);
-                $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
-                    screen_depth);
-                $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
+            if($form.find('[id="blinkGooglePay"]').length){
                 window.configValuesGlob={};
                 configValuesGlob = {};
                 var scriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
@@ -107,6 +68,25 @@ jQuery(function ($) {
                         console.error('Script element not found.');
                     }
             }
+
+            var screen_width = (window && window.screen ? window.screen.width : '0');
+            var screen_height = (window && window.screen ? window.screen.height : '0');
+            var screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
+            var language = (window && window.navigator ? (window.navigator.language ? window.navigator
+                .language : window.navigator.browserLanguage) : '');
+            var java = (window && window.navigator ? navigator.javaEnabled() : false);
+            var timezone = (new Date()).getTimezoneOffset();
+
+            $form.find('input[name=customer_name]').val(jQuery('input[name="billing_first_name"]').val()+ ' ' + jQuery('input[name="billing_last_name"]').val());
+            $form.find('input[name=customer_email]').val(jQuery('input[name="billing_email"]').val());
+            $form.find('input[name=customer_address]').val(jQuery('input[name="billing_address_1"]').val() + ', ' + jQuery('input[name="billing_address_2"]').val());
+            $form.find('input[name=customer_postcode]').val(jQuery('input[name="billing_postcode"]').val());
+            $form.find('input[name=device_timezone]').val(timezone);
+            $form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
+            $form.find('input[name=device_accept_language]').val(language);
+            $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
+                screen_depth);
+            $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
 
         }
     };
@@ -182,6 +162,12 @@ jQuery(function ($) {
         // Your click event handling code goes here
         // For example, you can set the value of another element when this button is clicked
         jQuery('form[name="checkout"]').find('[id="payment_by"]').val('google-pay');
+    });
+
+    jQuery(document).on('click', '#apple-pay-btn', function() {
+        // Your click event handling code goes here
+        // For example, you can set the value of another element when this button is clicked
+        jQuery('form[name="checkout"]').find('[id="payment_by"]').val('apple-pay');
     });
 
     jQuery(document).on('click', '#place_order', function() {

@@ -293,7 +293,11 @@ input:focus,
   display: none;
 }
 
-#container button {
+.payment_method_blink .form-container .gpay-card-info-container {
+  width:100%;
+}
+
+.payment_method_blink .form-container #apple-pay-btn {
   width:100%;
 }
 
