@@ -172,7 +172,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	public function blink_enqueue_scripts($hook) {
 		if ($hook === 'post.php') {
 			wp_enqueue_script('woocommerce_blink_payment_admin_scripts', plugins_url('/../assets/js/admin-scripts.js', __FILE__), ['jquery'], $this->version, true);
-			wp_enqueue_style('woocommerce_blink_payment_admin_css', plugins_url('/../assets/css/admin.css', __FILE__), [], $this->version, true);
+			wp_enqueue_style('woocommerce_blink_payment_admin_css', plugins_url('/../assets/css/admin.css', __FILE__), [], $this->version);
 			wp_localize_script('woocommerce_blink_payment_admin_scripts', 'blinkOrders', array(
 				'ajaxurl' => admin_url('admin-ajax.php'),
 				'cancel_order' => wp_create_nonce('cancel_order_nonce'),
