@@ -421,7 +421,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	
 	public function payment_fields() {
 
-		if((empty($_REQUEST['payment_method']) || $_REQUEST['payment_method'] != $this->id) && empty($_REQUEST['pay_for_order'])){
+		if((empty($_REQUEST['payment_method']) || $_REQUEST['payment_method'] != $this->id)){
 			return;
 		}
 
@@ -459,11 +459,28 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				}else{
 					$parsed_data = $_REQUEST;
 				}
-                $payment_by = !empty($parsed_data['payment_by']) ? $parsed_data['payment_by'] : current($this->paymentMethods);
+
+                $payment_by = !empty($parsed_data['payment_by']) ? $parsed_data['payment_by'] : '';
+				if(empty($payment_by))
+				{
+					foreach ($this->paymentMethods as $method){
+						$key = get_element_key($method);
+						if(!empty($element[$key])){
+							$payment_by = $method;	
+							break;
+						}
+					}
+				}
 				$showGP = true;
 
-				$count = count($this->paymentMethods);
-				$class = $count == 1 ? 'one' : ($count == 2 ? 'two' : '');
+				$count = 0;
+				foreach ($this->paymentMethods as $method){
+					 $key = get_element_key($method);
+					if(!empty($element[$key])){
+						$count++;	
+					}
+				}
+				 $class = $count == 1 ? 'one' : ($count == 2 ? 'two' : '');
 
 			?>
 			
@@ -486,21 +503,35 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 								<div class="select-batch" style="width:100%;">
 									<div class="switches-container <?php echo  $class; ?>" id="selectBatch">
 										<?php foreach ($this->paymentMethods as $method) : ?>
+											<?php 
+											$key = get_element_key($method);
+											if(!empty($element[$key])): ?>
 												
 											<input type="radio" id="<?php echo $method; ?>" name="switchPayment" value="<?php echo $method; ?>" <?php if ($method == $payment_by) echo 'checked="checked"';?>>
-					
+											<?php endif; ?>
+
 										<?php endforeach; 										
 										foreach ($this->paymentMethods as $method) : ?>
+
+										    <?php 
+											$key = get_element_key($method);
+											if(!empty($element[$key])): ?>
 												
 											<label for="<?php echo $method; ?>"><?php echo transformWord($method); ?></label>
+
+											<?php endif; ?>
 						
 										<?php endforeach; ?>
 										<div class="switch-wrapper <?php echo  $class; ?>">
 											<div class="switch">
 											<?php foreach ($this->paymentMethods as $method) : ?>
+												<?php 
+											$key = get_element_key($method);
+													if(!empty($element[$key])): ?>
 												
-												<div><?php echo transformWord($method); ?></div>
-							
+												    <div><?php echo transformWord($method); ?></div>
+												<?php endif; ?>
+
 											<?php endforeach; ?>
 											</div>
 										</div>
@@ -511,20 +542,22 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 										
 								<?php 
-									if ($method == $payment_by && 'credit-card' == $payment_by && !empty($element['ccElement'])) {
-										echo '<form name="blink-credit" action="" method="">'.$element['ccElement'].'
-										<div style="display:none"><input type="submit" name="submit" id="blink-credit-submit" value="check" /></div>
-										</form>
-										<input type="hidden" name="credit-card-data" id="credit-card-data" value="" />
-										';
-									}
-									if ($method == $payment_by && 'direct-debit' == $payment_by && !empty($element['ddElement'])) {
-										echo $element['ddElement'];
-									}
-									if ($method == $payment_by && 'open-banking' == $payment_by && !empty($element['obElement'])) {
-										echo $element['obElement'];
-									}
 									
+									$key = get_element_key($method);
+
+									if ($method == $payment_by && !empty($element[$key])) {
+										if('credit-card' == $payment_by){
+
+											echo '<form name="blink-credit" action="" method="">'.$element[$key].'
+											<div style="display:none"><input type="submit" name="submit" id="blink-credit-submit" value="check" /></div>
+											</form>
+											<input type="hidden" name="credit-card-data" id="credit-card-data" value="" />
+											';
+										}else{
+											echo $element[$key];
+										}
+										
+									}				
 									
 									
 									?>

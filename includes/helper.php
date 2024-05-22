@@ -167,5 +167,24 @@ function payment_failed( $order, $reason = '' ) {
 	}
 }
 
+function get_element_key($method)
+{
+	$key = '';
+	if($method == 'credit-card')
+	{
+		$key = 'ccElement';
+	}
+	if($method == 'direct-debit')
+	{
+		$key = 'ddElement';
+	}
+	if($method == 'open-banking')
+	{
+		$key = 'obElement';
+	}
+
+	return $key;
+}
+
 ?>
 
