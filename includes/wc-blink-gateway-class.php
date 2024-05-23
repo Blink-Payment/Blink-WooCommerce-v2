@@ -57,6 +57,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		add_action('admin_enqueue_scripts',  array($this,'blink_enqueue_scripts'), 10);
 		add_action('wp_ajax_cancel_transaction', array($this,'blink_cancel_transaction'));
 		add_action('wp_enqueue_scripts', array($this,'add_hostedfieldcss_to_head'));
+		add_action('admin_footer', array($this,'clear_admin_notice'));
 		
 		// We need custom JavaScript to obtain a token
 		add_action('wp_enqueue_scripts', [$this, 'payment_scripts']);
@@ -264,16 +265,21 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		return $render_refunds;
 	}
 
+	public function clear_admin_notice()
+	{
+		$adminnotice = new WC_Admin_Notices();
+		$adminnotice->remove_notice('blink-error');
+		$adminnotice->remove_notice('no-api');
+		$adminnotice->remove_notice('no-payment-type-selected');
+		$adminnotice->remove_notice('no-payment-types');
+	}
+
 	public function add_error_notices( $payment_types = [] ) { 
 		
-		if ( !is_admin() && !wp_doing_ajax() ) {
-			return;
-		}
-		
-		$adminnotice = new WC_Admin_Notices();
-		$token = get_option('blink_admin_token');
-		
-		if ( isset( $_GET['page'] ) && $_GET['page'] === 'wc-settings' && isset( $_GET['tab'] ) && $_GET['tab'] === 'checkout' && isset( $_GET['section'] ) && $_GET['section'] === $this->id ) {
+		if ( is_in_admin_section() ) {
+
+			$adminnotice = new WC_Admin_Notices();
+			$token = get_option('blink_admin_token');
 
 			if (empty($this->api_key) || empty($this->secret_key))
 		    {
@@ -282,8 +288,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 					$adminnotice->add_custom_notice('no-api', '<div>Please add '.$live.' API key and Secret Key</div>');
 				}
 
-			}
-			if (!empty($this->api_key) && !empty($this->secret_key)){
+			} else {
 				$adminnotice->remove_notice('no-api');
 				if (!empty($token['payment_types'])) {
 					if (empty($this->paymentMethods)) {
@@ -301,12 +306,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				}
 			}
 
-		}else{
-			$adminnotice->remove_notice('no-api');
-			$adminnotice->remove_notice('no-payment-type-selected');
-			$adminnotice->remove_notice('no-payment-types');
-
-		}
+		} 
 	}
 	
 	public function generate_access_token() { 
@@ -318,11 +318,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if (201 == wp_remote_retrieve_response_code($response)) {
 			return $apiBody;
 		} else {
-			if(!empty($apiBody))
-			{
-				$error = ( $apiBody['success'] === false ) ? $apiBody['message'] : $apiBody['error'];
-				wc_add_notice($error, 'error');
-			}
+			blink_add_notice($apiBody);
 		}
 
 		return [];
@@ -355,11 +351,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if (201 == wp_remote_retrieve_response_code($response)) {
 			return $apiBody;
 		} else {
-			if(!empty($apiBody))
-			{
-				$error = ( $apiBody['success'] === false ) ? $apiBody['message'] : $apiBody['error'];
-				wc_add_notice($error, 'error');
-			}
+			blink_add_notice($apiBody);
 		}
 
 		return [];
@@ -378,11 +370,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			if (200 == wp_remote_retrieve_response_code($response)) {
 				return $apiBody;
 			} else {
-				if(!empty($apiBody))
-				{
-					$error = ( $apiBody['success'] === false ) ? $apiBody['message'] : $apiBody['error'];
-					wc_add_notice($error, 'error');
-				}
+				blink_add_notice($apiBody);
 			}
 		}
 
@@ -393,7 +381,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	 * Plugin options,
 	 */
 	public function init_form_fields( $payment_types = [] ) { // call in front end
-		if ( !is_admin() && !wp_doing_ajax() ) {
+		if(!is_in_admin_section())
+		{
 			return;
 		}
 		$fields = ['enabled' => ['title' => 'Enable/Disable', 'label' => 'Enable Blink Gateway', 'type' => 'checkbox', 'description' => '', 'default' => 'no', ], 'title' => ['title' => 'Title', 'type' => 'text', 'description' => 'This controls the title which the user sees during checkout.', 'default' => 'Blink v2', 'desc_tip' => true, ], 'description' => ['title' => 'Description', 'type' => 'textarea', 'description' => 'This controls the description which the user sees during checkout.', 'default' => 'Pay with your credit card or direct debit at your convenience.', ], 'testmode' => ['title' => 'Test mode', 'label' => 'Enable Test Mode', 'type' => 'checkbox', 'description' => 'Place the payment gateway in test mode using test API keys.', 'default' => 'yes', 'desc_tip' => true, ], 'test_api_key' => ['title' => 'Test API Key', 'type' => 'text', ], 'test_secret_key' => ['title' => 'Test Secret Key', 'type' => 'password', ], 'api_key' => ['title' => 'Live API Key', 'type' => 'text', ], 'secret_key' => ['title' => 'Live Secret Key', 'type' => 'password', ], 'custom_style' => ['title' => 'Custom Style', 'type' => 'textarea', 'description' => 'Do not include style tag', ], ];
@@ -526,7 +515,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 											<div class="switch">
 											<?php foreach ($this->paymentMethods as $method) : ?>
 												<?php 
-											$key = get_element_key($method);
+											        $key = get_element_key($method);
 													if(!empty($element[$key])): ?>
 												
 												    <div><?php echo transformWord($method); ?></div>
@@ -687,11 +676,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 					return $apiBody['redirect_url']; //redirect_url
 				}
 			} else {
-				if(!empty($apiBody))
-				{
-					$error = ( $apiBody['success'] === false ) ? $apiBody['message'] : $apiBody['error'];
-					wc_add_notice($error, 'error');
-				}
+				blink_add_notice($apiBody);
 			}
 		}
 			
@@ -702,7 +687,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$order_id = $order->get_id();
 		if(!empty($this->token['access_token']) && !empty($this->intent['payment_intent'])){
 
-			$requestData = ['payment_intent' => $this->intent['payment_intent'], 'given_name' => !empty($request['given_name']) ? $request['given_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'family_name' => $request['family_name'], 'company_name' => $request['company_name'], 'email' => !empty($request['email']) ? $request['email'] : $order->get_billing_email(), 'country_code' => 'GB', 'account_holder_name' => $request['account_holder_name'], 'branch_code' => $request['branch_code'], 'account_number' => $request['account_number'], 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'merchant_data' => get_payment_information($order_id), ];
+			$requestData = ['payment_intent' => $this->intent['payment_intent'], 'given_name' => !empty($request['given_name']) ? $request['given_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'family_name' => $request['family_name'], 'company_name' => $request['company_name'], 'email' => !empty($request['email']) ? $request['email'] : $order->get_billing_email(), 'country_code' => get_woocommerce_currency(), 'account_holder_name' => $request['account_holder_name'], 'branch_code' => $request['branch_code'], 'account_number' => $request['account_number'], 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'merchant_data' => get_payment_information($order_id), ];
 			$url = $this->host_url . '/pay/v1/directdebits';
 			$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $this->token['access_token'], 'user-agent' => !empty($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '', 'accept' => !empty($_SERVER['HTTP_ACCEPT']) ? sanitize_text_field($_SERVER['HTTP_ACCEPT']) : '', 'accept-encoding' => 'gzip, deflate, br', 'accept-charset' => 'charset=utf-8', ], 'body' => $requestData, ]);
 			$apiBody = json_decode(wp_remote_retrieve_body($response), true);
@@ -712,11 +697,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 					return $apiBody['url'];
 				}
 			} else {
-				if(!empty($apiBody))
-				{
-					$error = ( $apiBody['success'] === false ) ? $apiBody['message'] : $apiBody['error'];
-					wc_add_notice($error, 'error');
-				}
+				blink_add_notice($apiBody);
 			}
 
 		}
@@ -728,10 +709,14 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 
 	public function processCreditCard( $order, $request, $endpoint = 'creditcards' ) { 
 
+		$cartAmount = WC()->cart->get_total('raw');
+        $cartAmount = !empty($cartAmount) ? $cartAmount : '1.0';
+		$amount = !empty($order) ? $order->get_total() : $cartAmount;
+		
 		$order_id = $order->get_id();
 		if(!empty($this->token['access_token']) && !empty($this->intent['payment_intent'])){
 
-			$requestData = ['resource'=> $request['resource'],'payment_intent' => $this->intent['payment_intent'], 'paymentToken' => wp_unslash($request['paymentToken']), 'type' => $request['type'], 'raw_amount' => $request['amount'], 'customer_email' => !empty($request['customer_email']) ? $request['customer_email'] : $order->get_billing_email(), 'customer_name' => !empty($request['customer_name']) ? $request['customer_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'transaction_unique' => $request['transaction_unique'], 'merchant_data' => get_payment_information($order_id), ];
+			$requestData = ['resource'=> $request['resource'],'payment_intent' => $this->intent['payment_intent'], 'paymentToken' => wp_unslash($request['paymentToken']), 'type' => $request['type'], 'raw_amount' => $amount, 'customer_email' => !empty($request['customer_email']) ? $request['customer_email'] : $order->get_billing_email(), 'customer_name' => !empty($request['customer_name']) ? $request['customer_name'] : $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'customer_address' => !empty($request['customer_address']) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(), 'customer_postcode' => !empty($request['customer_postcode']) ? $request['customer_postcode'] : $order->get_billing_postcode(), 'transaction_unique' => $request['transaction_unique'], 'merchant_data' => get_payment_information($order_id), ];
 			if (isset($request['remote_address'])) {
 				$requestData['device_timezone'] = $request['device_timezone'];
 				$requestData['device_capabilities'] = $request['device_capabilities'];
@@ -748,15 +733,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 					$threedToken = $apiBody['acsform'];
 					set_transient('blink3dProcess' . $order_id, $threedToken, 300);
 					return trailingslashit(wc_get_checkout_url()) . '?blink3dprocess=' . $order_id;
-				} elseif ($apiBody['url']) {
+				} else if (isset($apiBody['url'])) {
 					return $apiBody['url'];
 				}
 			} else {
-				if(!empty($apiBody))
-				{
-					$error = ( $apiBody['success'] === false ) ? $apiBody['message'] : $apiBody['error'];
-					wc_add_notice($error, 'error');
-				}
+				blink_add_notice($apiBody);
 			} 
 		}
 	   
@@ -901,11 +882,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if (200 == wp_remote_retrieve_response_code($response)) {
 			return !empty($apiBody['data']) ? $apiBody['data'] : [];
 		} else {
-			if(!empty($apiBody))
-			{
-				$error = ( $apiBody['success'] === false ) ? $apiBody['message'] : $apiBody['error'];
-				wc_add_notice($error, 'error');
-			}
+			blink_add_notice($apiBody);
 		}
 		wp_redirect($redirect, 302);
 		exit();

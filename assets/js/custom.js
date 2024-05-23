@@ -64,7 +64,7 @@ jQuery(function ($) {
                             try{
                                 eval(onloadValue);
                             }catch(err){
-                                
+
                             }
                         }, 1000);
                     } else {
@@ -169,25 +169,29 @@ jQuery(function ($) {
         jQuery('form[name="checkout"]').find('[id="payment_by"]').val('google-pay');
     });
 
-    jQuery(document).on('click', '#apple-pay-btn', function() {
-        // Your click event handling code goes here
-        // For example, you can set the value of another element when this button is clicked
-        jQuery('form[name="checkout"]').find('[id="payment_by"]').val('apple-pay');
-    });
-
-    jQuery(document).on('click', '.apple-pay-btn', function() {
-        // Your click event handling code goes here
-        // For example, you can set the value of another element when this button is clicked
-        jQuery('form[name="checkout"]').find('[id="payment_by"]').val('apple-pay');
-    });
-
-    jQuery(document).on('click', '#place_order', function() {
+    jQuery(document).on('click', '#place_order', function(e) {
         // Your click event handling code goes here
         // For example, you can set the value of another element when this button is clicked
         var payment_by = jQuery('form[name="checkout"]').find('[id="payment_by"]').val();
+        if(payment_by == 'apple-pay' || payment_by == 'google-pay')
+        {
+
+            if ($('input#credit-card').is(':checked')) {
+                jQuery('form[name="checkout"]').find('[id="payment_by"]').val('credit-card');
+                payment_by = 'credit-card';
+            }
+            if ($('input#direct-debit').is(':checked')) {
+                jQuery('form[name="checkout"]').find('[id="payment_by"]').val('direct-debit');
+                payment_by = 'direct-debit';
+            }
+            if ($('input#open-banking').is(':checked')) {
+                jQuery('form[name="checkout"]').find('[id="payment_by"]').val('open-banking');
+                payment_by = 'open-banking';
+            }
+
+        }
         if('credit-card' === payment_by){
             jQuery('#blink-credit-submit').click();
-
         }
     });
 
@@ -209,7 +213,7 @@ jQuery(function ($) {
     });
     
 
-// Define a function to set up the observer and check for the Apple Pay button
+    // Define a function to set up the observer and check for the Apple Pay button
 function setupApplePayButtonObserver() {
 
     function overrideApplePayButtonClicked() {
@@ -231,9 +235,10 @@ function setupApplePayButtonObserver() {
     // Function to check if the Apple Pay button script is loaded and the button is present
     function checkApplePayButton() {
         if (typeof window.onApplePayButtonClicked === 'function') {
+			            observer.disconnect();
+
             overrideApplePayButtonClicked();
             // Disconnect the observer once the button is found
-            observer.disconnect();
         }
     }
 
@@ -245,14 +250,5 @@ function setupApplePayButtonObserver() {
     // Start observing the document
     observer.observe(document, { childList: true, subtree: true });
 
-    // Check for the Apple Pay button immediately in case it's already present
-    checkApplePayButton();
-
-    // If the Apple Pay button is not found after a certain time, disconnect the observer
-    setTimeout(() => {
-        if (typeof window.onApplePayButtonClicked !== 'function') {
-            observer.disconnect();
-        }
-    }, 2000); // Adjust the timeout value as needed
 }
 

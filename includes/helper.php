@@ -186,5 +186,46 @@ function get_element_key($method)
 	return $key;
 }
 
+function is_in_admin_section()
+{
+	if ( isset( $_GET['page'] ) && $_GET['page'] === 'wc-settings' && isset( $_GET['tab'] ) && $_GET['tab'] === 'checkout' && isset( $_GET['section'] ) && $_GET['section'] === 'blink' ) 
+	{
+		return true;
+	}
+
+ return false;
+}
+
+function blink_add_notice($apiBody=[])
+{
+	// Initialize $error with a default value
+	$error = 'Unknown error! Something went wrong.';
+
+	// Check if $apiBody is an array and not null
+	if (is_array($apiBody) && !empty($apiBody)) {
+		// Check if the 'success' key exists and its value is false
+		if (isset($apiBody['success']) && $apiBody['success'] === false) {
+			// Check if the 'message' key exists and is not null
+			if (isset($apiBody['message'])) {
+				$error = $apiBody['message'];
+			} elseif (isset($apiBody['error'])) {
+				// If 'message' key does not exist, check if 'error' key exists and is not null
+				$error = $apiBody['error'];
+			}
+		} elseif (isset($apiBody['error'])) {
+			// If 'success' key does not exist or its value is not false, check if 'error' key exists and is not null
+			$error = $apiBody['error'];
+		}
+	}
+
+	if(!is_in_admin_section()){
+		wc_add_notice($error, 'error');
+	} else {
+		$adminnotice = new WC_Admin_Notices();
+		$adminnotice->add_custom_notice('blink-error', $error);
+	}
+
+}
+
 ?>
 
