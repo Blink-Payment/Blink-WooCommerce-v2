@@ -432,6 +432,14 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			set_transient( 'blink_intent', $intent, 15 * MINUTE_IN_SECONDS );
 			$element = !empty($intent) ? $intent['element'] : [];
 		}
+
+		$parsed_data = [];
+		if(!empty($_REQUEST['post_data'])){
+			parse_str($_REQUEST['post_data'], $parsed_data);	
+		}else{
+			$parsed_data = $_REQUEST;
+		}
+
 		$payment_by = !empty($parsed_data['payment_by']) ? $parsed_data['payment_by'] : '';
 		if(empty($payment_by))
 		{
@@ -453,14 +461,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 
 		if (!empty($this->paymentMethods) && !empty($payment_by)) 
-			{
-				if(!empty($_REQUEST['post_data'])){
-					parse_str($_REQUEST['post_data'], $parsed_data);	
-				}else{
-					$parsed_data = $_REQUEST;
-				}
-
-                
+			{                
 				$showGP = true;
 
 				$count = 0;
