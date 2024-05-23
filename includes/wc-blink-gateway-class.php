@@ -432,8 +432,19 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			set_transient( 'blink_intent', $intent, 15 * MINUTE_IN_SECONDS );
 			$element = !empty($intent) ? $intent['element'] : [];
 		}
+		$payment_by = !empty($parsed_data['payment_by']) ? $parsed_data['payment_by'] : '';
+		if(empty($payment_by))
+		{
+			foreach ($this->paymentMethods as $method){
+				$key = get_element_key($method);
+				if(!empty($element[$key])){
+					$payment_by = $method;	
+					break;
+				}
+			}
+		}
 
-		if (is_array($this->paymentMethods) && empty($this->paymentMethods)) {
+		if (empty($this->paymentMethods) || empty($payment_by)) {
 			echo '<p> Unable to process any payment at this moment! </p>';
 		} else {
 			if ($this->description) {
@@ -441,7 +452,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 		}
 
-		if (is_array($this->paymentMethods) && !empty($this->paymentMethods)) 
+		if (!empty($this->paymentMethods) && !empty($payment_by)) 
 			{
 				if(!empty($_REQUEST['post_data'])){
 					parse_str($_REQUEST['post_data'], $parsed_data);	
@@ -449,17 +460,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 					$parsed_data = $_REQUEST;
 				}
 
-                $payment_by = !empty($parsed_data['payment_by']) ? $parsed_data['payment_by'] : '';
-				if(empty($payment_by))
-				{
-					foreach ($this->paymentMethods as $method){
-						$key = get_element_key($method);
-						if(!empty($element[$key])){
-							$payment_by = $method;	
-							break;
-						}
-					}
-				}
+                
 				$showGP = true;
 
 				$count = 0;
@@ -562,11 +563,8 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			<?php
 			} else {
 				?>
-				<div class="form-container">
-				    <div class="batch-upload-wrap pb-3">
-						<input type="hidden" name="payment_by" value="" />
-					</div>
-				</div>
+				<input type="hidden" name="payment_by" value="" />
+
 				<?php
 			}
 			  
@@ -750,7 +748,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	*/
 	public function process_payment( $order_id ) { 
 
-
 			$order = wc_get_order($order_id);
 			
 			$request = $_POST;
@@ -767,7 +764,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 			if(empty($this->token))
 			{
-				error_payment_process();
+				return wp_send_json(error_payment_process());
 			}
 			set_transient( 'blink_token', $this->token, 15 * MINUTE_IN_SECONDS );
 
@@ -785,7 +782,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 			if(empty($this->intent))
 			{
-				error_payment_process();
+				return wp_send_json(error_payment_process());
 			}
 			set_transient( 'blink_intent', $this->intent, 15 * MINUTE_IN_SECONDS );
 
@@ -822,10 +819,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 
 			if(empty($redirect)){
-				error_payment_process();
+				return wp_send_json(error_payment_process());
 			}
+
 			
-		return ['result' => $result, 'redirect' => $redirect, ];
+		return wp_send_json(['result' => $result, 'redirect' => $redirect]);
 	}
 	/*
 	 * In case we need a webhook, like PayPal IPN etc
@@ -910,7 +908,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				$wc_order->add_order_note('Pay by ' . $source);
 				$wc_order->add_order_note('Transaction Note: ' . $message);
 				$wc_order->save();
-				change_status($wc_order, $transaction_result['transaction_id'], $status, $source);
+				change_status($wc_order, $transaction_result['transaction_id'], $status, $source, $message);
 			} else {
 				payment_failed($wc_order, 'Payment Failed (Transaction status - Null).');
 			}

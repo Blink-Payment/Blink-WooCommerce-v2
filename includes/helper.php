@@ -101,11 +101,12 @@ function error_payment_process()
 	$response = [
 		"result"=> "failure",
 		"messages"=> $html,
-		"refresh"=> false,
+		"refresh"=> true,
 		"reload"=> false
 	];
 	wc_clear_notices();
-	echo json_encode($response); wp_die();
+	
+	return $response;
 }
 
 function change_status( $wc_order, $transaction_id, $status = '', $source = '', $note = null ) { 
@@ -115,7 +116,7 @@ function change_status( $wc_order, $transaction_id, $status = '', $source = '', 
 	} elseif (strpos(strtolower($source), 'direct debit') !== false || 'pending submission' === strtolower($status)) {
 		payment_on_hold($wc_order, !empty($note) ? $note : 'Payment Pending (Transaction status - ' . $status . ')');
 	} else {
-		payment_failed($wc_order, !empty($note) ? $note : 'Payment Failed (Transaction status - ' . $status . ')');
+		payment_failed($wc_order, !empty($note) ? 'Payment Failed (Transaction status - ' . $status . ') Reason -'. $note : 'Payment Failed (Transaction status - ' . $status . ')');
 	}
 }
 
