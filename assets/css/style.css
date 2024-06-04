@@ -42,7 +42,7 @@
 
 /***********************/
 .payment_method_blink {
-  background-color: var(--body-background);
+  /* background-color: var(--body-background); */
   font-family: var(--font-family);
   font-weight: 400;
   font-size: var(--body-font-size);
@@ -152,7 +152,7 @@
   width: 24px;
 }
 
-.payment_method_blink input {
+.payment_method_blink input:not([type="radio"]) {
   position: relative;
   display: block;
   width: 100%;

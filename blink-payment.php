@@ -25,6 +25,20 @@ add_action('wp', 'check_order_response', 999);
 add_filter('http_request_timeout', 'timeout_extend', 99);
 add_action('wp_ajax_cancel_transaction', 'blink_cancel_transaction');
 add_action( 'template_redirect', 'handle_payorder_request' );
+add_action( 'before_woocommerce_init', 'cart_checkout_blocks_compatibility' );
+
+function cart_checkout_blocks_compatibility() {
+
+    if( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+				'cart_checkout_blocks',
+				__FILE__,
+				false // true (compatible, default) or false (not compatible)
+			);
+    }
+		
+}
+
 function handle_payorder_request() {
     if ( isset( $_GET['pay_for_order'] ) && $_GET['pay_for_order'] == 'true') {
         $order_id = get_query_var('order-pay');
