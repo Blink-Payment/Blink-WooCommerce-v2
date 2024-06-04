@@ -312,7 +312,14 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 	public function generate_access_token() { 
 		    
 		$url = $this->host_url . '/pay/v1/tokens';
-		$response = wp_remote_post($url, ['method' => 'POST', 'body' => ['api_key' => $this->api_key, 'secret_key' => $this->secret_key, ], ]);
+		$requestData = [ 
+			'api_key' => $this->api_key, 
+			'secret_key' => $this->secret_key, 
+			'source_site' => get_bloginfo( 'name' ), 
+			'application_name' => 'Woocommerce Blink '.$this->version, 
+			'application_description' => 'WP-'.get_bloginfo('version').' WC-'.WC_VERSION, 
+		];
+		$response = wp_remote_post($url, ['method' => 'POST', 'body' => $requestData, ]);
 		$apiBody = json_decode(wp_remote_retrieve_body($response), true);
 
 		if (201 == wp_remote_retrieve_response_code($response)) {
