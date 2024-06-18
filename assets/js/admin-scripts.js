@@ -74,7 +74,7 @@ jQuery(function ($) {
                     success: function(response) {
                         if (response.success) {
                             alert(domain + ' has been successfully registered with Apple Pay.');
-                            $('#woocommerce_blink_apple_pay_enabled').prop('checked', true).change(); // Adjust the ID as needed
+                            $('#woocommerce_blink_apple_pay_enabled').prop('checked', true).prop('disabled', false).change(); // Adjust the ID as needed
                         } else {
                             alert(response.data.message + ' Please ensure the DVF file has been uploaded to https://' + domain + '/.well-known/apple-developer-merchantid-domain-association');
                             $(".loader-container").remove();

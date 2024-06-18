@@ -511,7 +511,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			<div class="form-container">
 				<?php
 					if(isSafari()){
-						if(!empty($element['apElement']) && $this->apple_pay_enabled){
+						if(!empty($element['apElement']) && !empty($this->apple_pay_enabled)){
 							$showGP = false;
 							echo $element['apElement'];
 						}
