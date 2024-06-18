@@ -171,7 +171,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		return $data;
 	}
 	public function blink_enqueue_scripts($hook) {
-		//if ($hook === 'post.php') {
 			wp_enqueue_script('woocommerce_blink_payment_admin_scripts', plugins_url('/../assets/js/admin-scripts.js', __FILE__), ['jquery'], $this->version, true);
 			wp_enqueue_style('woocommerce_blink_payment_admin_css', plugins_url('/../assets/css/admin.css', __FILE__), [], $this->version);
 
@@ -183,7 +182,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 				'security' => wp_create_nonce( 'generate_access_token_nonce' ),
 				'apple_security' => wp_create_nonce( 'generate_applepay_domains_nonce' ),
 			));
-		//}
 	}
 	public function add_cancel_button($order) {
 
@@ -417,7 +415,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			'type' => 'title',
 			'description' => __('To enable Apple Pay please:<br>
 						 Download the domain verification file (DVF) <a href="' . plugin_dir_url(__FILE__) . 'download-apple-pay-dvf.php" target="_blank">here</a>.<br>
-						 Upload it to your domain as follows: "https://[thedomainofthesite]/.well-known/apple-developer-merchantid-domain-association".<br>
+						 Upload it to your domain as follows: "https://[thedomainofthesite]/.well-known/apple-developer-merchantid-domain-association".
 						 <button id="enable-apple-pay" class="button">Click here to enable</button>', 'woocommerce'),
 			'id' => 'apple_pay_enrollment'
 		);

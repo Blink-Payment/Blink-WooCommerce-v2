@@ -32,6 +32,9 @@ jQuery(function ($) {
     jQuery(document).ready(function($) {
         $('#enable-apple-pay').on('click', function(e) {
             e.preventDefault();
+            $(this).after(
+                `<div class="loader-container"><img src="${blinkOrders.spin_gif}" alt="Processing..."></div>`
+            );
 
                 $.ajax({
                     url: blinkOrders.ajaxurl,
@@ -46,10 +49,13 @@ jQuery(function ($) {
                             enableApplePay(accessToken);
                         } else {
                             alert('Failed to generate access token: ' + response.data.message);
+                            $(".loader-container").remove();
                         }
                     },
                     error: function(response) {
                         alert('AJAX request failed');
+                        $(".loader-container").remove();
+
                     }
                 });
             });
@@ -70,11 +76,15 @@ jQuery(function ($) {
                             alert(domain + ' has been successfully registered with Apple Pay.');
                             $('#woocommerce_blink_apple_pay_enabled').prop('checked', true).change(); // Adjust the ID as needed
                         } else {
-                            alert(response.data.message + 'Please ensure the DVF file has been uploaded to https://' + domain + '/.well-known/apple-developer-merchantid-domain-association');
+                            alert(response.data.message + ' Please ensure the DVF file has been uploaded to https://' + domain + '/.well-known/apple-developer-merchantid-domain-association');
+                            $(".loader-container").remove();
+
                         }
                     },
                     error: function() {
                         alert('Please ensure the DVF file has been uploaded to https://' + domain + '/.well-known/apple-developer-merchantid-domain-association');
+                        $(".loader-container").remove();
+
                     }
                 });
             }
