@@ -26,6 +26,8 @@ add_filter('http_request_timeout', 'timeout_extend', 99);
 add_action('wp_ajax_cancel_transaction', 'blink_cancel_transaction');
 add_action( 'template_redirect', 'handle_payorder_request' );
 add_action( 'before_woocommerce_init', 'cart_checkout_blocks_compatibility' );
+add_action( 'wp_ajax_generate_access_token', 'generate_access_token' );
+add_action( 'wp_ajax_generate_applepay_domains', 'generate_applepay_domains' );
 
 function cart_checkout_blocks_compatibility() {
 

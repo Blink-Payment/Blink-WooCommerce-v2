@@ -29,6 +29,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		$this->description = $this->get_option('description');
 		$this->enabled = $this->get_option('enabled');
 		$this->testmode = 'yes' === $this->get_option('testmode');
+		$this->apple_pay_enabled = 'yes' === $this->get_option('apple_pay_enabled');
 		$this->api_key = $this->testmode ? $this->get_option('test_api_key') : $this->get_option('api_key');
 		$this->secret_key = $this->testmode ? $this->get_option('test_secret_key') : $this->get_option('secret_key');
 		$token = get_option('blink_admin_token');
@@ -63,7 +64,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		add_action('wp_enqueue_scripts', [$this, 'payment_scripts']);
 		delete_transient('blink_token');
 		delete_transient('blink_intent');
-
 	}
 
 	public function blink_process_admin_options()
@@ -171,15 +171,19 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		return $data;
 	}
 	public function blink_enqueue_scripts($hook) {
-		if ($hook === 'post.php') {
+		//if ($hook === 'post.php') {
 			wp_enqueue_script('woocommerce_blink_payment_admin_scripts', plugins_url('/../assets/js/admin-scripts.js', __FILE__), ['jquery'], $this->version, true);
 			wp_enqueue_style('woocommerce_blink_payment_admin_css', plugins_url('/../assets/css/admin.css', __FILE__), [], $this->version);
+
 			wp_localize_script('woocommerce_blink_payment_admin_scripts', 'blinkOrders', array(
 				'ajaxurl' => admin_url('admin-ajax.php'),
 				'cancel_order' => wp_create_nonce('cancel_order_nonce'),
-				'spin_gif' => plugins_url('/../assets/img/wpspin.gif', __FILE__)
+				'spin_gif' => plugins_url('/../assets/img/wpspin.gif', __FILE__),
+				'apihost' => $this->host_url,
+				'security' => wp_create_nonce( 'generate_access_token_nonce' ),
+				'apple_security' => wp_create_nonce( 'generate_applepay_domains_nonce' ),
 			));
-		}
+		//}
 	}
 	public function add_cancel_button($order) {
 
@@ -408,8 +412,32 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			}
 		}
 
+		$new_settings['apple_pay_enrollment'] = array(
+			'title' => __('Apple Pay Enrollment', 'woocommerce'),
+			'type' => 'title',
+			'description' => __('To enable Apple Pay please:<br>
+						 Download the domain verification file (DVF) <a href="' . plugin_dir_url(__FILE__) . 'download-apple-pay-dvf.php" target="_blank">here</a>.<br>
+						 Upload it to your domain as follows: "https://[thedomainofthesite]/.well-known/apple-developer-merchantid-domain-association".<br>
+						 <button id="enable-apple-pay" class="button">Click here to enable</button>', 'woocommerce'),
+			'id' => 'apple_pay_enrollment'
+		);
+	
+		$apple_domain_auth = !empty(get_option('apple_domain_auth'));
+		$disabled = [
+			'disabled' => 'disabled'  // Disable the checkbox by default
+		];
 
-		$this->form_fields = $fields;
+		$new_settings['apple_pay_enabled'] = array(
+			'title' => __('Apple Pay Enabled', 'woocommerce'),
+			'type' => 'checkbox',
+			'description' => __('Enable this option once Apple Pay is successfully registered.', 'woocommerce'),
+			'id' => 'woocommerce_apple_pay_enabled',
+			'default' => 'yes',
+			'custom_attributes' => $apple_domain_auth ? '' : $disabled,
+		);
+
+		$this->form_fields = array_merge($fields, $new_settings);
+
 	}
 	/**
 	 * Credit card form
@@ -485,7 +513,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			<div class="form-container">
 				<?php
 					if(isSafari()){
-						if(!empty($element['apElement'])){
+						if(!empty($element['apElement']) && $this->apple_pay_enabled){
 							$showGP = false;
 							echo $element['apElement'];
 						}

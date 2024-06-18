@@ -228,5 +228,71 @@ function blink_add_notice($apiBody=[])
 
 }
 
+function generate_applepay_domains(){
+	$configs = include dirname(__FILE__) . '/../config.php';
+	$host_url = $configs['host_url'] . '/api';
+	$settings = get_option('woocommerce_blink_settings');
+	$testmode = 'yes' === $settings['testmode'];
+	$api_key = $testmode ? $settings['test_api_key'] : $settings['api_key'];
+	$secret_key = $testmode ? $settings['test_secret_key'] : $settings['secret_key'];
+    // Check for nonce security
+    check_ajax_referer( 'generate_applepay_domains_nonce', 'security' );
+
+    // Define your API endpoint and credentials
+    $url = $host_url.'/pay/v1/applepay/domains'; // Replace with your actual API URL
+	$requestData = [ 
+		'domain_name' => $_POST['domain'], 
+	];
+
+	$response = wp_remote_post($url, ['method' => 'POST', 'headers' => ['Authorization' => 'Bearer ' . $_POST['token'] ], 'body' => $requestData, ]);
+
+	$apiBody = json_decode(wp_remote_retrieve_body($response), true);
+
+	if ($apiBody['success'] == 'true') {
+		update_option('apple_domain_auth', 1);
+		return wp_send_json_success( array( 'message' => $apiBody['message'] ) );
+	}
+	 
+	return wp_send_json_error( array( 'message' => $apiBody['message'] ? $apiBody['message'] : 'Integration unsuccessful' ) );
+
+    wp_die();
+
+}
+
+function generate_access_token() {
+
+	$configs = include dirname(__FILE__) . '/../config.php';
+	$host_url = $configs['host_url'] . '/api';
+	$settings = get_option('woocommerce_blink_settings');
+	$testmode = 'yes' === $settings['testmode'];
+	$api_key = $testmode ? $settings['test_api_key'] : $settings['api_key'];
+	$secret_key = $testmode ? $settings['test_secret_key'] : $settings['secret_key'];
+    // Check for nonce security
+    check_ajax_referer( 'generate_access_token_nonce', 'security' );
+
+    // Define your API endpoint and credentials
+    $url = $host_url.'/pay/v1/tokens'; // Replace with your actual API URL
+
+    $requestData = [ 
+		'api_key' => $api_key, 
+		'secret_key' => $secret_key, 
+		'source_site' => get_bloginfo( 'name' ), 
+		'application_name' => 'Woocommerce Blink '.$configs['version'], 
+		'application_description' => 'WP-'.get_bloginfo('version').' WC-'.WC_VERSION, 
+	];
+
+	$response = wp_remote_post($url, ['method' => 'POST', 'body' => $requestData, ]);
+	$apiBody = json_decode(wp_remote_retrieve_body($response), true);
+
+	if (201 == wp_remote_retrieve_response_code($response)) {
+		return wp_send_json_success( array( 'access_token' => $apiBody['access_token'] ) );
+
+	}
+	 
+	return wp_send_json_error( array( 'message' => 'Failed to generate access token' ) );
+
+    wp_die();
+}
+
 ?>
 
