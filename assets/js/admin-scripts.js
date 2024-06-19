@@ -28,4 +28,67 @@ jQuery(function ($) {
             });
         });
     });
+
+    jQuery(document).ready(function($) {
+        $('#enable-apple-pay').on('click', function(e) {
+            e.preventDefault();
+            $(this).after(
+                `<div class="loader-container"><img src="${blinkOrders.spin_gif}" alt="Processing..."></div>`
+            );
+
+                $.ajax({
+                    url: blinkOrders.ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'generate_access_token',
+                        security: blinkOrders.security,
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var accessToken = response.data.access_token;
+                            enableApplePay(accessToken);
+                        } else {
+                            alert('Failed to generate access token: ' + response.data.message);
+                            $(".loader-container").remove();
+                        }
+                    },
+                    error: function(response) {
+                        alert('AJAX request failed');
+                        $(".loader-container").remove();
+
+                    }
+                });
+            });
+
+            function enableApplePay(accessToken){
+                var domain = window.location.hostname;
+                $.ajax({
+                    url: blinkOrders.ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'generate_applepay_domains',
+                        security: blinkOrders.apple_security,
+                        token: accessToken,
+                        domain: "https://" + domain
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert(domain + ' has been successfully registered with Apple Pay.');
+                            $('#woocommerce_blink_apple_pay_enabled').prop('checked', true).prop('disabled', false).change(); // Adjust the ID as needed
+
+                        } else {
+                            alert(response.data.message + ' Please ensure the DVF file has been uploaded to https://' + domain + '/.well-known/apple-developer-merchantid-domain-association');
+
+                        }
+                        $(".loader-container").remove();
+
+                    },
+                    error: function() {
+                        alert('Please ensure the DVF file has been uploaded to https://' + domain + '/.well-known/apple-developer-merchantid-domain-association');
+                        $(".loader-container").remove();
+
+                    }
+                });
+            }
+        });
 });
