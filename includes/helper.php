@@ -294,5 +294,5 @@ function generate_access_token() {
     wp_die();
 }
 
-?>
+
 

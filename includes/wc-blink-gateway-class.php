@@ -415,7 +415,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			'type' => 'title',
 			'description' => __('To enable Apple Pay please:<br>
 						 Download the domain verification file (DVF) <a href="' . plugin_dir_url(__FILE__) . 'download-apple-pay-dvf.php" target="_blank">here</a>.<br>
-						 Upload it to your domain as follows: "https://[thedomainofthesite]/.well-known/apple-developer-merchantid-domain-association".
+						 Upload it to your domain as follows: "https://'.$_SERVER['SERVER_NAME'].'/.well-known/apple-developer-merchantid-domain-association".
 						 <button id="enable-apple-pay" class="button">Click here to enable</button>', 'woocommerce'),
 			'id' => 'apple_pay_enrollment'
 		);
