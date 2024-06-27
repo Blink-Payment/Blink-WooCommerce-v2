@@ -16,6 +16,7 @@ jQuery(function ($) {
 
             // AJAX call to cancel transaction
             $.post(blinkOrders.ajaxurl, data, function (response) {
+                if(typeof response === "string") response = JSON.parse(response);
                 $(".loader-container").remove();
                 if (response.success) {
                     // Reload page or perform other actions
@@ -44,6 +45,7 @@ jQuery(function ($) {
                         security: blinkOrders.security,
                     },
                     success: function(response) {
+                        if(typeof response === "string") response = JSON.parse(response);
                         if (response.success) {
                             var accessToken = response.data.access_token;
                             enableApplePay(accessToken);
@@ -72,6 +74,7 @@ jQuery(function ($) {
                         domain: "https://" + domain
                     },
                     success: function(response) {
+                        if(typeof response === "string") response = JSON.parse(response);
                         if (response.success) {
                             alert(domain + ' has been successfully registered with Apple Pay.');
                             $('#woocommerce_blink_apple_pay_enabled').prop('checked', true).prop('disabled', false).change(); // Adjust the ID as needed
