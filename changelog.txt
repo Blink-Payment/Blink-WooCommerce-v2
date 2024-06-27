@@ -1,5 +1,14 @@
 *** WooCommerce - Blink Changelog ***
 
+2024-06-24 - version 1.0.2
+
+* Added Apple Pay
+* Added Google Pay
+* Added ability to refund
+* Bug fixes 
+
 2023-05-23 - version 1.0.11
 
 * Initial release
+
+
