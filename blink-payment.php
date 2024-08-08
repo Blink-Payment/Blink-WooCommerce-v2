@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.0.11
+ * Version: 1.1.0
 */
 /*
  * This action hook registers our PHP class as a WooCommerce payment gateway
@@ -19,11 +19,93 @@ function blink_add_gateway_class( $gateways ) {
 */
 add_action('plugins_loaded', 'blink_init_gateway_class');
 add_action('the_content', 'blink_3d_form_submission');
-add_action('the_content', 'checkBlinkPaymentMethod');
 add_action('init', 'checkFromSubmission');
 add_action('parse_request', 'update_order_response', 99);
 add_action('wp', 'check_order_response', 999);
 add_filter('http_request_timeout', 'timeout_extend', 99);
+add_action('wp_ajax_cancel_transaction', 'blink_cancel_transaction');
+add_action( 'template_redirect', 'handle_payorder_request' );
+add_action( 'before_woocommerce_init', 'cart_checkout_blocks_compatibility' );
+add_action( 'wp_ajax_generate_access_token', 'generate_access_token' );
+add_action( 'wp_ajax_generate_applepay_domains', 'generate_applepay_domains' );
+
+function cart_checkout_blocks_compatibility() {
+
+    if( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+				'cart_checkout_blocks',
+				__FILE__,
+				false // true (compatible, default) or false (not compatible)
+			);
+    }
+		
+}
+
+function handle_payorder_request() {
+    if ( isset( $_GET['pay_for_order'] ) && $_GET['pay_for_order'] == 'true') {
+        $order_id = get_query_var('order-pay');
+        add_order_items_to_cart_again( $order_id );
+
+        // Redirect to the checkout page
+        wp_safe_redirect( wc_get_checkout_url() );
+        exit;
+    }
+}
+
+function add_order_items_to_cart_again( $order_id ) {
+    if ( ! $order_id ) return;
+
+    $order = wc_get_order( $order_id );
+
+    if ( ! $order ) return;
+
+    foreach ( $order->get_items() as $item_id => $item ) {
+        $product_id = $item->get_product_id();
+        $quantity = $item->get_quantity();
+
+        WC()->cart->add_to_cart( $product_id, $quantity );
+    }
+}
+
+
+function blink_cancel_transaction() {
+
+	if(!check_ajax_referer('cancel_order_nonce', 'cancel_order'))
+	{
+		wp_send_json_error('[Security mismatch]');
+	}
+
+	$order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+
+	if (!$order_id) {
+		wp_send_json_error('Invalid order ID.');
+	}
+
+	$transaction_id = get_post_meta($order_id, 'blink_res', true);
+
+	if (!$transaction_id) {
+		wp_send_json_error('Transaction ID not found.');
+	}
+
+	$gateWay = new WC_Blink_Gateway();
+	// Call cancel API
+	$data = $gateWay->cancel_transaction($transaction_id);
+	$success  = isset($data['success']) ? $data['success'] : false;
+	$order = wc_get_order($order_id);
+
+	if ($success) {
+		// Cancel WooCommerce order
+		$order->update_status('cancelled');
+		$order->add_order_note('Transaction cancelled successfully.');
+
+		//wc_add_notice('Transaction cancelled successfully: ' . $transaction_id, 'error');
+		wp_send_json_success('Transaction cancelled successfully.');
+	} else {
+		$order->add_order_note('Failed to cancel transaction: ['.$data['message'].']');
+		wp_send_json_error('['.$data['message'].']');
+	}
+}
+
 function timeout_extend( $time ) { 
 	// Default timeout is 5
 	return 10;
@@ -93,61 +175,6 @@ function checkFromSubmission() {
 			}
 		}
 	} 
-}
-function checkBlinkPaymentMethod( $content ) { 
-	$blinkPay = isset($_GET['blinkPay']) ? sanitize_text_field($_GET['blinkPay']) : '';
-	$method = isset($_GET['p']) ? sanitize_text_field($_GET['p']) : '';
-	if (!empty($blinkPay)) {
-		checkOrderPayment($blinkPay);
-		$gateWay = new WC_Blink_Gateway();
-		if (!empty($method) && in_array($method, $gateWay->paymentMethods)) {
-			$gateWay->accessToken = $gateWay->generate_access_token();
-			$gateWay->paymentIntent = $gateWay->create_payment_intent();
-			if (isset($gateWay->paymentIntent['payment_intent'])) {
-				$string = implode(' ', array_map('ucfirst', explode('-', $method)));
-				$html = wc_print_notices();
-				$html.= '<section class="blink-api-section">
-							<div class="blink-api-form-stracture">
-								<h2 class="heading-text">Pay with ' . $string . '</h2>
-								<section class="blink-api-tabs-content">';
-				if ('credit-card' == $method && $gateWay->paymentIntent['element']['ccElement']) {
-					$html.= '<div id="tab1" class="tab-contents active">
-											<form name="blink-card" id="blink-card" method="POST" action="">
-												' . $gateWay->paymentIntent['element']['ccElement'];
-				}
-				if ('direct-debit' == $method && $gateWay->paymentIntent['element']['ddElement']) {
-					$html.= '<div id="tab1" class="tab-contents active">
-											<form name="blink-debit" id="blink-debit" method="POST" action="">
-												' . $gateWay->paymentIntent['element']['ddElement'];
-				}
-				if ('open-banking' == $method && $gateWay->paymentIntent['element']['obElement']) {
-					$html.= '<div id="tab1" class="tab-contents active">
-											<form name="blink-open" id="blink-open" method="POST" action="">
-												' . $gateWay->paymentIntent['element']['obElement'];
-				}
-				$html.= '<input type="hidden" name="transaction_unique" value="' . $gateWay->paymentIntent['transaction_unique'] . '">
-												<input type="hidden" name="amount" value="' . $gateWay->paymentIntent['amount'] . '">
-												<input type="hidden" name="intent_id" value="' . $gateWay->paymentIntent['id'] . '">
-												<input type="hidden" name="intent" value="' . $gateWay->paymentIntent['payment_intent'] . '">
-												<input type="hidden" name="access_token" value="' . $gateWay->accessToken . '">
-												<input type="hidden" name="payment_by" id="payment_by" value="' . $method . '">
-												<input type="hidden" name="action" value="blinkSubmitPayment">
-												<input type="hidden" name="order_id" value="' . $blinkPay . '">
-												' . wp_nonce_field( 'submit-payment' ) . '
-												<input type="submit" value="Pay now" name="blink-submit" />
-											</form>
-										</div>';
-				$html.= '</section>
-							</div>
-						</section>';
-				return $html;
-			} else {
-				wc_add_notice($gateWay->paymentIntent['error'] ? $gateWay->paymentIntent['error'] : 'Something Wrong! Please initate the payment from checkout page', 'error');
-				wp_redirect(wc_get_checkout_url());
-			}
-		}
-	}
-	return $content;
 }
 function blink_3d_form_submission( $content ) { 
 	$blink3dprocess = isset($_GET['blink3dprocess']) ? sanitize_text_field($_GET['blink3dprocess']) : '';
