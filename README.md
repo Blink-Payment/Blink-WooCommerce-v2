@@ -1,36 +1,32 @@
-# wp-woocommerce-plugin
+# Blink-WooCommerce-v2
 
-## Clone
-1. Add your public SSH key to [github](https://github.com/)
+## Description
 
-2. Clone the repo:
-```
-git clone git@github.com:blink3sixty/plugin-woocommerce.git
-```
+This module enables the use og the Blink Payment Gateway, utilising the Blink REST API, using the [Woocommerce project](https://woo.com/).
+The documentation for the Blink API cna be found [here](https://docs.blinkpayment.co.uk/docs/category/authentication).
+The API credentials can be found on your [Blink Portal](https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages)
 
 ## Install
-Process 1. Directly clone the repo into the wp-content/plugins directly and unzip the source code. The plugin will be listed there. Activate it.
-```
+1. Download [the plugin](https://github.com/Blink-Payment/Blink-WooCommerce-v2).
+2. On your Wordpress admin panel, go to the plugins section of the admin panel.
+3. Click "Add New".
+4. Click "Upload plugin" (Near the top left of the page nexto the menu).
+5. Click the "Choose File" button and select the module (which will be the whole zip file this readme is in).
+6. Click the "Install Now" button and then click the "Activate" button.
 
-Process 2. Log into administrator account in your wordpress installation. Find Plugins->Add New Menu in the left side bar.
-once click on it, user get a option to upload the plugin zip. Upload the plugin Zip downloaded from the Git repository.
-The plugin will be listed there and activate it.
-```
-
-![Plugin List](assets/img/PluginList.png)
-
+## Setup 
 
 
+1. Go to the Wordpress admin panel -> WooCommerce -> Settings -> Payments. By Blink, select *Finish Set Up*.
+![Set Up](assets/img/finish_set_up.png)
+2. Click on the Enable *Blink Gateway* checkbox.
+3. Title and Description: User can set payment gateway title and description.
+4. Add *Live API Key* and *Live Secret Key* from [Blink](https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages).
+5. If you are using keys from a sandbox Blink account, please place them in *Test API Key* and *Test Secret Key* and tick *Enable Test Mode*. 
+6. Payment methods: Select which payment methods you want to add to your blink payment gateway.
+7. Custom Style: Use can put custom style into this text area. It can be used to overwrite the existing style of the payment form.
 
-## Settings
-Once you activate it, you get a settings link under the plugin name. Click on it and you wll redirected to Plugin payment Settings page.
 
-1. First user have to activate the plugin. click on the Enable Blink Gateway checkbox.
-2. Title and Description: User can set payment gateway title and description 
-3. Payment methods: Select which payment methods you want to add to your blink payment gateway
-4. Enable Test Mode: Depend on the selection payment host will change form dev or live environment.
-5. API Key and Secret Key: Those keys should be obtain from Merchant account and use here. Those fields are self explanotory.
-6. Custom Style: Use can put custom style into this text area. It can be used to overwrite the existing style of the payment form.
 Note: Please don't use any style tag in to that text area.
 
 ![Settings](assets/img/settings.png)
@@ -121,7 +117,3 @@ Content-Type: application/json
 
 
 `````
-
-
-
-
