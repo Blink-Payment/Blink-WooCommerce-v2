@@ -1,213 +1,213 @@
 @import url("https://fonts.googleapis.com/css2?family=Cabin:wght@400;500;600;700&display=swap");
 
 :root {
-  --body-background: #f3f4fa;
-  --color-white: #ffffff;
-  --color-black: #000000;
-  --input-text-color: #495057;
-  --heading-color: #616161;
-  --button-color: #3fb0ff;
-  --button-hover-color: #0151f0;
-  --body-font-size: 15px;
-  --para-font-size: 15px;
-  --para-color: #212529;
-  --input-font-size: 15px;
-  --font-family: "Cabin", sans-serif;
-  --outline-color: 0, 0, 0;
-  --input-outline-color-1: 60, 66, 87;
-  --input-outline-color-2: 58, 151, 212;
-  --input-outline-color-3: #e0e0e0;
-  --radio-btn-color: #8b8b8b;
-  --radio-btn-background: #f9f9f9;
-  --radio-btn-font-size: 14px;
-  --border-color: #888888;
-  --border-radius: 6px;
+	--body-background: #f3f4fa;
+	--color-white: #ffffff;
+	--color-black: #000000;
+	--input-text-color: #495057;
+	--heading-color: #616161;
+	--button-color: #3fb0ff;
+	--button-hover-color: #0151f0;
+	--body-font-size: 15px;
+	--para-font-size: 15px;
+	--para-color: #212529;
+	--input-font-size: 15px;
+	--font-family: "Cabin", sans-serif;
+	--outline-color: 0, 0, 0;
+	--input-outline-color-1: 60, 66, 87;
+	--input-outline-color-2: 58, 151, 212;
+	--input-outline-color-3: #e0e0e0;
+	--radio-btn-color: #8b8b8b;
+	--radio-btn-background: #f9f9f9;
+	--radio-btn-font-size: 14px;
+	--border-color: #888888;
+	--border-radius: 6px;
 }
 
 * {
-  margin: 0;
-  padding: 0;
+	margin: 0;
+	padding: 0;
 }
 
 *,
 :after,
 :before {
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 
 .text-center {
-  text-align: center;
+	text-align: center;
 }
 
 /***********************/
 .payment_method_blink {
-  /* background-color: var(--body-background); */
-  font-family: var(--font-family);
-  font-weight: 400;
-  font-size: var(--body-font-size);
-  font-weight: normal;
-  line-height: 1.5;
+	/* background-color: var(--body-background); */
+	font-family: var(--font-family);
+	font-weight: 400;
+	font-size: var(--body-font-size);
+	font-weight: normal;
+	line-height: 1.5;
 }
 
 .payment_method_blink p {
-  line-height: normal;
-  font-weight: 400;
-  margin: 0 0 15px 0;
-  font-size: var(--para-font-size);
-  font-family: var(--font-family);
-  line-height: 1.5;
-  color: var(--para-color);
+	line-height: normal;
+	font-weight: 400;
+	margin: 0 0 15px 0;
+	font-size: var(--para-font-size);
+	font-family: var(--font-family);
+	line-height: 1.5;
+	color: var(--para-color);
 }
 
 .payment_method_blink .d-flex-center {
-  display: -webkit-box;
-  display: -webkit-flex;
-  display: -ms-flexbox;
-  display: flex;
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  align-items: center;
+	display: -webkit-box;
+	display: -webkit-flex;
+	display: -ms-flexbox;
+	display: flex;
+	-webkit-box-align: center;
+	-ms-flex-align: center;
+	align-items: center;
 }
 
 .payment_method_blink .field-label {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--input-text-color);
-  font-size: var(--input-font-size);
+	display: block;
+	margin-bottom: 7px;
+	color: var(--input-text-color);
+	font-size: var(--input-font-size);
 }
 
 .payment_method_blink .fieldgroup-container {
-  position: relative;
-  display: -webkit-box;
-  display: -webkit-flex;
-  display: -ms-flexbox;
-  display: flex;
-  -webkit-flex-wrap: wrap;
-  -ms-flex-wrap: wrap;
-  flex-wrap: wrap;
-  gap: 15px;
+	position: relative;
+	display: -webkit-box;
+	display: -webkit-flex;
+	display: -ms-flexbox;
+	display: flex;
+	-webkit-flex-wrap: wrap;
+	-ms-flex-wrap: wrap;
+	flex-wrap: wrap;
+	gap: 15px;
 }
 
 .payment_method_blink .relative {
-  position: relative;
+	position: relative;
 }
 
 .payment_method_blink .fieldgroup-child--width-12 {
-  width: 100%;
+	width: 100%;
 }
 
 .payment_method_blink .fieldgroup-child--width-8 {
-  width: 75%;
+	width: 75%;
 }
 
 .payment_method_blink .fieldgroup-child--width-6 {
-  width: 48%;
+	width: 48%;
 }
 
 .payment_method_blink .fieldgroup-child--width-4 {
-  width: 25%;
+	width: 25%;
 }
 
 .payment_method_blink .fieldgroup-child--width-12 .hostedfield-wrapper {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
 }
 
 .payment_method_blink .fieldgroup-child--width-6 .hostedfield-wrapper {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
 }
 
 .payment_method_blink .fieldgroup-child--width-6.child-left .hostedfield-wrapper {
-  border-bottom-right-radius: 0;
+	border-bottom-right-radius: 0;
 }
 
 .payment_method_blink .fieldgroup-child--width-6.child-right .hostedfield-wrapper {
-  border-bottom-left-radius: 0;
+	border-bottom-left-radius: 0;
 }
 
 .payment_method_blink .fieldgroup-child--width-8 input {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
 }
 
 .payment_method_blink .fieldgroup-child--width-4 input {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
 }
 
 .payment_method_blink .cards_icons {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--color-white);
-  min-height: 20px;
-  gap: 3px;
-  z-index: 5;
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: var(--color-white);
+	min-height: 20px;
+	gap: 3px;
+	z-index: 5;
 }
 
 .payment_method_blink .cards_icons img {
-  width: 24px;
+	width: 24px;
 }
 
 .payment_method_blink input:not([type="radio"]) {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 48px;
-  padding: 0.375rem 0.75rem;
-  font-size: var(--input-font-size);
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--input-text-color);
-  font-family: var(--font-family);
-  background-color: var(--color-white);
-  background-clip: padding-box;
+	position: relative;
+	display: block;
+	width: 100%;
+	height: 48px;
+	padding: 0.375rem 0.75rem;
+	font-size: var(--input-font-size);
+	font-weight: 400;
+	line-height: 1.5;
+	color: var(--input-text-color);
+	font-family: var(--font-family);
+	background-color: var(--color-white);
+	background-clip: padding-box;
 
-  border: none;
-  border-radius: var(--border-radius);
-  box-shadow: 0 0 0 1px var(--input-outline-color-3),
-    0 2px 4px 0 rgba(var(--outline-color), 0.07),
-    0 1px 1.5px 0 rgba(var(--outline-color), 0.05);
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+	border: none;
+	border-radius: var(--border-radius);
+	box-shadow: 0 0 0 1px var(--input-outline-color-3),
+	0 2px 4px 0 rgba(var(--outline-color), 0.07),
+	0 1px 1.5px 0 rgba(var(--outline-color), 0.05);
+	transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
 .hostedfield-wrapper {
-  display: -webkit-box;
-  display: -webkit-flex;
-  display: -ms-flexbox;
-  display: flex;
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 48px;
-  padding: 0.375rem 0.75rem;
-  font-size: var(--input-font-size);
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--input-text-color);
-  font-family: var(--font-family);
-  background-color: var(--color-white);
-  background-clip: padding-box;
-  border: none;
-  border-radius: var(--border-radius);
-  box-shadow: 0 0 0 1px var(--input-outline-color-3),
-    0 2px 4px 0 rgba(var(--outline-color), 0.07),
-    0 1px 1.5px 0 rgba(var(--outline-color), 0.05);
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+	display: -webkit-box;
+	display: -webkit-flex;
+	display: -ms-flexbox;
+	display: flex;
+	position: relative;
+	display: block;
+	width: 100%;
+	height: 48px;
+	padding: 0.375rem 0.75rem;
+	font-size: var(--input-font-size);
+	font-weight: 400;
+	line-height: 1.5;
+	color: var(--input-text-color);
+	font-family: var(--font-family);
+	background-color: var(--color-white);
+	background-clip: padding-box;
+	border: none;
+	border-radius: var(--border-radius);
+	box-shadow: 0 0 0 1px var(--input-outline-color-3),
+	0 2px 4px 0 rgba(var(--outline-color), 0.07),
+	0 1px 1.5px 0 rgba(var(--outline-color), 0.05);
+	transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
 .hostedfield-wrapper>div {
-  display: -webkit-box;
-  display: -webkit-flex;
-  display: -ms-flexbox;
-  display: flex;
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  align-items: center;
-  width: 100%;
+	display: -webkit-box;
+	display: -webkit-flex;
+	display: -ms-flexbox;
+	display: flex;
+	-webkit-box-align: center;
+	-ms-flex-align: center;
+	align-items: center;
+	width: 100%;
 }
 
 .hostedfield-wrapper:hover,
@@ -215,383 +215,383 @@ input:hover,
 .hostedfield-wrapper:focus,
 input:focus,
 .input:focus-visible {
-  border: none;
-  outline: 0;
-  box-shadow: rgba(var(--input-outline-color-2), 0.36) 0px 0px 0px 4px,
-    rgba(var(--input-outline-color-1), 0.16) 0px 0px 0px 1px;
-  z-index: 1;
+	border: none;
+	outline: 0;
+	box-shadow: rgba(var(--input-outline-color-2), 0.36) 0px 0px 0px 4px,
+	rgba(var(--input-outline-color-1), 0.16) 0px 0px 0px 1px;
+	z-index: 1;
 }
 
 .payment_method_blink .btn {
-  border-radius: var(--border-radius);
-  background-color: var(--button-color);
-  font-size: 18px;
-  line-height: 21px;
-  color: var(--color-white);
-  font-weight: 700;
-  font-family: var(--font-family);
-  padding: 15px;
-  border: 0;
-  width: 100%;
-  height: 55px;
-  text-transform: none;
-  cursor: pointer;
+	border-radius: var(--border-radius);
+	background-color: var(--button-color);
+	font-size: 18px;
+	line-height: 21px;
+	color: var(--color-white);
+	font-weight: 700;
+	font-family: var(--font-family);
+	padding: 15px;
+	border: 0;
+	width: 100%;
+	height: 55px;
+	text-transform: none;
+	cursor: pointer;
 }
 
 .payment_method_blink .btn:hover,
 .payment_method_blink .btn:focus {
-  background-color: var(--button-hover-color);
-  color: var(--color-white);
+	background-color: var(--button-hover-color);
+	color: var(--color-white);
 }
 
 /*****21-05-24************/
 .payment_method_blink .form-group .mb-4 {
-  margin-bottom: 20px;
+	margin-bottom: 20px;
 }
 
 .fieldgroup-container.mb-4:empty {
-  margin: 0;
+	margin: 0;
 }
 
 .payment_method_blink .form-container {
-  box-sizing: border-box;
-  box-shadow: 0px 0px 8px 6px rgba(var(--outline-color), 0.02);
-  background-color: var(--color-white);
-  padding: 30px;
-  border-radius: 10px;
-  max-width: 500px;
+	box-sizing: border-box;
+	box-shadow: 0px 0px 8px 6px rgba(var(--outline-color), 0.02);
+	background-color: var(--color-white);
+	padding: 30px;
+	border-radius: 10px;
+	max-width: 500px;
 }
 
 .payment_method_blink .switches-container {
-  position: relative;
-  display: flex;
-  padding: 0;
-  background: #fff;
-  line-height: 3rem;
-  border-radius: 10px;
-  border: 2px solid #ced4da;
+	position: relative;
+	display: flex;
+	padding: 0;
+	background: #fff;
+	line-height: 3rem;
+	border-radius: 10px;
+	border: 2px solid #ced4da;
 }
 
 .payment_method_blink .switches-container input {
-  visibility: hidden;
-  position: absolute;
-  top: 0;
+	visibility: hidden;
+	position: absolute;
+	top: 0;
 }
 
 .payment_method_blink .switches-container label {
-  width: 33%;
-  padding: 0;
-  margin: 0;
-  text-align: center;
-  cursor: pointer;
-  color: #000;
+	width: 33%;
+	padding: 0;
+	margin: 0;
+	text-align: center;
+	cursor: pointer;
+	color: #000;
 }
 
 .payment_method_blink .switches-container.two label {
-  width: 50%;
+	width: 50%;
 }
 
 .payment_method_blink .switches-container.one {
-  display: none;
+	display: none;
 }
 
 .payment_method_blink .form-container .gpay-card-info-container {
-  width: 100%;
+	width: 100%;
 }
 
 .payment_method_blink .form-container #apple-pay-btn {
-  width: 100%;
+	width: 100%;
 }
 
 .payment_method_blink .switch-wrapper {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 33%;
-  padding: 0;
-  z-index: 3;
-  transition: transform 0.5s cubic-bezier(0.77, 0, 0.175, 1);
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 33%;
+	padding: 0;
+	z-index: 3;
+	transition: transform 0.5s cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 .payment_method_blink .switch-wrapper.two {
-  width: 50%;
+	width: 50%;
 }
 
 .payment_method_blink .switch-wrapper.one {
-  width: 100%;
+	width: 100%;
 }
 
 .payment_method_blink .switch {
-  border-radius: 8px;
-  background: #2196f3;
-  height: 100%;
+	border-radius: 8px;
+	background: #2196f3;
+	height: 100%;
 }
 
 .payment_method_blink .switch div {
-  width: 100%;
-  text-align: center;
-  opacity: 0;
-  display: block;
-  color: #fff;
-  transition: opacity 0.2s cubic-bezier(0.77, 0, 0.175, 1) 0.125s;
-  will-change: opacity;
-  position: absolute;
-  top: 0;
-  left: 0;
+	width: 100%;
+	text-align: center;
+	opacity: 0;
+	display: block;
+	color: #fff;
+	transition: opacity 0.2s cubic-bezier(0.77, 0, 0.175, 1) 0.125s;
+	will-change: opacity;
+	position: absolute;
+	top: 0;
+	left: 0;
 }
 
 .payment_method_blink .switches-container input:nth-of-type(1):checked~.switch-wrapper {
-  transform: translateX(0%);
+	transform: translateX(0%);
 }
 
 .payment_method_blink .switches-container input:nth-of-type(2):checked~.switch-wrapper {
-  transform: translateX(100%);
+	transform: translateX(100%);
 }
 
 .payment_method_blink .switches-container input:nth-of-type(3):checked~.switch-wrapper {
-  transform: translateX(204%);
+	transform: translateX(204%);
 }
 
 .payment_method_blink .switches-container input:nth-of-type(1):checked~.switch-wrapper .switch div:nth-of-type(1),
 .payment_method_blink .switches-container input:nth-of-type(2):checked~.switch-wrapper .switch div:nth-of-type(2),
 .payment_method_blink .switches-container input:nth-of-type(3):checked~.switch-wrapper .switch div:nth-of-type(3) {
-  opacity: 1;
-  font-weight: 700;
+	opacity: 1;
+	font-weight: 700;
 }
 
 @media (max-width: 767px) {
-  .payment_method_blink .mb-4 {
-    margin-bottom: 15px;
-  }
+	.payment_method_blink .mb-4 {
+	margin-bottom: 15px;
+	}
 }
 
 @media (max-width: 575px) {
-  .payment_method_blink .form-container {
-    max-width: 100%;
-    padding: 30px 15px;
-  }
+	.payment_method_blink .form-container {
+	max-width: 100%;
+	padding: 30px 15px;
+	}
 
-  .hostedfield-wrapper,
-  input {
-    height: 36px;
-    font-size: 14px;
-  }
+	.hostedfield-wrapper,
+	input {
+	height: 36px;
+	font-size: 14px;
+	}
 
-  .payment_method_blink .cards_icons {
-    gap: 0;
-  }
+	.payment_method_blink .cards_icons {
+	gap: 0;
+	}
 
-  .payment_method_blink .cards_icons img {
-    width: 20px;
-  }
+	.payment_method_blink .cards_icons img {
+	width: 20px;
+	}
 
-  .btn {
-    line-height: 1;
-    height: 45px;
-    font-size: 16px;
-  }
+	.btn {
+	line-height: 1;
+	height: 45px;
+	font-size: 16px;
+	}
 
-  .payment_method_blink .switches-container {
-    line-height: 2.5rem;
-    border-radius: 8px;
-    border: 1px solid #ced4da;
-  }
+	.payment_method_blink .switches-container {
+	line-height: 2.5rem;
+	border-radius: 8px;
+	border: 1px solid #ced4da;
+	}
 
-  .payment_method_blink .switches-container label,
-  .payment_method_blink .switch div {
-    font-size: 13px;
-  }
+	.payment_method_blink .switches-container label,
+	.payment_method_blink .switch div {
+	font-size: 13px;
+	}
 }
 
 @media (max-width: 414px) {
-  .payment_method_blink .cards_icons {
-    top: -5px;
-    right: 5px;
-    border: 1px solid rgba(var(--input-outline-color-1), 0.16);
-    border-radius: 4px;
-  }
+	.payment_method_blink .cards_icons {
+	top: -5px;
+	right: 5px;
+	border: 1px solid rgba(var(--input-outline-color-1), 0.16);
+	border-radius: 4px;
+	}
 }
 
 /* Absolute Center Spinner */
 .blink-loading {
-  position: fixed;
-  z-index: 999;
-  height: 2em;
-  width: 2em;
-  overflow: show;
-  margin: auto;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
+	position: fixed;
+	z-index: 999;
+	height: 2em;
+	width: 2em;
+	overflow: show;
+	margin: auto;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
 }
 
 /* Transparent Overlay */
 .blink-loading:before {
-  content: "";
-  display: block;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(rgba(20, 20, 20, 0.8), rgba(0, 0, 0, 0.8));
+	content: "";
+	display: block;
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: radial-gradient(rgba(20, 20, 20, 0.8), rgba(0, 0, 0, 0.8));
 
-  background: -webkit-radial-gradient(rgba(20, 20, 20, 0.8),
-      rgba(0, 0, 0, 0.8));
+	background: -webkit-radial-gradient(rgba(20, 20, 20, 0.8),
+		rgba(0, 0, 0, 0.8));
 }
 
 /* :not(:required) hides these rules from IE9 and below */
 .blink-loading:not(:required) {
-  /* hide "blink-loading..." text */
-  font: 0/0 a;
-  color: transparent;
-  text-shadow: none;
-  background-color: transparent;
-  border: 0;
+	/* hide "blink-loading..." text */
+	font: 0/0 a;
+	color: transparent;
+	text-shadow: none;
+	background-color: transparent;
+	border: 0;
 }
 
 .blink-loading:not(:required):after {
-  content: "";
-  display: block;
-  font-size: 10px;
-  width: 1em;
-  height: 1em;
-  margin-top: -0.5em;
-  -webkit-animation: spinner 150ms infinite linear;
-  -moz-animation: spinner 150ms infinite linear;
-  -ms-animation: spinner 150ms infinite linear;
-  -o-animation: spinner 150ms infinite linear;
-  animation: spinner 150ms infinite linear;
-  border-radius: 0.5em;
-  -webkit-box-shadow: rgba(255, 255, 255, 0.75) 1.5em 0 0 0,
-    rgba(255, 255, 255, 0.75) 1.1em 1.1em 0 0,
-    rgba(255, 255, 255, 0.75) 0 1.5em 0 0,
-    rgba(255, 255, 255, 0.75) -1.1em 1.1em 0 0,
-    rgba(255, 255, 255, 0.75) -1.5em 0 0 0,
-    rgba(255, 255, 255, 0.75) -1.1em -1.1em 0 0,
-    rgba(255, 255, 255, 0.75) 0 -1.5em 0 0,
-    rgba(255, 255, 255, 0.75) 1.1em -1.1em 0 0;
-  box-shadow: rgba(255, 255, 255, 0.75) 1.5em 0 0 0,
-    rgba(255, 255, 255, 0.75) 1.1em 1.1em 0 0,
-    rgba(255, 255, 255, 0.75) 0 1.5em 0 0,
-    rgba(255, 255, 255, 0.75) -1.1em 1.1em 0 0,
-    rgba(255, 255, 255, 0.75) -1.5em 0 0 0,
-    rgba(255, 255, 255, 0.75) -1.1em -1.1em 0 0,
-    rgba(255, 255, 255, 0.75) 0 -1.5em 0 0,
-    rgba(255, 255, 255, 0.75) 1.1em -1.1em 0 0;
+	content: "";
+	display: block;
+	font-size: 10px;
+	width: 1em;
+	height: 1em;
+	margin-top: -0.5em;
+	-webkit-animation: spinner 150ms infinite linear;
+	-moz-animation: spinner 150ms infinite linear;
+	-ms-animation: spinner 150ms infinite linear;
+	-o-animation: spinner 150ms infinite linear;
+	animation: spinner 150ms infinite linear;
+	border-radius: 0.5em;
+	-webkit-box-shadow: rgba(255, 255, 255, 0.75) 1.5em 0 0 0,
+	rgba(255, 255, 255, 0.75) 1.1em 1.1em 0 0,
+	rgba(255, 255, 255, 0.75) 0 1.5em 0 0,
+	rgba(255, 255, 255, 0.75) -1.1em 1.1em 0 0,
+	rgba(255, 255, 255, 0.75) -1.5em 0 0 0,
+	rgba(255, 255, 255, 0.75) -1.1em -1.1em 0 0,
+	rgba(255, 255, 255, 0.75) 0 -1.5em 0 0,
+	rgba(255, 255, 255, 0.75) 1.1em -1.1em 0 0;
+	box-shadow: rgba(255, 255, 255, 0.75) 1.5em 0 0 0,
+	rgba(255, 255, 255, 0.75) 1.1em 1.1em 0 0,
+	rgba(255, 255, 255, 0.75) 0 1.5em 0 0,
+	rgba(255, 255, 255, 0.75) -1.1em 1.1em 0 0,
+	rgba(255, 255, 255, 0.75) -1.5em 0 0 0,
+	rgba(255, 255, 255, 0.75) -1.1em -1.1em 0 0,
+	rgba(255, 255, 255, 0.75) 0 -1.5em 0 0,
+	rgba(255, 255, 255, 0.75) 1.1em -1.1em 0 0;
 }
 
 /* Animation */
 
 @-webkit-keyframes spinner {
-  0% {
-    -webkit-transform: rotate(0deg);
-    -moz-transform: rotate(0deg);
-    -ms-transform: rotate(0deg);
-    -o-transform: rotate(0deg);
-    transform: rotate(0deg);
-  }
+	0% {
+	-webkit-transform: rotate(0deg);
+	-moz-transform: rotate(0deg);
+	-ms-transform: rotate(0deg);
+	-o-transform: rotate(0deg);
+	transform: rotate(0deg);
+	}
 
-  100% {
-    -webkit-transform: rotate(360deg);
-    -moz-transform: rotate(360deg);
-    -ms-transform: rotate(360deg);
-    -o-transform: rotate(360deg);
-    transform: rotate(360deg);
-  }
+	100% {
+	-webkit-transform: rotate(360deg);
+	-moz-transform: rotate(360deg);
+	-ms-transform: rotate(360deg);
+	-o-transform: rotate(360deg);
+	transform: rotate(360deg);
+	}
 }
 
 @-moz-keyframes spinner {
-  0% {
-    -webkit-transform: rotate(0deg);
-    -moz-transform: rotate(0deg);
-    -ms-transform: rotate(0deg);
-    -o-transform: rotate(0deg);
-    transform: rotate(0deg);
-  }
+	0% {
+	-webkit-transform: rotate(0deg);
+	-moz-transform: rotate(0deg);
+	-ms-transform: rotate(0deg);
+	-o-transform: rotate(0deg);
+	transform: rotate(0deg);
+	}
 
-  100% {
-    -webkit-transform: rotate(360deg);
-    -moz-transform: rotate(360deg);
-    -ms-transform: rotate(360deg);
-    -o-transform: rotate(360deg);
-    transform: rotate(360deg);
-  }
+	100% {
+	-webkit-transform: rotate(360deg);
+	-moz-transform: rotate(360deg);
+	-ms-transform: rotate(360deg);
+	-o-transform: rotate(360deg);
+	transform: rotate(360deg);
+	}
 }
 
 @-o-keyframes spinner {
-  0% {
-    -webkit-transform: rotate(0deg);
-    -moz-transform: rotate(0deg);
-    -ms-transform: rotate(0deg);
-    -o-transform: rotate(0deg);
-    transform: rotate(0deg);
-  }
+	0% {
+	-webkit-transform: rotate(0deg);
+	-moz-transform: rotate(0deg);
+	-ms-transform: rotate(0deg);
+	-o-transform: rotate(0deg);
+	transform: rotate(0deg);
+	}
 
-  100% {
-    -webkit-transform: rotate(360deg);
-    -moz-transform: rotate(360deg);
-    -ms-transform: rotate(360deg);
-    -o-transform: rotate(360deg);
-    transform: rotate(360deg);
-  }
+	100% {
+	-webkit-transform: rotate(360deg);
+	-moz-transform: rotate(360deg);
+	-ms-transform: rotate(360deg);
+	-o-transform: rotate(360deg);
+	transform: rotate(360deg);
+	}
 }
 
 @keyframes spinner {
-  0% {
-    -webkit-transform: rotate(0deg);
-    -moz-transform: rotate(0deg);
-    -ms-transform: rotate(0deg);
-    -o-transform: rotate(0deg);
-    transform: rotate(0deg);
-  }
+	0% {
+	-webkit-transform: rotate(0deg);
+	-moz-transform: rotate(0deg);
+	-ms-transform: rotate(0deg);
+	-o-transform: rotate(0deg);
+	transform: rotate(0deg);
+	}
 
-  100% {
-    -webkit-transform: rotate(360deg);
-    -moz-transform: rotate(360deg);
-    -ms-transform: rotate(360deg);
-    -o-transform: rotate(360deg);
-    transform: rotate(360deg);
-  }
+	100% {
+	-webkit-transform: rotate(360deg);
+	-moz-transform: rotate(360deg);
+	-ms-transform: rotate(360deg);
+	-o-transform: rotate(360deg);
+	transform: rotate(360deg);
+	}
 }
 
 /*****New modified css**********/
 .payment_method_blink .form-container {
-  padding: 20px 15px;
+	padding: 20px 15px;
 }
 
 .payment_method_blink .switches-container label,
 .payment_method_blink .switch div {
-  font-size: 13px;
+	font-size: 13px;
 }
 
 .payment_method_blink .switches-container {
-  height: 50px;
+	height: 50px;
 }
 
 .payment_method_blink .switches-container label,
 .payment_method_blink .switch div {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .payment_method_blink .switches-container label {
-  line-height: 1.2;
+	line-height: 1.2;
 }
 
 .payment_method_blink .switch div {
-  height: 100%;
-  line-height: 1.2;
+	height: 100%;
+	line-height: 1.2;
 }
 
 @media (max-width: 575px) {
-  .payment_method_blink .switches-container {
-    height: 40px;
-  }
+	.payment_method_blink .switches-container {
+	height: 40px;
+	}
 
-  .payment_method_blink input {
-    height: 38px;
-  }
+	.payment_method_blink input {
+	height: 38px;
+	}
 }
