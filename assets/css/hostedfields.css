@@ -1,76 +1,76 @@
 .hostedfield {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue';
-  font-family: "Cabin", sans-serif !important;
-  color: #333333;
-  font-size: 16px;
-  font-weight: normal;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+	'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue';
+	font-family: "Cabin", sans-serif !important;
+	color: #333333;
+	font-size: 16px;
+	font-weight: normal;
 }
 
 .hostedfield::placeholder {
-  color: #999999;
-  opacity: 1;
+	color: #999999;
+	opacity: 1;
 }
 
 .hostedfield-wrapper {
-  display: inline-block;
-  cursor: text;
-  letter-spacing: normal;
-  word-spacing: normal;
-  text-transform: none;
-  text-indent: 0px;
-  text-shadow: none;
-  display: inline-block;
-  text-align: start;
-  background-color: #ffff;
-  cursor: text;
-  margin: 0em;
-  font: 400 13.3333px Arial;
-  padding: 1px 0px;
-  border-width: 2px;
-  border-style: inset;
-  border-color: initial;
-  border-image: initial;
-  overflow: hidden !important;
+	display: inline-block;
+	cursor: text;
+	letter-spacing: normal;
+	word-spacing: normal;
+	text-transform: none;
+	text-indent: 0px;
+	text-shadow: none;
+	display: inline-block;
+	text-align: start;
+	background-color: #ffff;
+	cursor: text;
+	margin: 0em;
+	font: 400 13.3333px Arial;
+	padding: 1px 0px;
+	border-width: 2px;
+	border-style: inset;
+	border-color: initial;
+	border-image: initial;
+	overflow: hidden !important;
 }
 
 .hostedfield-wrapper.hf-disabled {
-  cursor: default;
+	cursor: default;
 }
 
 .hostedfield-wrapper>div {
-  position: relative;
+	position: relative;
 }
 
 .hostedfield-frame {
-  display: table-cell !important;
-  border: none !important;
-  margin: 0px !important;
-  padding: 0px !important;
-  width: 100% !important;
-  height: 100% !important;
-  overflow: hidden !important;
+	display: table-cell !important;
+	border: none !important;
+	margin: 0px !important;
+	padding: 0px !important;
+	width: 100% !important;
+	height: 100% !important;
+	overflow: hidden !important;
 }
 
 .hostedfield-input {
-  border: none !important;
-  display: block !important;
-  position: absolute !important;
-  height: 1px !important;
-  bottom: 0px;
-  left: 0px !important;
-  padding: 0px !important;
-  margin: 0px !important;
-  width: 100% !important;
-  opacity: 0 !important;
-  background: transparent !important;
-  pointer-events: none !important;
-  font-size: 16px !important;
+	border: none !important;
+	display: block !important;
+	position: absolute !important;
+	height: 1px !important;
+	bottom: 0px;
+	left: 0px !important;
+	padding: 0px !important;
+	margin: 0px !important;
+	width: 100% !important;
+	opacity: 0 !important;
+	background: transparent !important;
+	pointer-events: none !important;
+	font-size: 16px !important;
 }
 
 /* Emulate webkit auto fill style */
 .hostedfield.hf-autofill {
-  background-color: rgb(250, 255, 189) !important;
-  background-image: none !important;
-  color: rgb(0, 0, 0) !important;
+	background-color: rgb(250, 255, 189) !important;
+	background-image: none !important;
+	color: rgb(0, 0, 0) !important;
 }
