@@ -761,7 +761,6 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		if ( ! $this->testmode && ! is_ssl() ) {
 			return;
 		}
-		wp_enqueue_script( 'blink_l', 'https://code.jquery.com/jquery-3.6.3.min.js', array(), $this->version );
 		// let's suppose it is our payment processor JavaScript that allows to obtain a token
 		wp_enqueue_script( 'blink_hosted_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', array( 'jquery' ), $this->version, false );
 		wp_register_style( 'woocommerce_blink_payment_style', plugins_url( '../assets/css/style.css', __FILE__ ), array(), $this->version );
