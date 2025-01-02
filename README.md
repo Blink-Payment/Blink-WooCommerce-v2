@@ -1,5 +1,7 @@
 # Blink-WooCommerce-v2
 
+> **_NOTE:_**  This is a BETA release for compatability with the new block editor.
+
 ## Description
 
 This module enables the use og the Blink Payment Gateway, utilising the Blink REST API, using the [Woocommerce project](https://woo.com/).

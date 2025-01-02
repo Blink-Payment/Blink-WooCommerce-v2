@@ -260,6 +260,7 @@ input:focus,
 	padding: 30px;
 	border-radius: 10px;
 	max-width: 500px;
+	margin: 0 auto;
 }
 
 .payment_method_blink .switches-container {
