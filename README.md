@@ -1,11 +1,10 @@
 # Blink-WooCommerce-v2
 
-> **_NOTE:_**  This is a BETA release for compatability with the new block editor.
-
 ## Description
 
 This module enables the use og the Blink Payment Gateway, utilising the Blink REST API, using the [Woocommerce project](https://woo.com/).
-The documentation for the Blink API cna be found [here](https://docs.blinkpayment.co.uk/docs/category/authentication).
+Allow customers to pay at checkout through card, Googlepay, Apple Pay, Open Banking adn direct debit.
+The documentation for the Blink API can be found [here](https://docs.blinkpayment.co.uk/docs/category/authentication).
 The API credentials can be found on your [Blink Portal](https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages)
 
 ## Install
