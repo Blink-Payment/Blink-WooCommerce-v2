@@ -352,15 +352,17 @@ function generate_access_token() {
 	wp_die();
 }
 
-function write_log( $data ) {
-	if ( empty( $data ) ) {
-		return;
-	}
-	if ( true === WP_DEBUG ) {
-		if ( is_array( $data ) || is_object( $data ) ) {
-			error_log( print_r( $data, true ) );
-		} else {
-			error_log( $data );
+if(!function_exists('write_log')){
+	function write_log( $data ) {
+		if ( empty( $data ) ) {
+			return;
+		}
+		if ( true === WP_DEBUG ) {
+			if ( is_array( $data ) || is_object( $data ) ) {
+				error_log( print_r( $data, true ) );
+			} else {
+				error_log( $data );
+			}
 		}
 	}
 }
