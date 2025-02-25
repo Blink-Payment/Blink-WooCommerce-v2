@@ -785,9 +785,9 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		wp_register_style( 'woocommerce_blink_payment_style', plugins_url( '../assets/css/style.css', __FILE__ ), array(), $this->version );
 		// and this is our custom JS in your plugin directory that works with token.js
 		if ( is_wc_endpoint_url( 'order-pay' ) ) {
-			wp_register_script( 'woocommerce_blink_payment', plugins_url( '../assets/js/order-pay.js', __FILE__ ), array( 'jquery' ), $this->version, true );      
+			wp_register_script( 'woocommerce_blink_payment_order_pay', plugins_url( '../assets/js/order-pay.js', __FILE__ ), array( 'jquery' ), $this->version, true );      
 		} else {
-			wp_register_script( 'woocommerce_blink_payment', plugins_url( '../assets/js/checkout.js', __FILE__ ), array( 'jquery' ), $this->version, true );       
+			wp_register_script( 'woocommerce_blink_payment_checkout', plugins_url( '../assets/js/checkout.js', __FILE__ ), array( 'jquery' ), $this->version, true );       
 		}
 			// in most payment processors you have to use API KEY and SECRET KEY to obtain a token
 			wp_localize_script(
@@ -816,8 +816,11 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 					'order_id'      		 => $order->get_id(),
 				)
 			);
+			wp_enqueu_script( 'woocommerce_blink_payment_order_pay' );
+		}else{
+			wp_enqueu_script( 'woocommerce_blink_payment_checkout' );
 		}
-		wp_enqueue_script( 'woocommerce_blink_payment' );
+
 		wp_enqueue_style( 'woocommerce_blink_payment_style' );
 		$custom_css = $this->get_option( 'custom_style' );
 		if ( $custom_css ) {
