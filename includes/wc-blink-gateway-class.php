@@ -791,7 +791,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 		}
 			// in most payment processors you have to use API KEY and SECRET KEY to obtain a token
 			wp_localize_script(
-				'woocommerce_blink_payment',
+				'woocommerce_blink_payment_checkout',
 				'blink_params',
 				array(
 					'ajaxurl'       => admin_url( 'admin-ajax.php' ),
@@ -802,7 +802,7 @@ class WC_Blink_Gateway extends WC_Payment_Gateway {
 			$order = wc_get_order( get_query_var( 'order-pay' ) );
 
 			wp_localize_script(
-				'woocommerce_blink_payment',
+				'woocommerce_blink_payment_order_pay',
 				'order_params',
 				array(
 					'billing_first_name' => $order->get_billing_first_name(),
