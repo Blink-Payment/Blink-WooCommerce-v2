@@ -56,6 +56,7 @@ jQuery(function ($) {
                 data: {
                     action: 'blink_payment_fields',
                     payment_method: selectedMethod,
+                    order: order_params.order_id,
                     payment_by: paymentBy
                 },
                 success: function(response) {
@@ -105,9 +106,11 @@ jQuery(function ($) {
             var $formCard = jQuery('form[name="blink-credit"]');
             
             jQuery('#cc_customer_email').hide();
+            jQuery('#cc_customer_postcode').hide();
+            jQuery('#cc_customer_address').hide();
             jQuery(".blink-form__label.field-label").each(function(){
                 // Check if the label contains the text "Email"
-                if (jQuery(this).text().trim() === "Email") {
+                if (jQuery(this).text().trim() === "Email" || jQuery(this).text().trim() === "Address") {
                     // Hide the label
                     jQuery(this).hide();
                 }

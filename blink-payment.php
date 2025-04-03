@@ -27,12 +27,43 @@ add_action( 'wp_ajax_generate_access_token', 'generate_access_token' );
 add_action( 'wp_ajax_generate_applepay_domains', 'generate_applepay_domains' );
 add_action( 'wp_ajax_blink_payment_fields', 'blink_payment_fields_ajax' );
 add_action( 'wp_ajax_nopriv_blink_payment_fields', 'blink_payment_fields_ajax' );
+add_action( 'woocommerce_blocks_loaded', 'gateway_block_support' );
+add_action( 'before_woocommerce_init', 'cart_checkout_blocks_compatibility' );
 
+
+function gateway_block_support() {
+
+	if ( ! class_exists( 'Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' ) ) {
+		return;
+	}
+
+	// here we're including our "gateway block support class"
+	require_once __DIR__ . '/includes/class-wc-blink-gateway-block.php';
+
+	// registering the PHP class we have just included
+	add_action(
+		'woocommerce_blocks_payment_method_type_registration',
+		function ( Automattic\WooCommerce\Blocks\Payments\PaymentMethodRegistry $payment_method_registry ) {
+			$payment_method_registry->register( new WC_Blink_Gateway_Block() );
+		}
+	);
+}
+function cart_checkout_blocks_compatibility() {
+
+	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+			'cart_checkout_blocks',
+			__FILE__,
+			true
+		);
+	}
+}
 function blink_payment_fields_ajax() {
 	// Make sure WooCommerce is available
 	if ( class_exists( 'WC_Payment_Gateway' ) ) {
 		$gateway = new WC_Blink_Gateway();
 		ob_start();
+		$gateway->destroy_session_intent();
 		$gateway->payment_fields();
 		$payment_fields_html = ob_get_clean();
 
@@ -43,18 +74,6 @@ function blink_payment_fields_ajax() {
 		);
 	} else {
 		wp_send_json_error( 'Payment gateway not found' );
-	}
-}
-
-
-function cart_checkout_blocks_compatibility() {
-
-	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
-		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
-			'cart_checkout_blocks',
-			__FILE__,
-			false // true (compatible, default) or false (not compatible)
-		);
 	}
 }
 

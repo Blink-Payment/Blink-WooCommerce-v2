@@ -151,7 +151,7 @@ function error_payment_process() {
 }
 
 function get_blink_status( $status = '', $source = '' ) {
-
+     $status = urldecode($status );
 	if ( 'tendered' === strtolower( $status ) || 'captured' === strtolower( $status ) || 'success' === strtolower( $status ) || 'accept' === strtolower( $status ) ) {
 		return 'complete';
 	} elseif ( strpos( strtolower( $source ), 'direct debit' ) !== false || 'pending submission' === strtolower( $status ) ) {
@@ -363,4 +363,33 @@ function write_log( $data ) {
 			error_log( $data );
 		}
 	}
+}
+
+// Conditional function that check if Checkout page use Checkout Blocks
+function is_checkout_block() {
+    return WC_Blocks_Utils::has_block_in_page( wc_get_page_id('checkout'), 'woocommerce/checkout' );
+}
+
+function decodeUnicodeString($string) {
+    // Decode URL-encoded sequences first
+    $string = urldecode($string);
+    // Replace specific Unicode characters like \u003d with their actual character
+    $string = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', function ($matches) {
+        return mb_convert_encoding(pack('H*', $matches[1]), 'UTF-8', 'UCS-2BE');
+    }, $string);
+    return $string;
+}
+
+function decodeUnicodeJSON($jsonString) {
+    // Decode JSON, turning into an associative array
+    $data = json_decode(wp_unslash($jsonString), true);
+
+    // Recursively decode any strings in the array
+    array_walk_recursive($data, function (&$item) {
+        if (is_string($item)) {
+            $item = decodeUnicodeString($item);
+        }
+    });
+
+    return $data;
 }

@@ -1,5 +1,9 @@
 *** WooCommerce - Blink Changelog ***
 
+2025-02-03 - version 1.1.1
+
+* make plugin comaptible with guttneberg blocks
+
 2024-06-24 - version 1.1.0
 
 * Added Apple Pay

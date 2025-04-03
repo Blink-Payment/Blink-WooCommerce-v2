@@ -21,9 +21,11 @@ jQuery(function ($) {
 
                 
                 $('#cc_customer_email').hide();
+                $('#cc_customer_postcode').hide();
+                $('#cc_customer_address').hide();
                 $(".blink-form__label.field-label").each(function(){
                     // Check if the label contains the text "Email"
-                    if ($(this).text().trim() === "Email") {
+                    if ($(this).text().trim() === "Email" || $(this).text().trim() === "Address") {
                         // Hide the label
                         $(this).hide();
                     }
