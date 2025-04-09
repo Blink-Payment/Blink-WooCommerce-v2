@@ -41,7 +41,7 @@ jQuery(function ($) {
                     url: blinkOrders.ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'generate_access_token',
+                        action: 'blink_generate_access_token',
                         security: blinkOrders.security,
                     },
                     success: function(response) {
@@ -68,7 +68,7 @@ jQuery(function ($) {
                     url: blinkOrders.ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'generate_applepay_domains',
+                        action: 'blink_generate_applepay_domains',
                         security: blinkOrders.apple_security,
                         token: accessToken,
                         domain: "https://" + domain
