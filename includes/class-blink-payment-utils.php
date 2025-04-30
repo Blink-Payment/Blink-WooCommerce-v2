@@ -25,6 +25,7 @@ class Blink_Payment_Utils {
 			'source_site'             => get_bloginfo( 'name' ),
 			'application_name'        => 'Woocommerce Blink ' . $this->gateway->version,
 			'application_description' => 'WP-' . get_bloginfo( 'version' ) . ' WC-' . WC_VERSION,
+			'address_postcode_required' => true,
 		);
 		$response     = wp_remote_post(
 			$url,
