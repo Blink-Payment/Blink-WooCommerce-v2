@@ -31,6 +31,27 @@ const BlinkPayment = (props) => {
   const java = (window && window.navigator ? navigator.javaEnabled() : false);
   const timezone = (new Date()).getTimezoneOffset();
 
+  
+  useEffect(() => {
+    if (settings.isHosted) {
+      const unsubscribe = onPaymentSetup(async () => {
+        return {
+          type: emitResponse.responseTypes.SUCCESS,
+          meta: {
+            paymentMethodData: {
+              customer_address: formData.customer_address || billingFullAddress,
+              customer_postcode: formData.customer_postcode || billingAddress.postcode,
+            },
+          },
+        };
+      });
+      return unsubscribe;
+    }
+  }, [settings.isHosted, onPaymentSetup, formData, billingFullAddress, billingAddress.postcode, emitResponse]);
+
+  if (settings.isHosted) {
+    return null;
+  }
 
 	useEffect( () => {
 		const unsubscribe = onCheckoutFail( () => {

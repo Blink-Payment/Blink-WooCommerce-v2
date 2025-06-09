@@ -45,10 +45,11 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 			'description'       => $this->get_setting( 'description' ),
 			'supports'          => array_filter( $this->gateway->supports ),
 			'elements'          => $elements,
-			'selected_methods'  => $this->gateway->paymentMethods,
+			'selected_methods'  => array_values($this->gateway->paymentMethods),
 			'apple_pay_enabled' => 'yes' === $this->get_setting( 'apple_pay_enabled' ),
 			'isSafari'          => blink_is_safari(),
 			'makePayment'       => empty( $elements ) ? false : true,
+			'isHosted'       	=> 'direct' !== $this->get_setting( 'integration_type' ),
 		);
 	}
 

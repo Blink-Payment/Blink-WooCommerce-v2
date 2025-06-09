@@ -216,6 +216,16 @@ jQuery(function ($) {
         
     });
 
+    // When a coupon is applied successfully
+    $(document.body).on('applied_coupon', function() {
+        location.reload(); // Reload the page
+    });
+
+    // If the coupon is removed
+    $(document.body).on('removed_coupon', function() {
+        location.reload(); // Reload the page
+    });
+
 
     var effect = function(html) {
         return $(targetDiv).empty().html(html);;

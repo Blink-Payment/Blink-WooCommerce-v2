@@ -2,13 +2,15 @@
 // phpcs:ignoreFile
 
 if (!function_exists('blink_insert_array_at_position')) {
-    function blink_insert_array_at_position($array, $insert, $position) {
+    function blink_insert_array_at_position($array, $insert, $position)
+    {
         return array_slice($array, 0, $position, true) + $insert + array_slice($array, $position, null, true);
     }
 }
 
 if (!function_exists('blink_is_safari')) {
-    function blink_is_safari() {
+    function blink_is_safari()
+    {
         if (isset($_SERVER['HTTP_USER_AGENT'])) {
             $userAgent = $_SERVER['HTTP_USER_AGENT'];
             if (strpos($userAgent, 'Safari') !== false && strpos($userAgent, 'Chrome') === false) {
@@ -20,7 +22,8 @@ if (!function_exists('blink_is_safari')) {
 }
 
 if (!function_exists('blink_transform_word')) {
-    function blink_transform_word($word) {
+    function blink_transform_word($word)
+    {
         $transformations = array(
             'credit-card'  => 'Card',
             'direct-debit' => 'Direct Debit',
@@ -31,7 +34,8 @@ if (!function_exists('blink_transform_word')) {
 }
 
 if (!function_exists('blink_check_timestamp_expired')) {
-    function blink_check_timestamp_expired($timestamp) {
+    function blink_check_timestamp_expired($timestamp)
+    {
         $current_time = time();
         $expiry_time  = strtotime($timestamp);
         return $current_time > $expiry_time ? 0 : 1;
@@ -39,7 +43,8 @@ if (!function_exists('blink_check_timestamp_expired')) {
 }
 
 if (!function_exists('blink_get_time_diff')) {
-    function blink_get_time_diff($order) {
+    function blink_get_time_diff($order)
+    {
         $order_date_time   = new DateTime($order->get_date_created()->date('Y-m-d H:i:s'));
         $current_date_time = new DateTime();
         $time_difference   = $current_date_time->diff($order_date_time);
@@ -48,7 +53,8 @@ if (!function_exists('blink_get_time_diff')) {
 }
 
 if (!function_exists('blink_check_CCPayment')) {
-    function blink_check_CCPayment($source) {
+    function blink_check_CCPayment($source)
+    {
         $payment_types = array('direct debit', 'open banking');
         foreach ($payment_types as $type) {
             if (preg_match('/\b' . strtolower($type) . '\b/i', $source)) {
@@ -60,7 +66,8 @@ if (!function_exists('blink_check_CCPayment')) {
 }
 
 if (!function_exists('blink_get_customer_data')) {
-    function blink_get_customer_data($order) {
+    function blink_get_customer_data($order)
+    {
         return array(
             'customer_id'        => $order->get_user_id(),
             'customer_name'      => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
@@ -81,7 +88,8 @@ if (!function_exists('blink_get_customer_data')) {
 }
 
 if (!function_exists('blink_get_order_data')) {
-    function blink_get_order_data($order) {
+    function blink_get_order_data($order)
+    {
         return array(
             'order_id'           => $order->get_id(),
             'order_number'       => $order->get_order_number(),
@@ -100,7 +108,8 @@ if (!function_exists('blink_get_order_data')) {
 }
 
 if (!function_exists('blink_get_payment_information')) {
-    function blink_get_payment_information($order_id) {
+    function blink_get_payment_information($order_id)
+    {
         $order = wc_get_order($order_id);
         return wp_json_encode(
             array(
@@ -112,7 +121,8 @@ if (!function_exists('blink_get_payment_information')) {
 }
 
 if (!function_exists('blink_error_payment_process')) {
-    function blink_error_payment_process($apiBody = array()) {
+    function blink_error_payment_process($apiBody = array())
+    {
         $error = __('Error! Something went wrong.', 'blink-payment-checkout');
         if (is_array($apiBody) && !empty($apiBody)) {
             if (isset($apiBody['success']) && $apiBody['success'] === false) {
@@ -131,9 +141,10 @@ if (!function_exists('blink_error_payment_process')) {
 }
 
 if (!function_exists('blink_get_status')) {
-    function blink_get_status($status = '', $source = '') {
+    function blink_get_status($status = '', $source = '')
+    {
         $status = urldecode($status);
-        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept'], true)) {
+        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'paid'], true)) {
             return 'complete';
         } elseif (strpos(strtolower($source), 'direct debit') !== false || strtolower($status) === 'pending submission') {
             return 'hold';
@@ -143,7 +154,8 @@ if (!function_exists('blink_get_status')) {
 }
 
 if (!function_exists('blink_change_status')) {
-    function blink_change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null) {
+    function blink_change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null)
+    {
         $wc_order->add_order_note(__('Transaction status - ', 'blink-payment-checkout') . $status);
         if (blink_get_status($status, $source) === 'complete') {
             blink_payment_complete($wc_order, $transaction_id, $note ?: __('Blink payment completed', 'blink-payment-checkout'));
@@ -163,7 +175,8 @@ if (!function_exists('blink_payment_complete')) {
      * @param string   $txn_id Transaction ID.
      * @param string   $note Payment note.
      */
-    function blink_payment_complete($order, $txn_id = '', $note = '') {
+    function blink_payment_complete($order, $txn_id = '', $note = '')
+    {
         if (!$order->has_status(array('processing', 'completed'))) {
             if ($note) {
                 $order->add_order_note($note);
@@ -183,7 +196,8 @@ if (!function_exists('blink_payment_on_hold')) {
      * @param WC_Order $order Order object.
      * @param string   $reason Reason why the payment is on hold.
      */
-    function blink_payment_on_hold($order, $reason = '') {
+    function blink_payment_on_hold($order, $reason = '')
+    {
         $order->update_status('on-hold', $reason);
         if ($reason) {
             $order->add_order_note($reason);
@@ -201,7 +215,8 @@ if (!function_exists('blink_payment_failed')) {
      * @param WC_Order $order Order object.
      * @param string   $reason Reason why the payment failed.
      */
-    function blink_payment_failed($order, $reason = '') {
+    function blink_payment_failed($order, $reason = '')
+    {
         $order->update_status('failed', $reason);
         if ($reason) {
             $order->add_order_note($reason);
@@ -215,7 +230,8 @@ if (!function_exists('blink_is_in_admin_section')) {
      *
      * @return bool
      */
-    function blink_is_in_admin_section() {
+    function blink_is_in_admin_section()
+    {
         if (isset($_GET['page']) && $_GET['page'] === 'wc-settings' && isset($_GET['tab']) && $_GET['tab'] === 'checkout' && isset($_GET['section']) && $_GET['section'] === 'blink') {
             return true;
         }
@@ -229,7 +245,8 @@ if (!function_exists('blink_add_notice')) {
      *
      * @param array $apiBody API response body.
      */
-    function blink_add_notice($apiBody = array()) {
+    function blink_add_notice($apiBody = array())
+    {
         $error = __('Error! Something went wrong.', 'blink-payment-checkout');
         if (is_array($apiBody) && !empty($apiBody)) {
             if (isset($apiBody['success']) && $apiBody['success'] === false) {
@@ -250,7 +267,8 @@ if (!function_exists('blink_generate_applepay_domains')) {
     /**
      * Generate Apple Pay domains.
      */
-    function blink_generate_applepay_domains() {
+    function blink_generate_applepay_domains()
+    {
         $configs    = include __DIR__ . '/../config.php';
         $host_url   = $configs['host_url'] . '/api';
         $settings   = get_option('woocommerce_blink_settings');
@@ -292,7 +310,8 @@ if (!function_exists('blink_generate_access_token')) {
     /**
      * Generate access token for Blink API.
      */
-    function blink_generate_access_token() {
+    function blink_generate_access_token()
+    {
         $configs    = include __DIR__ . '/../config.php';
         $host_url   = $configs['host_url'] . '/api';
         $settings   = get_option('woocommerce_blink_settings');
@@ -311,6 +330,8 @@ if (!function_exists('blink_generate_access_token')) {
             'source_site'             => get_bloginfo('name'),
             'application_name'        => 'Woocommerce Blink ' . $configs['version'],
             'application_description' => 'WP-' . get_bloginfo('version') . ' WC-' . WC_VERSION,
+            'address_postcode_required' => true,
+            'send_blink_receipt' => false,
         );
 
         $response = wp_remote_post(
@@ -338,7 +359,8 @@ if (!function_exists('blink_write_log')) {
      *
      * @param mixed $data Data to log.
      */
-    function blink_write_log($data) {
+    function blink_write_log($data)
+    {
         if (empty($data)) {
             return;
         }
@@ -358,7 +380,8 @@ if (!function_exists('blink_is_checkout_block')) {
      *
      * @return bool
      */
-    function blink_is_checkout_block() {
+    function blink_is_checkout_block()
+    {
         return WC_Blocks_Utils::has_block_in_page(get_queried_object_id(), 'woocommerce/checkout');
     }
 }
@@ -370,7 +393,8 @@ if (!function_exists('decodeUnicodeString')) {
      * @param string $string Unicode string.
      * @return string Decoded string.
      */
-    function decodeUnicodeString($string) {
+    function decodeUnicodeString($string)
+    {
         $string = urldecode($string);
         $string = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', function ($matches) {
             return mb_convert_encoding(pack('H*', $matches[1]), 'UTF-8', 'UCS-2BE');
@@ -386,7 +410,8 @@ if (!function_exists('decodeUnicodeJSON')) {
      * @param string $jsonString JSON string.
      * @return array Decoded array.
      */
-    function decodeUnicodeJSON($jsonString) {
+    function decodeUnicodeJSON($jsonString)
+    {
         $data = json_decode(wp_unslash($jsonString), true);
 
         array_walk_recursive($data, function (&$item) {
@@ -403,7 +428,8 @@ if (!function_exists('pay_action')) {
     /**
      * Process payment action.
      */
-    function pay_action() {
+    function pay_action()
+    {
         $checkout = WC_Checkout::instance();
         $response = $checkout->process_checkout();
         $result   = json_decode($response, true);
@@ -419,7 +445,8 @@ if (!function_exists('blink_3d_allow_html')) {
      *
      * @return array Allowed HTML tags and attributes.
      */
-    function blink_3d_allow_html() {
+    function blink_3d_allow_html()
+    {
         return array(
             'form' => array(
                 'id'     => true,

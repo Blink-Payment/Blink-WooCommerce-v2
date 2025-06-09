@@ -57,6 +57,11 @@ class Blink_Payment_Fields_Handler {
 
 	public function render_payment_fields() {
 
+		if ( $this->gateway->is_hosted() ) {
+			echo '<p>' . esc_html( $this->gateway->description ) . '</p>';
+			return;
+		}
+
 		$request        = $_POST;
 		$blink3dprocess = isset( $_GET['blink3dprocess'] ) ? sanitize_text_field( wp_unslash( $_GET['blink3dprocess'] ) ) : '';
 

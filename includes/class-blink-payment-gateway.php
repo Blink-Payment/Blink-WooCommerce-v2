@@ -39,6 +39,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 		$this->title             = $this->get_option( 'title' );
 		$this->description       = $this->get_option( 'description' );
 		$this->enabled           = $this->get_option( 'enabled' );
+		$this->integration_type  = $this->get_option( 'integration_type' );
 		$this->testmode          = 'yes' === $this->get_option( 'testmode' );
 		$this->apple_pay_enabled = 'yes' === $this->get_option( 'apple_pay_enabled' );
 		$this->api_key           = $this->testmode ? $this->get_option( 'test_api_key' ) : $this->get_option( 'api_key' );
@@ -300,5 +301,9 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 			wc_print_notice( $note, 'error' );
 			set_transient( 'custom_notice_shown', true, 15 );
 		}
+	}
+
+	public function is_hosted() {
+		return ( $this->integration_type !== 'direct' );
 	}
 }

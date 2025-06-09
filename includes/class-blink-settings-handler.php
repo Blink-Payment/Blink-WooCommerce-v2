@@ -39,6 +39,18 @@ class Blink_Settings_Handler {
 				'description' => __( 'This controls the description which the user sees during checkout.', 'blink-payment-checkout' ),
 				'default'     => __( 'Pay with your credit card or direct debit at your convenience.', 'blink-payment-checkout' ),
 			),
+			'integration_type' => array(
+				'title'       => __( 'Integration Type', 'blink-payment-checkout' ),
+				'type'        => 'select',
+				'description' => __( 'Choose the integration type for the payment gateway.', 'blink-payment-checkout' ),
+				'default'     => 'checkout',
+				'options'     => array(
+            			'direct'  => __( 'Direct', 'blink-payment-checkout' ),
+            			'hosted'  => __( 'Hosted', 'blink-payment-checkout' ),
+				),
+				'default' => 'direct',
+
+			),
 			'testmode'        => array(
 				'title'       => __( 'Test mode', 'blink-payment-checkout' ),
 				'label'       => __( 'Enable Test Mode', 'blink-payment-checkout' ),
