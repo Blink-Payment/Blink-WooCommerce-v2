@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.1.3
+ * Version: 1.2.0
  * Text Domain: blink-payment-checkout
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
