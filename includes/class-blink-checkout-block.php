@@ -1,7 +1,11 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly
+}
+
 use Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType;
 
-final class WC_Blink_Gateway_Block extends AbstractPaymentMethodType {
+final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 
 	private $gateway;
 
@@ -15,14 +19,9 @@ final class WC_Blink_Gateway_Block extends AbstractPaymentMethodType {
 		$this->gateway = $gateways[ $this->name ];
 	}
 
-	public function is_active() {
-		return ! empty( $this->settings['enabled'] ) && 'yes' === $this->settings['enabled'];
-	}
-
 	public function get_payment_method_script_handles() {
-
 		wp_register_script(
-			'wc-blink-blocks-integration',
+			'blink-checkout-block-integration',
 			plugin_dir_url( __DIR__ ) . 'dist/blink-block.js',
 			array(
 				'wc-blocks-registry',
@@ -34,29 +33,39 @@ final class WC_Blink_Gateway_Block extends AbstractPaymentMethodType {
 			true
 		);
 
-		return array( 'wc-blink-blocks-integration' );
+		return array( 'blink-checkout-block-integration' );
 	}
 
 	public function get_payment_method_data() {
+
+		$elements = $this->get_elements();
+
 		return array(
 			'title'             => $this->get_setting( 'title' ),
 			'description'       => $this->get_setting( 'description' ),
 			'supports'          => array_filter( $this->gateway->supports ),
-			'elements'          => $this->get_elements(),
+			'elements'          => $elements,
+			'selected_methods'  => $this->gateway->paymentMethods,
 			'apple_pay_enabled' => 'yes' === $this->get_setting( 'apple_pay_enabled' ),
-			'isSafari'          => isSafari(),
-			'makePayment'       => empty( $this->get_elements() ) ? false : true,
+			'isSafari'          => blink_is_safari(),
+			'makePayment'       => empty( $elements ) ? false : true,
 		);
 	}
 
 	private function get_elements() {
 
+		if ( is_admin() ) {
+			return array();
+		}
+
 		$paymentGateway = new $this->gateway();
-		$request        = $_POST;
 
-		$token = $paymentGateway->setTokens();
+		// Validate, unslash, and sanitize the input
+		$request['payment_by'] = isset( $_POST['payment_by'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_by'] ) ) : '';
 
-		$intent = $paymentGateway->setIntents( $request );
+		$token = $paymentGateway->utils->setTokens();
+
+		$intent = $paymentGateway->utils->setIntents( $request );
 
 		$element = ! empty( $intent ) ? $intent['element'] : array();
 

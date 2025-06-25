@@ -2,10 +2,14 @@
 
 ## Description
 
-This module enables the use og the Blink Payment Gateway, utilising the Blink REST API, using the [Woocommerce project](https://woo.com/).
-Allow customers to pay at checkout through card, Googlepay, Apple Pay, Open Banking adn direct debit.
-The documentation for the Blink API can be found [here](https://docs.blinkpayment.co.uk/docs/category/authentication).
-The API credentials can be found on your [Blink Portal](https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages)
+This WooCommerce plugin integrates your store with the Blink Payment Gateway via the Blink REST API. It allows you to offer various payment methods at checkout — including card, Apple Pay, Google Pay, Open Banking, and Direct Debit — *once they have been enabled on your Blink merchant account*.
+
+> ⚠️ **Note:** Availability of payment methods depends on your Blink account setup. Each method requires separate onboarding and approval through the Blink Portal before it becomes active in your checkout.
+
+- **Blink API Documentation:** [https://api-docs.blinkpayment.co.uk/](https://api-docs.blinkpayment.co.uk/)
+- **Access Your API Credentials:** [https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages](https://secure.blinkpayment.co.uk/admin/customer-centre/blink-pages)
+- **Sign Up for a Sandbox Account:** [https://www.blinkpayment.co.uk/developer-signup](https://www.blinkpayment.co.uk/developer-signup)
+
 
 ## Install
 1. Download [the plugin](https://github.com/Blink-Payment/Blink-WooCommerce-v2).

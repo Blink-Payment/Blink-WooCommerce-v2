@@ -1,6 +1,12 @@
 *** WooCommerce - Blink Changelog ***
 
-2025-02-03 - version 1.1.1
+2025-27-05 - version 1.1.2
+
+* plugin name change to "Blink Payment Gateway for WooCommerce"
+* Google Pay Fix
+
+
+2025-02-04 - version 1.1.1
 
 * make plugin comaptible with guttneberg blocks
 

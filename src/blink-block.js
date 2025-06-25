@@ -327,25 +327,54 @@ const handleSubmitCC = async () => {
         <div className='form-group mb-4'>
             <div className='form-group mb-4'>
               <div className="select-batch" style={{ width: "100%" }}>
-                <div className="switches-container" id="selectBatch">
-                  
-                  <input type="radio" id="credit-card" name="switchPayment" value="credit-card" defaultChecked onClick={() => setSelectedTab('credit-card')} />
-                  
-                  <input type="radio" id="direct-debit" name="switchPayment" value="direct-debit" onClick={() => setSelectedTab('direct-debit')}/>
-                  
-                  <input type="radio" id="open-banking" name="switchPayment" value="open-banking" onClick={() => setSelectedTab('open-banking')}/>
-                  
-                  <label htmlFor="credit-card">Card</label>
-                  
-                  <label htmlFor="direct-debit">Direct Debit</label>
-                  
-                  <label htmlFor="open-banking">Open Banking</label>
-                  
-                  <div className="switch-wrapper">
+                <div className={`switches-container ${containerClass}`} id="selectBatch">
+                  {settings.selected_methods.includes('credit-card') && (
+                    <>
+                      <input
+                        type="radio"
+                        id="credit-card"
+                        name="switchPayment"
+                        value="credit-card"
+                        defaultChecked={settings.selected_methods[0] === 'credit-card'}
+                        onClick={() => setSelectedTab('credit-card')}
+                      />
+                      <label htmlFor="credit-card">Card</label>
+                    </>
+                  )}
+
+                  {settings.selected_methods.includes('direct-debit') && (
+                    <>
+                      <input
+                        type="radio"
+                        id="direct-debit"
+                        name="switchPayment"
+                        value="direct-debit"
+                        defaultChecked={settings.selected_methods[0] === 'direct-debit'}
+                        onClick={() => setSelectedTab('direct-debit')}
+                      />
+                      <label htmlFor="direct-debit">Direct Debit</label>
+                    </>
+                  )}
+
+                  {settings.selected_methods.includes('open-banking') && (
+                    <>
+                      <input
+                        type="radio"
+                        id="open-banking"
+                        name="switchPayment"
+                        value="open-banking"
+                        defaultChecked={settings.selected_methods[0] === 'open-banking'}
+                        onClick={() => setSelectedTab('open-banking')}
+                      />
+                      <label htmlFor="open-banking">Open Banking</label>
+                    </>
+                  )}
+
+                  <div className={`switch-wrapper ${containerClass}`}>
                     <div className="switch">
-                      <div>Card</div>
-                      <div>Direct Debit</div>
-                      <div>Open Banking</div>
+                      {settings.selected_methods.includes('credit-card') && <div>Card</div>}
+                      {settings.selected_methods.includes('direct-debit') && <div>Direct Debit</div>}
+                      {settings.selected_methods.includes('open-banking') && <div>Open Banking</div>}
                     </div>
                   </div>
                 </div>
@@ -393,6 +422,9 @@ const settings = getSetting('blink_data', {});
 const label = decodeEntities(settings?.title || 'Blink');
 
 const enabled = settings?.makePayment || false;
+
+const methodCount = settings.selected_methods.length;
+const containerClass = methodCount === 1 ? 'one' : methodCount === 2 ? 'two' : '';
 
 registerPaymentMethod({
   name: 'blink',
