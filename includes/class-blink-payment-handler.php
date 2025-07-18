@@ -159,7 +159,7 @@ class Blink_Payment_Handler {
 		$order_id = $order->get_id();
 		if ( ! empty( $this->token['access_token'] ) && ! empty( $this->intent['payment_intent'] ) ) {
 			$request_data = array(
-				'resource'           => $request['resource'],
+				'resource'           => $endpoint,
 				'payment_intent'     => $this->intent['payment_intent'],
 				'paymentToken'       => $request['paymentToken'],
 				'type'               => $request['type'],
@@ -228,22 +228,12 @@ class Blink_Payment_Handler {
 	public function handle_payment( $order_id ) {
 		$order   = wc_get_order( $order_id );
 		$request = $_POST;
-
-		if ( ! empty( $request['paymenttoken'] ) ) {
-			$token_array = json_decode( $request['paymenttoken'], true );
-			if ( ! empty( $token_array ) ) {
-				$request['paymenttoken'] = $token_array;
-			}
-		}
-
-		if ( ! empty( $request['paymentToken'] ) ) {
-			$token_array = json_decode( wp_unslash( $request['paymentToken'] ), true );
-			if ( ! empty( $token_array ) ) {
-				$request['paymentToken'] = $token_array;
-			}
-		}
-
 		$this->token  = $this->gateway->utils->setTokens();
+
+		if ( method_exists( $this->gateway, 'is_hosted' ) && $this->gateway->is_hosted() ) {
+			return $this->handle_hosted_payment( $order, $request );
+		}
+
 		$this->intent = $this->gateway->utils->setIntents( $request, $order );
 
 		if ( empty( $this->intent ) || empty( $this->token ) ) {
@@ -251,6 +241,20 @@ class Blink_Payment_Handler {
 				return;
 			}
 			return blink_error_payment_process();
+		}
+
+		// Decode payment tokens if present
+		if ( ! empty( $request['paymenttoken'] ) ) {
+			$token_array = json_decode( $request['paymenttoken'], true );
+			if ( ! empty( $token_array ) ) {
+				$request['paymenttoken'] = $token_array;
+			}
+		}
+		if ( ! empty( $request['paymentToken'] ) ) {
+			$token_array = json_decode( wp_unslash( $request['paymentToken'] ), true );
+			if ( ! empty( $token_array ) ) {
+				$request['paymentToken'] = $token_array;
+			}
 		}
 
 		$response = array();
@@ -287,5 +291,72 @@ class Blink_Payment_Handler {
 			'result'   => 'success',
 			'redirect' => $response['redirect_url'],
 		);
+	}
+
+	/**
+	 * Handle hosted payment (paylink API).
+	 */
+	public function handle_hosted_payment( $order, $request ) {
+		$order_id = $order->get_id();
+
+
+		// Prepare paylink API data
+		$payment_methods = array();
+		if ( isset( $this->gateway->paymentMethods ) && is_array( $this->gateway->paymentMethods ) ) {
+			$payment_methods = $this->gateway->paymentMethods;
+		} else {
+			$payment_methods = array( 'credit-card' );
+		}
+
+		$amount = (float) $order->get_total();
+		$customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+
+		$paylink_data = array(
+			'payment_method'     => $payment_methods,
+			'transaction_type'   => 'SALE',
+			'full_name'          => $customer_name,
+			'email'              => $order->get_billing_email(),
+			'mobile_number'      => $order->get_billing_phone(),
+			'transaction_unique' => 'WC-' . $order_id,
+			'is_decide_amount'   => false,
+			'amount'             => $amount,
+			'address'            => blink_get_full_address($order),
+			'postcode'           => $order->get_billing_postcode(),
+			'notes'              => 'WooCommerce Order #' . $order_id,
+			'currency'         	 => get_woocommerce_currency(),
+			'redirect_url'       => $this->gateway->get_return_url( $order ),
+			'notification_url'   => WC()->api_request_url( 'blink_gateway' ),
+		);
+
+		$url = $this->gateway->host_url . '/paylink/v1/paylinks';
+
+		$response = wp_remote_post(
+			$url,
+			array(
+				'method'  => 'POST',
+				'headers' => array(
+					'Authorization'   => 'Bearer ' . $this->token['access_token'],
+					'Content-Type'    => 'application/json',
+				),
+				'body'    => wp_json_encode( $paylink_data ),
+				'timeout' => 30,
+			)
+		);
+
+
+		if ( is_wp_error( $response ) ) {
+			return blink_error_payment_process( $response->get_error_message() );
+		}
+
+		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( isset( $api_body['paylink_url'] ) ) {
+			return array(
+				'result'   => 'success',
+				'redirect' => $api_body['paylink_url'],
+			);
+		} else {
+			$error = ! empty( $api_body['error'] ) ? $api_body['error'] : $api_body;
+			return blink_error_payment_process( $error );
+		}
 	}
 }

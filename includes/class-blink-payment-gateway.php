@@ -18,6 +18,15 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 		public $refund_handler;
 		public $transaction_handler;
 
+		public $api_key;         
+		public $secret_key;      
+		public $testmode;        
+		public $apple_pay_enabled;
+		public $configs;         
+		public $host_url;      
+		public $integration_type;        
+		public $version;
+
 
 	public function __construct() {
 
@@ -39,6 +48,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 		$this->title             = $this->get_option( 'title' );
 		$this->description       = $this->get_option( 'description' );
 		$this->enabled           = $this->get_option( 'enabled' );
+		$this->integration_type  = $this->get_option( 'integration_type' );
 		$this->testmode          = 'yes' === $this->get_option( 'testmode' );
 		$this->apple_pay_enabled = 'yes' === $this->get_option( 'apple_pay_enabled' );
 		$this->api_key           = $this->testmode ? $this->get_option( 'test_api_key' ) : $this->get_option( 'api_key' );
@@ -81,7 +91,6 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 
 		// We need custom JavaScript to obtain a token
 		add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
-		add_action( 'woocommerce_cart_updated', array( $this->utils, 'destroy_session_tokens' ) );
 	}
 
 	public function payment_fields() {
@@ -243,6 +252,8 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 					'billing_country'    => $order->get_billing_country(),
 					'billing_phone'      => $order->get_billing_phone(),
 					'order_id'           => $order->get_id(),
+					'ajaxurl'       => admin_url( 'admin-ajax.php' ),
+					'remoteAddress' => ! empty( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '',
 				)
 			);
 			wp_enqueue_script( 'woocommerce_blink_payment_order_pay' );
@@ -300,5 +311,9 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 			wc_print_notice( $note, 'error' );
 			set_transient( 'custom_notice_shown', true, 15 );
 		}
+	}
+
+	public function is_hosted() {
+		return ( $this->integration_type !== 'direct' );
 	}
 }

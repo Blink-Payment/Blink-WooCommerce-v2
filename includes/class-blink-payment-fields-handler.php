@@ -57,6 +57,11 @@ class Blink_Payment_Fields_Handler {
 
 	public function render_payment_fields() {
 
+		if ( $this->gateway->is_hosted() ) {
+			echo '<p>' . esc_html( $this->gateway->description ) . '</p>';
+			return;
+		}
+
 		$request        = $_POST;
 		$blink3dprocess = isset( $_GET['blink3dprocess'] ) ? sanitize_text_field( wp_unslash( $_GET['blink3dprocess'] ) ) : '';
 
@@ -72,9 +77,12 @@ class Blink_Payment_Fields_Handler {
 		if ( ! empty( $request['order'] ) ) {
 			$order = wc_get_order( sanitize_text_field( $request['order'] ) );
 		}
+		$cart_amount = null; 
+		if ( WC()->cart && method_exists( WC()->cart, 'get_total' ) ) {
+			$cart_amount = WC()->cart->get_total( 'raw' );
+		}
 
-		$token   = $this->gateway->utils->setTokens();
-		$intent  = $this->gateway->utils->setIntents( $request, $order );
+		$intent  = $this->gateway->utils->setIntents( $request, $order, $cart_amount );
 		$element = ! empty( $intent ) ? $intent['element'] : array();
 
 		$parsed_data = array();
@@ -84,7 +92,15 @@ class Blink_Payment_Fields_Handler {
 			$parsed_data = $request;
 		}
 
-		$payment_by = ! empty( $parsed_data['payment_by'] ) ? sanitize_text_field( $parsed_data['payment_by'] ) : '';
+		$payment_by = '';
+		if ( ! empty( $parsed_data['payment_by'] ) ) {
+			$candidate = sanitize_text_field( $parsed_data['payment_by'] );
+			// Only use if not google-pay or apple-pay
+			if ( ! in_array( $candidate, array( 'google-pay', 'apple-pay' ), true ) ) {
+				$payment_by = $candidate;
+			}
+		}
+
 		if ( empty( $payment_by ) ) {
 			foreach ( $this->gateway->paymentMethods as $method ) {
 				$key = $this->get_element_key( $method );

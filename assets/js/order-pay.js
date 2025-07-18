@@ -51,7 +51,7 @@ jQuery(function ($) {
         if (selectedMethod === 'blink') {
             // Prepare AJAX request
             $.ajax({
-                url: blink_params.ajaxurl,
+                url: order_params.ajaxurl,
                 type: 'POST',
                 data: {
                     action: 'blink_payment_fields',
@@ -78,6 +78,8 @@ jQuery(function ($) {
     }
 
     $(document.body).on('update', function() {
+
+        document.querySelectorAll('#gpay-button-online-api-id').forEach(el => el.remove());
         
         var paymentBy = $(this).find('input[name=payment_by]').val();
 
@@ -98,7 +100,7 @@ jQuery(function ($) {
          $(this).find('input[name=device_accept_language]').val(language);
          $(this).find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
             screen_depth);
-         $(this).find('input[name=remote_address]').val(blink_params.remoteAddress);
+         $(this).find('input[name=remote_address]').val(order_params.remoteAddress);
 
          setupApplePayButtonObserver();
 
@@ -135,12 +137,8 @@ jQuery(function ($) {
 
         if($(this).find('[id="blinkGooglePay"]').length){
             var scriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
-            var googleElement = document.querySelector('#gpay-button-online-api-id');
                 
-                if (scriptElement) { 
-                    if (googleElement) { 
-                        googleElement.remove();
-                    }  
+                if (scriptElement) {   
                     // Extract the onload attribute value
                     var onloadValue = scriptElement.getAttribute('onload');                        
                     // Execute the onload function call
@@ -169,7 +167,12 @@ jQuery(function ($) {
                 opacity: 0.6
             }
         });
+        
         var paymentBy = $(orderForm).find('input[name=payment_by]').val();
+        if(paymentBy === 'google-pay' || paymentBy === 'apple-pay') {
+            paymentBy = $('input[name="switchPayment"]:checked').val();
+            $(orderForm).find('input[name=payment_by]').val(paymentBy);
+        }
 
         if(paymentBy === 'credit-card'){
 

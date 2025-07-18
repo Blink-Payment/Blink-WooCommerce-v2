@@ -32,11 +32,14 @@ if (!function_exists('blink_transform_word')) {
 
 if (!function_exists('blink_check_timestamp_expired')) {
     function blink_check_timestamp_expired($timestamp) {
-        $current_time = time();
-        $expiry_time  = strtotime($timestamp);
-        return $current_time > $expiry_time ? 0 : 1;
+        // Ensure both timestamps are in UTC
+        $nowUtc = new DateTime("now", new DateTimeZone("UTC"));
+        $expiryUtc = new DateTime($timestamp, new DateTimeZone("UTC"));
+
+        return $nowUtc > $expiryUtc ? 1 : 0;
     }
 }
+
 
 if (!function_exists('blink_get_time_diff')) {
     function blink_get_time_diff($order) {
@@ -133,7 +136,7 @@ if (!function_exists('blink_error_payment_process')) {
 if (!function_exists('blink_get_status')) {
     function blink_get_status($status = '', $source = '') {
         $status = urldecode($status);
-        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept'], true)) {
+        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid'], true)) {
             return 'complete';
         } elseif (strpos(strtolower($source), 'direct debit') !== false || strtolower($status) === 'pending submission') {
             return 'hold';
@@ -472,5 +475,33 @@ if (!function_exists('blink_3d_allow_html')) {
                 'data-toggle' => true,
             ),
         );
+    }
+}
+
+if (!function_exists('blink_get_full_address')) {
+    function blink_get_full_address($order = null) {
+        if (!$order) {
+            return '';
+        }
+
+        $parts = array();
+
+        if ($order->get_billing_address_1()) {
+            $parts[] = $order->get_billing_address_1();
+        }
+        if ($order->get_billing_address_2()) {
+            $parts[] = $order->get_billing_address_2();
+        }
+        if ($order->get_billing_city()) {
+            $parts[] = $order->get_billing_city();
+        }
+        if ($order->get_billing_state()) {
+            $parts[] = $order->get_billing_state();
+        }
+        if ($order->get_billing_country()) {
+            $parts[] = $order->get_billing_country();
+        }
+
+        return implode(', ', $parts);
     }
 }

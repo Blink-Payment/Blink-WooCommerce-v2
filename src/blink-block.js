@@ -1,5 +1,7 @@
 const { registerPaymentMethod } = window.wc.wcBlocksRegistry;
 const { useState, useEffect, useRef } = window.wp.element;
+const { useSelect } = window.wp.data;
+const { CART_STORE_KEY } = window.wc.wcBlocksData;
 const { getSetting } = window.wc.wcSettings;
 import { decodeEntities } from '@wordpress/html-entities';
 
@@ -11,7 +13,11 @@ const Content = (props) => {
 
 const BlinkPayment = (props) => {
   const { settings, eventRegistration, emitResponse, billing } = props;
-  const [selectedTab, setSelectedTab] = useState('credit-card'); // Default to Credit Card tab
+  const [selectedTab, setSelectedTab] = useState(
+    Array.isArray(settings.selected_methods) && settings.selected_methods.length > 0
+      ? settings.selected_methods[0]
+      : ''
+  );
   const [formFields, setFormFields] = useState([]);
   const [formData, setFormData] = useState({});
   const formRef = useRef(null); 
@@ -20,6 +26,8 @@ const BlinkPayment = (props) => {
   const googleFormRef = useRef(null);
   const appleFormRef = useRef(null);
   const [paymentToken, setPaymentToken] = useState(null);
+  const [elements, setElements] = useState(settings.elements);
+  const [cartAmount, setCartAmount] = useState(settings.cartAmount);
   const { onCheckoutValidation, onPaymentSetup, onCheckoutFail  } = eventRegistration;
   const { billingAddress } = billing;
   const billingName = `${billingAddress.first_name} ${billingAddress.last_name}`;
@@ -30,7 +38,56 @@ const BlinkPayment = (props) => {
   const language = (window && window.navigator ? (window.navigator.language ? window.navigator.language : window.navigator.browserLanguage) : '');
   const java = (window && window.navigator ? navigator.javaEnabled() : false);
   const timezone = (new Date()).getTimezoneOffset();
+  const cartData = useSelect((select) => select(CART_STORE_KEY).getCartData(), []);
+  const cartTotal = cartData?.totals?.total_price;
+  const currencyMinorUnit = cartData?.totals?.currency_minor_unit;
+  const formattedTotal = (cartTotal && currencyMinorUnit !== undefined)
+    ? (cartTotal / Math.pow(10, currencyMinorUnit)).toFixed(currencyMinorUnit)
+    : null;
 
+    useEffect(() => {
+    // Only call set-intent if cart total changes
+    if (formattedTotal && cartAmount !== formattedTotal) {
+      (async () => {
+        document.querySelectorAll('#gpay-button-online-api-id').forEach(el => el.remove());
+        try {
+          const intentRes = await fetch('/wp-json/blink/v1/set-intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cartAmount: formattedTotal }),
+          });
+          const intentData = await intentRes.json();
+          if (intentData.intent?.element) {
+            setElements(intentData.intent.element);
+            setCartAmount(formattedTotal);
+          }
+        } catch (e) {
+          console.error('Cart check failed', e);
+        }
+      })();
+    }
+  }, [formattedTotal]);
+  
+  useEffect(() => {
+    if (settings.isHosted) {
+      const unsubscribe = onPaymentSetup(async () => {
+        return {
+          type: emitResponse.responseTypes.SUCCESS,
+          meta: {
+            paymentMethodData: {
+              customer_address: formData.customer_address || billingFullAddress,
+              customer_postcode: formData.customer_postcode || billingAddress.postcode,
+            },
+          },
+        };
+      });
+      return unsubscribe;
+    }
+  }, [settings.isHosted, onPaymentSetup, formData, billingFullAddress, billingAddress.postcode, emitResponse]);
+
+  if (settings.isHosted) {
+    return null;
+  }
 
 	useEffect( () => {
 		const unsubscribe = onCheckoutFail( () => {
@@ -93,7 +150,7 @@ const BlinkPayment = (props) => {
         screen_depth);
     currentForm.find('input[name=remote_address]').val(blink_params.remoteAddress);
 
-  }, [selectedTab, billingAddress]);
+  }, [selectedTab, billingAddress, elements]);
 
   // Function to initialize the hosted form using jQuery
   const initializeHostedForm = () => {
@@ -199,11 +256,21 @@ const handleSubmitCC = async () => {
 
   useEffect(() => {
 
+    const removeScriptBySrc = (src) => {
+      document.querySelectorAll(`script[src="${src}"]`).forEach(script => {
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      });
+    };
+
     if(settings.isSafari && settings.apple_pay_enabled) {
+
+      removeScriptBySrc(settings.hostUrl+'/assets/js/apple-pay-api.js');
 
       const loadApplePayApi = new Promise((resolve, reject) => {
         const script1 = document.createElement('script');
-        script1.src = 'https://secure.blinkpayment.co.uk/assets/js/apple-pay-api.js';
+        script1.src = settings.hostUrl+'/assets/js/apple-pay-api.js';
         script1.async = true;
         script1.onload = resolve; // Resolve when google-pay-api.js loads
         script1.onerror = reject;
@@ -226,12 +293,16 @@ const handleSubmitCC = async () => {
       });
 
     } else { 
+
+      document.querySelectorAll('#gpay-button-online-api-id').forEach(el => el.remove());
+
+      removeScriptBySrc(settings.hostUrl+'/assets/js/google-pay-api.js');
+
       const googleScriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
-      const googleElement = document.querySelector('#gpay-button-online-api-id');
   
       const loadGooglePayApi = new Promise((resolve, reject) => {
         const script1 = document.createElement('script');
-        script1.src = 'https://secure.blinkpayment.co.uk/assets/js/google-pay-api.js';
+        script1.src = settings.hostUrl+'/assets/js/google-pay-api.js';
         script1.async = true;
         script1.onload = resolve; // Resolve when google-pay-api.js loads
         script1.onerror = reject;
@@ -253,9 +324,6 @@ const handleSubmitCC = async () => {
         // Manually trigger the `onGooglePayLoaded` function if defined
         if (typeof window.onGooglePayLoaded === 'function') {
           if (googleScriptElement) {
-            if (googleElement) {
-              googleElement.remove(); // Remove the Google Pay button if it exists
-            }
       
             // Get the onload attribute from the script tag and execute it
             const onloadValue = googleScriptElement.getAttribute('onload');
@@ -286,23 +354,7 @@ const handleSubmitCC = async () => {
 
     }
 
-    // Cleanup scripts when component unmounts
-    return () => {
-      if(settings.isSafari && settings.apple_pay_enabled) {
-
-        document.querySelectorAll('script[src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js"], script[src="https://secure.blinkpayment.co.uk/assets/js/apple-pay-api.js"]').forEach(script => {
-          document.body.removeChild(script);
-        });
-
-      } else {
-
-        document.querySelectorAll('script[src="https://pay.google.com/gp/p/js/pay.js"], script[src="https://secure.blinkpayment.co.uk/assets/js/google-pay-api.js"]').forEach(script => {
-          document.body.removeChild(script);
-        });
-
-      }
-    };
-  }, []);
+  }, [elements]);
 
 
   return (
@@ -312,12 +364,12 @@ const handleSubmitCC = async () => {
       <>
           {settings.isSafari && settings.apple_pay_enabled ? (
               <form ref={appleFormRef}>
-                  <div dangerouslySetInnerHTML={{ __html: settings.elements?.apElement }} />
+                  <div dangerouslySetInnerHTML={{ __html: elements?.apElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="apple-pay" />
               </form>
           ) : (
               <form ref={googleFormRef}>
-                  <div dangerouslySetInnerHTML={{ __html: settings.elements?.gpElement }} />
+                  <div dangerouslySetInnerHTML={{ __html: elements?.gpElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="google-pay" />
               </form>
           )}
@@ -384,7 +436,7 @@ const handleSubmitCC = async () => {
               {selectedTab === 'credit-card' && (
                 <>
                 <form ref={formRef} name="blink-credit" id="blink-credit-form" method="POST" className="wc-block-checkout__form blink-credit">
-                  <div dangerouslySetInnerHTML={{ __html: settings.elements?.ccElement }} />
+                  <div dangerouslySetInnerHTML={{ __html: elements?.ccElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="credit-card" />
                 </form>
                 </>
@@ -393,7 +445,7 @@ const handleSubmitCC = async () => {
               {selectedTab === 'direct-debit' && (
                 <>
                 <form ref={ddFormRef}>
-                  <div dangerouslySetInnerHTML={{ __html: settings.elements?.ddElement }} />
+                  <div dangerouslySetInnerHTML={{ __html: elements?.ddElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="direct-debit" />
                 </form> 
                 </>
@@ -402,7 +454,7 @@ const handleSubmitCC = async () => {
               {selectedTab === 'open-banking' && (
                 <>
                 <form ref={obFormRef}>
-                  <div dangerouslySetInnerHTML={{ __html: settings.elements?.obElement }} />
+                  <div dangerouslySetInnerHTML={{ __html: elements?.obElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="open-banking" />
                 </form>
                 </> 

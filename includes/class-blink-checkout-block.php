@@ -38,21 +38,28 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 
 	public function get_payment_method_data() {
 
-		$elements = $this->get_elements();
+		$cart_data = $this->get_elements_with_cart_amount();
 
 		return array(
 			'title'             => $this->get_setting( 'title' ),
 			'description'       => $this->get_setting( 'description' ),
 			'supports'          => array_filter( $this->gateway->supports ),
-			'elements'          => $elements,
-			'selected_methods'  => $this->gateway->paymentMethods,
+			'hostUrl'          => $this->gateway->configs['host_url'],
+			'elements'          => $cart_data['element'] ?? array(),
+			'selected_methods'  => array_values($this->gateway->paymentMethods),
 			'apple_pay_enabled' => 'yes' === $this->get_setting( 'apple_pay_enabled' ),
 			'isSafari'          => blink_is_safari(),
-			'makePayment'       => empty( $elements ) ? false : true,
+			'makePayment'       => empty( $cart_data['element'] ) ? false : true,
+			'isHosted'       	=> 'direct' !== $this->get_setting( 'integration_type' ),
+			'cartAmount'       	=> (
+										isset($cart_data['amount']) && $cart_data['amount'] !== ''
+											? number_format($cart_data['amount'], 2, '.', '')
+											: ''
+									),
 		);
 	}
 
-	private function get_elements() {
+	private function get_elements_with_cart_amount() {
 
 		if ( is_admin() ) {
 			return array();
@@ -60,15 +67,14 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 
 		$paymentGateway = new $this->gateway();
 
-		// Validate, unslash, and sanitize the input
-		$request['payment_by'] = isset( $_POST['payment_by'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_by'] ) ) : '';
-
-		$token = $paymentGateway->utils->setTokens();
+		$request['payment_by'] = '';
 
 		$intent = $paymentGateway->utils->setIntents( $request );
 
-		$element = ! empty( $intent ) ? $intent['element'] : array();
+		$element = ! empty( $intent ) ? $intent['element'] : '';
+		$amount = ! empty( $intent ) ? $intent['amount'] : '';
 
-		return $element;
+		return array('element' => $element, 'amount' => $amount);
 	}
+
 }
