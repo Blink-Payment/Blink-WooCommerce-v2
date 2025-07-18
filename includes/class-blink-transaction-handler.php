@@ -65,20 +65,28 @@ class Blink_Transaction_Handler {
 		$order_id = '';
 		$request  = isset( $_REQUEST['transaction_id'] ) ? $_REQUEST : file_get_contents( 'php://input' );
 		if ( is_array( $request ) ) {
-			$data                     = isset( $request['merchant_data'] ) ? stripslashes( $request['merchant_data'] ) : '';
+			$data = isset( $request['merchant_data'] ) ? stripslashes( $request['merchant_data'] ) : '';
 			$request['merchant_data'] = json_decode( $data, true );
 		} else {
 			$request = json_decode( $request, true );
 		}
 		$transaction_id = ! empty( $request['transaction_id'] ) ? sanitize_text_field( $request['transaction_id'] ) : '';
+
+		// Try to get order_id from merchant_data or reference
 		if ( $transaction_id ) {
-			$merchant_data = $request['merchant_data'];
-			if ( ! empty( $merchant_data ) ) {
-				$order_id = ! empty( $merchant_data['order_info']['order_id'] ) ? sanitize_text_field( $merchant_data['order_info']['order_id'] ) : '';
+			$merchant_data = isset( $request['merchant_data'] ) ? $request['merchant_data'] : array();
+			if ( ! empty( $merchant_data ) && ! empty( $merchant_data['order_info']['order_id'] ) ) {
+				$order_id = sanitize_text_field( $merchant_data['order_info']['order_id'] );
+			} elseif ( ! empty( $request['reference'] ) ) {
+				// Try to extract order ID from reference, e.g. "WC-124"
+				if ( preg_match( '/WC-(\d+)/', $request['reference'], $matches ) ) {
+					$order_id = $matches[1];
+				}
 			}
+
+			// Fallback: try to find order by transaction_id
 			if ( ! $order_id ) {
 				$order_id = wp_cache_get( 'order_id_' . $transaction_id, 'blink_payment' );
-
 				if ( false === $order_id ) {
 					$args = array(
 						'post_type'   => 'shop_order',
@@ -93,25 +101,27 @@ class Blink_Transaction_Handler {
 								'value' => $transaction_id,
 							),
 						),
-						'fields'      => 'ids', // Only retrieve the post IDs
-						'numberposts' => 1, // Limit to one result
+						'fields'      => 'ids',
+						'numberposts' => 1,
 					);
-
 					$order_ids = get_posts( $args );
 					if ( ! empty( $order_ids ) ) {
 						$order_id = $order_ids[0];
 					}
-
-					// Cache the result for future use
 					wp_cache_set( 'order_id_' . $transaction_id, $order_id, 'blink_payment', HOUR_IN_SECONDS );
 				}
 			}
-			$status = ! empty( $request['status'] ) ? $request['status'] : '';
-			$note   = ! empty( $request['note'] ) ? $request['note'] : '';
-			$order  = wc_get_order( $order_id );
+
+			$status  = ! empty( $request['status'] ) ? $request['status'] : '';
+			$note    = ! empty( $request['note'] ) ? $request['note'] : '';
+			$order   = wc_get_order( $order_id );
 			if ( $order ) {
-				blink_change_status( $order, $transaction_id, $status, '', $note );
 				$order->update_meta_data( '_debug', $request );
+				$order->update_meta_data( 'blink_res', $transaction_id );
+				$order->set_transaction_id( $transaction_id );
+				$order->update_meta_data( 'status', $status );
+				blink_change_status( $order, $transaction_id, $status, '', $note );
+
 				$response = array(
 					'order_id'     => $order_id,
 					'order_status' => $status,
@@ -193,19 +203,32 @@ class Blink_Transaction_Handler {
 
 	public static function check_order_response() {
 		global $wp;
+		$wc_order = null;
+		$order_id = null;
 
-		$transaction_id = isset( $_REQUEST['transaction_id'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['transaction_id'] ) ) : '';
-		if ( empty( $transaction_id ) ) {
+		if ( ! empty( $wp->query_vars['order-received'] ) ) {
+
+			$order_id = apply_filters( 'woocommerce_thankyou_order_id', absint( $wp->query_vars['order-received'] ) );
+			$wc_order = wc_get_order( $order_id );
+		}
+
+		if ( empty( $wc_order ) ) {
 			return;
 		}
 
-		if ( ! empty( $wp->query_vars['order-received'] ) ) {
-			$order_id    = apply_filters( 'woocommerce_thankyou_order_id', absint( $wp->query_vars['order-received'] ) );
+		$transaction_id = '';
+		if ( isset( $_REQUEST['transaction_id'] ) && ! empty( $_REQUEST['transaction_id'] ) ) {
+			$transaction_id = sanitize_text_field( wp_unslash( $_REQUEST['transaction_id'] ) );
+		} elseif ( $wc_order && $wc_order->get_transaction_id() ) {
+			$transaction_id = $wc_order->get_transaction_id();
+		}
+
+		if ( ! empty( $transaction_id ) ) {
 			$transaction = wc_clean( wp_unslash( $transaction_id ) );
-			$wc_order    = wc_get_order( $order_id );
 			$wc_order->update_meta_data( 'blink_res', $transaction );
 			$wc_order->update_meta_data( '_blink_res_expired', 'false' );
 			$wc_order->save();
+
 			$payment_method_id  = $wc_order->get_payment_method();
 			$available_gateways = WC()->payment_gateways->get_available_payment_gateways();
 			$payment_method     = isset( $available_gateways[ $payment_method_id ] ) ? $available_gateways[ $payment_method_id ] : false;
@@ -214,6 +237,11 @@ class Blink_Transaction_Handler {
 				$instance = new self( $payment_method );
 				$instance->check_response_for_order( $order_id );
 			}
+		} else {
+			$status    = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( $_GET['status'] ) ) : '';
+			$reference = isset( $_GET['reference'] ) ? sanitize_text_field( wp_unslash( $_GET['reference'] ) ) : '';
+			$message   = isset( $_GET['note'] ) ? sanitize_text_field( wp_unslash( $_GET['note'] ) ) : '';
+			blink_change_status( $wc_order, null, $status, $reference, $message );
 		}
 	}
 }

@@ -5,12 +5,11 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.2.0
+ * Version: 1.1.0
  * Text Domain: blink-payment-checkout
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
-
 // WooCommerce fallback notice
 function blink_wc_missing_notice()
 {
@@ -87,6 +86,7 @@ function blink_init_gateway_class()
     include_once __DIR__ . '/includes/helper.php';
     include_once __DIR__ . '/includes/class-blink-payment-gateway.php';
     include_once __DIR__ . '/includes/class-blink-ajax-handler.php';
+    include_once __DIR__ . '/includes/class-blink-api-handler.php';
     include_once __DIR__ . '/includes/class-blink-3d-secure.php';
     include_once __DIR__ . '/includes/class-blink-payment-utils.php';
     require_once __DIR__ . '/includes/class-blink-settings-handler.php';

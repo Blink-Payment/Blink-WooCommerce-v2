@@ -1,4 +1,8 @@
 *** WooCommerce - Blink Changelog ***
+2025-07-18 - version 1.2.1
+
+* Fix Apple Pay issues
+* Billing address prepoulates hosted link
 
 2025-06-05 - version 1.2.0
 

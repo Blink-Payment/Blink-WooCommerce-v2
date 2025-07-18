@@ -4,10 +4,25 @@ jQuery(function ($) {
         $form: $('form.woocommerce-checkout'),
         $creditForm: $('form[name="blink-credit"]'),
         init: function () {
+            $( document.body ).on( 'update_checkout', this.update_checkout );
             $(document.body).on('updated_checkout', this.updated_checkout);
+        },
+        update_checkout: function () {
+            // Remove the Google Pay and Apple Pay elements if they exist
+            const blinkGooglePay = document.querySelector('#blinkGooglePay');
+            if (blinkGooglePay) {
+                blinkGooglePay.remove();
+            }
+
+            const blinkApplePay = document.querySelector('#blinkApplePay');
+            if (blinkApplePay) {
+                blinkApplePay.remove();
+            }
+
         },
         updated_checkout: function () {
 
+            document.querySelectorAll('#gpay-button-online-api-id').forEach(el => el.remove());
 
             var paymentMode = $('input[name=payment_method]:checked').val();
             if(paymentMode !== 'blink'){
@@ -58,12 +73,8 @@ jQuery(function ($) {
 
             if($form.find('[id="blinkGooglePay"]').length){
                 var scriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
-                var googleElement = document.querySelector('#gpay-button-online-api-id');
                 
                     if (scriptElement) { 
-                        if (googleElement) { 
-                            googleElement.remove();
-                        }
 
                         // Extract the onload attribute value
                         var onloadValue = scriptElement.getAttribute('onload');                        
@@ -113,6 +124,10 @@ jQuery(function ($) {
         e.preventDefault();
 
         var activeTab = $('#payment_by').val();
+        if(activeTab === 'google-pay' || activeTab === 'apple-pay') {
+            activeTab = $('input[name="switchPayment"]:checked').val();
+            $('#payment_by').val(activeTab);
+        }
         var isCreditCard = activeTab === 'credit-card';
 
         if(isCreditCard){
@@ -158,18 +173,7 @@ jQuery(function ($) {
 
     
 
-    blink_checkout_form.init();
-
-    // When a coupon is applied successfully
-    $(document.body).on('applied_coupon', function() {
-        location.reload(); // Reload the page
-    });
-
-    // If the coupon is removed
-    $(document.body).on('removed_coupon', function() {
-        location.reload(); // Reload the page
-    });
-    
+    blink_checkout_form.init();    
 
     if ($(".blink-api-section").width() < 500)
         $('.blink-api-section').addClass('responsive-screen');
@@ -194,16 +198,6 @@ jQuery(function ($) {
                 }  
             $('form.checkout').trigger('update');
         }); 
-        
-        $(window).on('load', function() {
-
-            var selectedMethod = $('input[name="payment_method"]:checked').val();
-    
-            if (selectedMethod === 'blink') {
-                $('form.checkout').trigger('update');
-            }
-    
-        });
 
 });
 

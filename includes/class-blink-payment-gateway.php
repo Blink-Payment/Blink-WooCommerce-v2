@@ -18,6 +18,15 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 		public $refund_handler;
 		public $transaction_handler;
 
+		public $api_key;         
+		public $secret_key;      
+		public $testmode;        
+		public $apple_pay_enabled;
+		public $configs;         
+		public $host_url;      
+		public $integration_type;        
+		public $version;
+
 
 	public function __construct() {
 
@@ -82,7 +91,6 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 
 		// We need custom JavaScript to obtain a token
 		add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
-		add_action( 'woocommerce_cart_updated', array( $this->utils, 'destroy_session_tokens' ) );
 	}
 
 	public function payment_fields() {
@@ -244,6 +252,8 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway {
 					'billing_country'    => $order->get_billing_country(),
 					'billing_phone'      => $order->get_billing_phone(),
 					'order_id'           => $order->get_id(),
+					'ajaxurl'       => admin_url( 'admin-ajax.php' ),
+					'remoteAddress' => ! empty( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '',
 				)
 			);
 			wp_enqueue_script( 'woocommerce_blink_payment_order_pay' );

@@ -159,7 +159,7 @@ class Blink_Payment_Handler {
 		$order_id = $order->get_id();
 		if ( ! empty( $this->token['access_token'] ) && ! empty( $this->intent['payment_intent'] ) ) {
 			$request_data = array(
-				'resource'           => $request['resource'],
+				'resource'           => $endpoint,
 				'payment_intent'     => $this->intent['payment_intent'],
 				'paymentToken'       => $request['paymentToken'],
 				'type'               => $request['type'],
@@ -320,10 +320,12 @@ class Blink_Payment_Handler {
 			'transaction_unique' => 'WC-' . $order_id,
 			'is_decide_amount'   => false,
 			'amount'             => $amount,
+			'address'            => blink_get_full_address($order),
+			'postcode'           => $order->get_billing_postcode(),
 			'notes'              => 'WooCommerce Order #' . $order_id,
-			'currency'         => get_woocommerce_currency(),
+			'currency'         	 => get_woocommerce_currency(),
 			'redirect_url'       => $this->gateway->get_return_url( $order ),
-			'notification_url' => WC()->api_request_url( 'blink_gateway' ),
+			'notification_url'   => WC()->api_request_url( 'blink_gateway' ),
 		);
 
 		$url = $this->gateway->host_url . '/paylink/v1/paylinks';
