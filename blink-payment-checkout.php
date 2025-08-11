@@ -2,10 +2,10 @@
 /*
  * Plugin Name: Blink Payment Gateway for WooCommerce
  * Plugin URI: https://www.blinkpayment.co.uk/
- * Description: Take credit card and direct debit payments on your store.
+ * Description: Take card, open banking and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.2.2
+ * Version: 1.2.3
  * Text Domain: blink-payment-checkout
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html

@@ -171,13 +171,20 @@ class Blink_Payment_Handler {
 				'transaction_unique' => 'WC-' . $order_id,
 				'merchant_data'      => blink_get_payment_information( $order_id ),
 			);
-			if ( isset( $request['remote_address'] ) ) {
-				$request_data['device_timezone']          = $request['device_timezone'];
-				$request_data['device_capabilities']      = $request['device_capabilities'];
-				$request_data['device_accept_language']   = $request['device_accept_language'];
-				$request_data['device_screen_resolution'] = $request['device_screen_resolution'];
-				$request_data['remote_address']           = $request['remote_address'];
+
+			$request_data['device_timezone']          = $request['device_timezone'];
+			$request_data['device_capabilities']      = $request['device_capabilities'];
+			$request_data['device_accept_language']   = $request['device_accept_language'];
+			$request_data['device_screen_resolution'] = $request['device_screen_resolution'];
+
+			if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+				$ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+			} else {
+				$ip = $_SERVER['REMOTE_ADDR'];
 			}
+
+			$request_data['remote_address']           = $ip;
+			$request_data['device_ip_address']        = $ip;
 
 			$url = $this->gateway->host_url . '/pay/v1/' . $endpoint;
 
