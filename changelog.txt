@@ -1,5 +1,9 @@
 *** WooCommerce - Blink Changelog ***
 
+2025-08-11 - version 1.2.3
+
+* Updated plugin to be compatible with WooCommerce version 10
+
 2025-07-24 - version 1.2.2
 
 * Added get_client_ipv4_address() helper function for IPv4 

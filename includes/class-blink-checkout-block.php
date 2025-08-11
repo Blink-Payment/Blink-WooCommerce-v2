@@ -43,6 +43,7 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 		return array(
 			'title'             => $this->get_setting( 'title' ),
 			'description'       => $this->get_setting( 'description' ),
+			'icon'              => plugins_url('/../assets/img/blink_logo_sml.svg', __FILE__),
 			'supports'          => array_filter( $this->gateway->supports ),
 			'hostUrl'          => $this->gateway->configs['host_url'],
 			'elements'          => $cart_data['element'] ?? array(),

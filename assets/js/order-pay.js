@@ -101,6 +101,7 @@ jQuery(function ($) {
          $(this).find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
             screen_depth);
          $(this).find('input[name=remote_address]').val(order_params.remoteAddress);
+         $(this).find('input[name=device_ip_address]').val(order_params.remoteAddress);
 
          setupApplePayButtonObserver();
 

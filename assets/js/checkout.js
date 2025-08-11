@@ -109,6 +109,7 @@ jQuery(function ($) {
             $form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' +
                 screen_depth);
             $form.find('input[name=remote_address]').val(blink_params.remoteAddress);
+            $form.find('input[name=device_ip_address]').val(blink_params.remoteAddress);
 
             setupApplePayButtonObserver();
 
@@ -139,13 +140,11 @@ jQuery(function ($) {
           
                 // Retrieve the payment details
                 const paymentDetails = await hostedForm.getPaymentDetails();
-                console.log('Payment details:', paymentDetails);
           
                 if (paymentDetails) {
                   // Check if the payment was successful
                   if (paymentDetails.success) {
                     const paymentToken = paymentDetails.paymentToken;
-                    console.log('Payment token:', paymentToken);
                     // Set the payment token in a hidden input field (or another required field)
                     hostedForm.addPaymentToken(paymentToken);
     

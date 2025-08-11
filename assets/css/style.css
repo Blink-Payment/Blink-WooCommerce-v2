@@ -60,6 +60,21 @@
 	color: var(--para-color);
 }
 
+.payment_method_blink label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .payment_method_blink img {
+    max-width: 100%;
+    height: auto;
+    width: auto;
+    max-height: 30px; 
+	border-radius: 0;
+  }
+
 .payment_method_blink .d-flex-center {
 	display: -webkit-box;
 	display: -webkit-flex;

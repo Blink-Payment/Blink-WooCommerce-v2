@@ -34,7 +34,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 
 		$this->configs            = include __DIR__ . '/../config.php';
 		$this->id                 = str_replace(' ', '', strtolower($this->configs['method_title']));
-		$this->icon               = plugins_url('/../assets/img/logo.png', __FILE__);
+		$this->icon               = plugins_url('/../assets/img/blink_logo_sml.svg', __FILE__);
 		$this->has_fields         = true; // in case you need a custom credit card form
 		$this->method_title       = $this->configs['method_title'];
 		$this->method_description = $this->configs['method_description'];
