@@ -20,6 +20,7 @@ class Blink_Api_Handler {
     }
 
     public static function set_intent( WP_REST_Request $request ) {
+        Blink_Logger::log( 'REST set_intent called' );
 
 		$cart_amount = $request->get_param('cartAmount');
 		$gateWay = new Blink_Payment_Gateway();
@@ -27,6 +28,7 @@ class Blink_Api_Handler {
         $gateWay->utils->setTokens();
         // Use setIntents to always get the latest intent based on current cart
         $intent = $gateWay->utils->setIntents( array( 'payment_by' => 'credit-card' ), null, $cart_amount );
+        Blink_Logger::log( 'REST set_intent result', array( 'has_intent' => ! empty( $intent ) ) );
 
         return array(
             'intent' => $intent,

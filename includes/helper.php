@@ -97,15 +97,8 @@ if (!function_exists('blink_get_order_data')) {
             'order_id'           => $order->get_id(),
             'order_number'       => $order->get_order_number(),
             'order_date'         => gmdate('Y-m-d H:i:s', strtotime(get_post($order->get_id())->post_date)),
-            'shipping_total'     => $order->get_total_shipping(),
-            'shipping_tax_total' => wc_format_decimal($order->get_shipping_tax(), 2),
-            'tax_total'          => wc_format_decimal($order->get_total_tax(), 2),
-            'cart_discount'      => wc_format_decimal($order->get_total_discount(), 2),
-            'order_discount'     => wc_format_decimal($order->get_total_discount(), 2),
-            'discount_total'     => wc_format_decimal($order->get_total_discount(), 2),
             'order_total'        => wc_format_decimal($order->get_total(), 2),
             'order_currency'     => $order->get_currency(),
-            'customer_note'      => $order->get_customer_note(),
         );
     }
 }

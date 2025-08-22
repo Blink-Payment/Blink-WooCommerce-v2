@@ -1,5 +1,11 @@
 *** WooCommerce - Blink Changelog ***
 
+2025-08-22 - vrsion 1.2.4
+
+* Added Debug logs
+* Added error handling for faulty webhooks
+* Reduced merchant_data request
+
 2025-08-11 - version 1.2.3
 
 * Updated plugin to be compatible with WooCommerce version 10

@@ -1,6 +1,6 @@
 {
   "name": "plugin-woocommerce",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "woocommerce checkout block support for Blink Payment Gateway",
   "scripts": {
     "build": "wp-scripts build",

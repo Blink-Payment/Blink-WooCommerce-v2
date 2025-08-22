@@ -15,6 +15,7 @@ class Blink_Payment_Handler {
 	}
 
 	public function process_open_banking( $order, $request ) {
+		Blink_Logger::log( 'process_open_banking called', array( 'order_id' => $order->get_id() ) );
 		$order_id   = $order->get_id();
 		$return_arr = array(
 			'success'      => false,
@@ -47,6 +48,7 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
+			Blink_Logger::log( 'process_open_banking response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -60,10 +62,12 @@ class Blink_Payment_Handler {
 				} elseif ( ! empty( $api_body['redirect_url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['redirect_url'];
 				}
+				Blink_Logger::log( 'process_open_banking success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
 			} else {
 				$error                 = ! empty( $api_body['error'] ) ? $api_body : $response['response'];
 				$return_arr['success'] = false;
 				$return_arr['error']   = $error;
+				Blink_Logger::log( 'process_open_banking error', array( 'error' => $error ) );
 			}
 		}
 
@@ -71,6 +75,7 @@ class Blink_Payment_Handler {
 	}
 
 	public function process_direct_debit( $order, $request ) {
+		Blink_Logger::log( 'process_direct_debit called', array( 'order_id' => $order->get_id() ) );
 		$order_id   = $order->get_id();
 		$return_arr = array(
 			'success'      => false,
@@ -108,6 +113,7 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
+			Blink_Logger::log( 'process_direct_debit response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -119,10 +125,12 @@ class Blink_Payment_Handler {
 				if ( ! empty( $api_body['url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['url'];
 				}
+				Blink_Logger::log( 'process_direct_debit success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
 			} else {
 				$error                 = ! empty( $api_body['error'] ) ? $api_body : $response['response'];
 				$return_arr['success'] = false;
 				$return_arr['error']   = $error;
+				Blink_Logger::log( 'process_direct_debit error', array( 'error' => $error ) );
 			}
 		}
 
@@ -130,6 +138,7 @@ class Blink_Payment_Handler {
 	}
 
 	public function process_credit_card( $order, $request, $endpoint = 'creditcards' ) {
+		Blink_Logger::log( 'process_credit_card called', array( 'order_id' => $order->get_id(), 'endpoint' => $endpoint ) );
 		$cart_amount = null; 
 
 		if ( WC()->cart && method_exists( WC()->cart, 'get_total' ) ) {
@@ -139,7 +148,8 @@ class Blink_Payment_Handler {
 		$amount      = ! empty( $order ) ? $order->get_total() : $cart_amount;
 
 		if ( empty( $amount ) ) {
-			return array(
+				Blink_Logger::log( 'process_credit_card: empty amount' );
+				return array(
 				'success'      => false,
 				'redirect_url' => false,
 				'error'        => 'Invalid order.',
@@ -202,6 +212,7 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
+			Blink_Logger::log( 'process_credit_card response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -212,7 +223,7 @@ class Blink_Payment_Handler {
 				$return_arr['success'] = true;
 
 				if ( isset( $api_body['acsform'] ) ) {
-					$threedToken = $api_body['acsform'];
+						$threedToken = $api_body['acsform'];
 					set_transient( 'blink3dProcess' . $order_id, $threedToken, 300 );
 					if ( is_wc_endpoint_url( 'order-pay' ) ) {
 						$return_arr['redirect_url'] = add_query_arg( 'blink3dprocess', $order_id, $order->get_checkout_payment_url() );
@@ -222,10 +233,12 @@ class Blink_Payment_Handler {
 				} elseif ( isset( $api_body['url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['url'];
 				}
+					Blink_Logger::log( 'process_credit_card success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
 			} else {
 				$error                 = ! empty( $api_body['error'] ) ? $api_body : $response['response'];
 				$return_arr['success'] = false;
 				$return_arr['error']   = $error;
+					Blink_Logger::log( 'process_credit_card error', array( 'error' => $error ) );
 			}
 		}
 
@@ -233,6 +246,7 @@ class Blink_Payment_Handler {
 	}
 
 	public function handle_payment( $order_id ) {
+		Blink_Logger::log( 'handle_payment called', array( 'order_id' => $order_id ) );
 		$order   = wc_get_order( $order_id );
 		$request = $_POST;
 		$this->token  = $this->gateway->utils->setTokens();
@@ -247,6 +261,7 @@ class Blink_Payment_Handler {
 			if ( is_wc_endpoint_url( 'order-pay' ) ) {
 				return;
 			}
+			Blink_Logger::log( 'handle_payment error: missing intent or token' );
 			return blink_error_payment_process();
 		}
 
@@ -290,10 +305,12 @@ class Blink_Payment_Handler {
 		}
 
 		if ( ! $response['success'] ) {
+			Blink_Logger::log( 'handle_payment failed', array( 'error' => $response['error'] ) );
 			$this->gateway->utils->destroy_session_tokens();
 			return blink_error_payment_process( $response['error'] );
 		}
 
+		Blink_Logger::log( 'handle_payment success', array( 'redirect' => $response['redirect_url'] ) );
 		return array(
 			'result'   => 'success',
 			'redirect' => $response['redirect_url'],
@@ -304,6 +321,7 @@ class Blink_Payment_Handler {
 	 * Handle hosted payment (paylink API).
 	 */
 	public function handle_hosted_payment( $order, $request ) {
+		Blink_Logger::log( 'handle_hosted_payment called', array( 'order_id' => $order->get_id() ) );
 		$order_id = $order->get_id();
 
 
@@ -349,6 +367,7 @@ class Blink_Payment_Handler {
 				'timeout' => 30,
 			)
 		);
+		Blink_Logger::log( 'handle_hosted_payment response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 
 		if ( is_wp_error( $response ) ) {
@@ -357,12 +376,14 @@ class Blink_Payment_Handler {
 
 		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( isset( $api_body['paylink_url'] ) ) {
+			Blink_Logger::log( 'handle_hosted_payment success', array( 'redirect' => $api_body['paylink_url'] ) );
 			return array(
 				'result'   => 'success',
 				'redirect' => $api_body['paylink_url'],
 			);
 		} else {
 			$error = ! empty( $api_body['error'] ) ? $api_body['error'] : $api_body;
+			Blink_Logger::log( 'handle_hosted_payment error', array( 'error' => $error ) );
 			return blink_error_payment_process( $error );
 		}
 	}
