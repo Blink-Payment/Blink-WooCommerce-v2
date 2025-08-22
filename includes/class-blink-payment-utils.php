@@ -18,6 +18,7 @@ class Blink_Payment_Utils {
 	}
 
 	public function blink_generate_access_token() {
+		Blink_Logger::log( 'Generating access token' );
 		$url          = $this->gateway->host_url . '/pay/v1/tokens';
 		$request_data = array(
 			'api_key'                 => $this->gateway->api_key,
@@ -34,6 +35,7 @@ class Blink_Payment_Utils {
 				'body'    => $request_data,
 			)
 		);
+		Blink_Logger::log( 'Access token response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 		if ( is_wp_error( $response ) ) {
 			return array();
@@ -51,6 +53,7 @@ class Blink_Payment_Utils {
 					'body'    => $request_data,
 				)
 			);
+			Blink_Logger::log( 'Access token retry response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 		}
 		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 
@@ -59,12 +62,14 @@ class Blink_Payment_Utils {
 		} else {
 			$error = ! empty( $api_body['error'] ) ? $api_body : $response['response'];
 			blink_add_notice( $error );
+			Blink_Logger::log( 'Access token error', array( 'error' => $error ) );
 		}
 
 		return array();
 	}
 
 	public function create_payment_intent( $method = 'credit-card', $order = null, $amount = null ) {
+		Blink_Logger::log( 'Creating payment intent', array( 'method' => $method, 'order_id' => is_object( $order ) ? $order->get_id() : $order, 'amount' => $amount ) );
 		$cart_amount = $amount; 
 
 		if ( $this->token ) {
@@ -83,6 +88,7 @@ class Blink_Payment_Utils {
 			$amount       = ! empty( $order ) ? $order->get_total() : $cart_amount;
 
 			if ( empty( $amount ) ) {
+				Blink_Logger::log( 'create_payment_intent: empty amount, aborting' );
 				return array();
 			}
 
@@ -103,6 +109,7 @@ class Blink_Payment_Utils {
 					'body'    => $request_data,
 				)
 			);
+			Blink_Logger::log( 'create_payment_intent response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -120,14 +127,17 @@ class Blink_Payment_Utils {
 						'body'    => $request_data,
 					)
 				);
+				Blink_Logger::log( 'create_payment_intent retry response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 			}
 
 			$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 			if ( 201 == wp_remote_retrieve_response_code( $response ) ) {
+				Blink_Logger::log( 'create_payment_intent success' );
 				return $api_body;
 			} else {
 				$error = ! empty( $api_body['error'] ) ? $api_body : $response['response'];
 				blink_add_notice( $error );
+				Blink_Logger::log( 'create_payment_intent error', array( 'error' => $error ) );
 			}
 		}
 
@@ -135,6 +145,7 @@ class Blink_Payment_Utils {
 	}
 
 	public function update_payment_intent( $method = 'credit-card', $order = null, $id = null, $amount = null  ) {
+		Blink_Logger::log( 'Updating payment intent', array( 'id' => $id, 'method' => $method, 'order_id' => is_object( $order ) ? $order->get_id() : $order, 'amount' => $amount ) );
 		if ( $this->token ) {
 			$request_data = array(
 				'payment_type' => $method,
@@ -151,6 +162,7 @@ class Blink_Payment_Utils {
 						'body'    => $request_data,
 					)
 				);
+				Blink_Logger::log( 'update_payment_intent response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 				if ( is_wp_error( $response ) ) {
 					return array();
@@ -168,15 +180,18 @@ class Blink_Payment_Utils {
 							'body'    => $request_data,
 						)
 					);
+					Blink_Logger::log( 'update_payment_intent retry response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 				}
 
 				$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 				if ( 200 == wp_remote_retrieve_response_code( $response ) ) {
+					Blink_Logger::log( 'update_payment_intent success' );
 					return $api_body;
 				} else {
 					$error = ! empty( $api_body['error'] ) ? $api_body : $response['response'];
 					blink_add_notice( $error );
+					Blink_Logger::log( 'update_payment_intent error, falling back to create', array( 'error' => $error ) );
 					return $this->create_payment_intent( $method, $order, $amount);
 				}
 			}
@@ -187,8 +202,10 @@ class Blink_Payment_Utils {
 
 
 	public function setTokens() {
+		Blink_Logger::log( 'setTokens called' );
 			$token = $this->blink_generate_access_token();
 			$this->token = $token;
+			Blink_Logger::log( 'setTokens result', array( 'has_token' => ! empty( $this->token ) ) );
 
 		return $this->token;
 	}
@@ -201,6 +218,8 @@ class Blink_Payment_Utils {
 	 * @return array Payment intent data.
 	 */
 	public function setIntents( $request = array(), $order = null, $amount = null ) {
+
+		Blink_Logger::log( 'setIntents called', array( 'request_keys' => is_array( $request ) ? array_keys( $request ) : array(), 'order_id' => is_object( $order ) ? $order->get_id() : $order, 'amount' => $amount ) );
 
 		$this->setTokens();
 
@@ -236,6 +255,7 @@ class Blink_Payment_Utils {
 
 		set_transient( 'blink_intent', $intent, 15 * MINUTE_IN_SECONDS );
 
+		Blink_Logger::log( 'setIntents result', array( 'has_intent' => ! empty( $this->intent ), 'intent_id' => isset( $this->intent['id'] ) ? $this->intent['id'] : null ) );
 		return $this->intent;
 	}
 

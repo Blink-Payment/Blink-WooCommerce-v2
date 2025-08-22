@@ -13,6 +13,7 @@ class Blink_Transaction_Handler {
 	}
 
 	public function cancel_transaction( $transaction_id ) {
+		Blink_Logger::log( 'cancel_transaction called', array( 'transaction_id' => $transaction_id ) );
 		$url = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
 
 		$this->token = $this->gateway->utils->blink_generate_access_token();
@@ -23,6 +24,7 @@ class Blink_Transaction_Handler {
 		$headers = array( 'Authorization' => 'Bearer ' . $this->token['access_token'] );
 
 		$response = wp_remote_post( $url, array( 'headers' => $headers ) );
+		Blink_Logger::log( 'cancel_transaction response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 		if ( is_wp_error( $response ) ) {
 			wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-checkout' ) . $response->get_error_message(), 'error' );
@@ -31,11 +33,13 @@ class Blink_Transaction_Handler {
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 
+		Blink_Logger::log( 'cancel_transaction result', array( 'success' => isset( $data['success'] ) ? $data['success'] : null ) );
 		return $data;
 	}
 
 	// New function to fetch transaction status
 	public function get_transaction_status( $transaction_id, $order = null ) {
+		Blink_Logger::log( 'get_transaction_status called', array( 'transaction_id' => $transaction_id, 'order_id' => is_object( $order ) ? $order->get_id() : $order ) );
 		$url         = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id;
 		$data        = array();
 		$this->token = $this->gateway->utils->blink_generate_access_token();
@@ -44,6 +48,7 @@ class Blink_Transaction_Handler {
 			$headers = array( 'Authorization' => 'Bearer ' . $this->token['access_token'] );
 
 			$response = wp_remote_get( $url, array( 'headers' => $headers ) );
+			Blink_Logger::log( 'get_transaction_status response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-checkout' ) . $response->get_error_message(), 'error' );
@@ -55,12 +60,14 @@ class Blink_Transaction_Handler {
 
 		$this->gateway->paymentSource = ! empty( $data->data->payment_source ) ? $data->data->payment_source : '';
 		$this->gateway->paymentStatus = ! empty( $data->data->status ) ? $data->data->status : '';
+		Blink_Logger::log( 'get_transaction_status result', array( 'payment_source' => $this->gateway->paymentSource, 'status' => $this->gateway->paymentStatus ) );
 	}
 
 	/*
 	 * In case we need a webhook, like PayPal IPN etc
 	*/
 	public function webhook() {
+		Blink_Logger::log( 'webhook called' );
 		global $wpdb;
 		$order_id = '';
 		$request  = isset( $_REQUEST['transaction_id'] ) ? $_REQUEST : file_get_contents( 'php://input' );
@@ -70,6 +77,15 @@ class Blink_Transaction_Handler {
 		} else {
 			$request = json_decode( $request, true );
 		}
+
+		Blink_Logger::log( 'request data', array( 'request' => $request ) );
+
+		if(empty($request['status'])) {
+			Blink_Logger::log( 'no transaction status found in the request' );
+			echo wp_json_encode( array( 'error' => 'No valid transaction status found in the request' ) );
+			exit();
+		}
+
 		$transaction_id = ! empty( $request['transaction_id'] ) ? sanitize_text_field( $request['transaction_id'] ) : '';
 
 		// Try to get order_id from merchant_data or reference
@@ -196,7 +212,8 @@ class Blink_Transaction_Handler {
 			$wc_order->set_transaction_id( $transaction_result['transaction_id'] );
 			$wc_order->add_order_note( __( 'Pay by ', 'blink-payment-checkout' ) . $source );
 			$wc_order->add_order_note( __( 'Transaction Note: ', 'blink-payment-checkout' ) . $message );
-			$wc_order->save();
+				$wc_order->save();
+				Blink_Logger::log( 'webhook processed', array( 'order_id' => $order_id, 'status' => $status ) );
 			blink_change_status( $wc_order, $transaction_result['transaction_id'], $status, $source, $message );
 		}
 	}

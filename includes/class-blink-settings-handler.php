@@ -133,6 +133,29 @@ class Blink_Settings_Handler {
 			'custom_attributes' => $disabled,
 		);
 
+		// Debug settings
+		$fields['debug_mode'] = array(
+			'title'       => __( 'Debug mode', 'blink-payment-checkout' ),
+			'label'       => __( 'Enable debug logging', 'blink-payment-checkout' ),
+			'type'        => 'checkbox',
+			'description' => __( 'When enabled, the plugin writes diagnostic logs to a file under Uploads/blink-logs. Use only for troubleshooting.', 'blink-payment-checkout' ),
+			'default'     => 'no',
+			'desc_tip'    => true,
+		);
+
+		if ( class_exists( 'Blink_Logger' ) && Blink_Logger::is_enabled() ) {
+			$download_url = Blink_Logger::get_download_url();
+			$fields['debug_download'] = array(
+				'title'       => __( 'Download debug log', 'blink-payment-checkout' ),
+				'type'        => 'title',
+				'description' => sprintf(
+					/* translators: 1: download URL */
+					__( 'Download today\'s log file <a href="%1$s">here</a>.', 'blink-payment-checkout' ),
+					esc_url( $download_url )
+				),
+			);
+		}
+
 		return $fields;
 	}
 }

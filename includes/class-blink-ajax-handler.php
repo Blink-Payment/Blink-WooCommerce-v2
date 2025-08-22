@@ -14,6 +14,7 @@ class Blink_Ajax_Handler {
 	}
 
 	public static function blink_cancel_transaction() {
+		Blink_Logger::log( 'blink_cancel_transaction AJAX called' );
 		if ( ! check_ajax_referer( 'cancel_order_nonce', 'cancel_order' ) ) {
 			wp_send_json_error( __( 'Security mismatch', 'blink-payment-checkout' ) );
 		}
@@ -40,12 +41,14 @@ class Blink_Ajax_Handler {
 			// Cancel WooCommerce order
 			$order->update_status( 'cancelled' );
 			$order->add_order_note( __( 'Transaction cancelled successfully.', 'blink-payment-checkout' ) );
+			Blink_Logger::log( 'blink_cancel_transaction success', array( 'order_id' => $order_id, 'transaction_id' => $transaction_id ) );
 
 			wp_send_json_success( __( 'Transaction cancelled successfully.', 'blink-payment-checkout' ) );
 		} else {
 			/* translators: %s is the error message returned by the API. */
 			$order->add_order_note( sprintf( __( 'Failed to cancel transaction: [%s]', 'blink-payment-checkout' ), $data['message'] ) );
 			/* translators: %s is the error message returned by the API. */
+			Blink_Logger::log( 'blink_cancel_transaction failed', array( 'order_id' => $order_id, 'transaction_id' => $transaction_id, 'message' => isset( $data['message'] ) ? $data['message'] : '' ) );
 			wp_send_json_error( sprintf( __( '[%s]', 'blink-payment-checkout' ), $data['message'] ) );
 		}
 	}

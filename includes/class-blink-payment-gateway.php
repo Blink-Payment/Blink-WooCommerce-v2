@@ -80,7 +80,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
 		add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'blink_process_admin_options'), 99);
 		// if needed we can use this webhook
-		add_action('woocommerce_api_wc_blink_gateway', array($this->transaction_handler, 'webhook'));
+		add_action('woocommerce_api_blink_gateway', array($this->transaction_handler, 'webhook'));
 		add_action('woocommerce_thankyou_blink', array($this->transaction_handler, 'check_response_for_order'));
 		add_filter('woocommerce_endpoint_order-received_title', array($this, 'change_title'), 99);
 
