@@ -20,8 +20,8 @@ class Blink_Refund_Handler {
 
 		// Exit if transaction ID is not found
 		if ( ! $transaction_id ) {
-			$order->add_order_note( __( 'Transaction ID not found.', 'blink-payment-checkout' ) );
-			return new WP_Error( 'invalid_order', __( 'Transaction ID not found.', 'blink-payment-checkout' ) );
+			$order->add_order_note( __( 'Transaction ID not found.', 'blink-payment-gateway-for-woocommerce' ) );
+			return new WP_Error( 'invalid_order', __( 'Transaction ID not found.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		// Check if there were previous partial refunds
@@ -39,8 +39,8 @@ class Blink_Refund_Handler {
 
 		$this->token = $this->gateway->utils->blink_generate_access_token();
 		if ( empty( $this->token ) ) {
-			$order->add_order_note( __( 'Refund request failed: check payment settings', 'blink-payment-checkout' ) );
-			return new WP_Error( 'refund_failed', __( 'Refund request failed.', 'blink-payment-checkout' ) );
+			$order->add_order_note( __( 'Refund request failed: check payment settings', 'blink-payment-gateway-for-woocommerce' ) );
+			return new WP_Error( 'refund_failed', __( 'Refund request failed.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		// Prepare request headers
@@ -58,8 +58,8 @@ class Blink_Refund_Handler {
 
 		// Check if the refund request was successful
 		if ( is_wp_error( $response ) ) {
-			$order->add_order_note( __( 'Refund request failed: ', 'blink-payment-checkout' ) . $response->get_error_message() );
-			return new WP_Error( 'refund_failed', __( 'Refund request failed.', 'blink-payment-checkout' ) );
+			$order->add_order_note( __( 'Refund request failed: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message() );
+			return new WP_Error( 'refund_failed', __( 'Refund request failed.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -68,15 +68,15 @@ class Blink_Refund_Handler {
 		if ( $data['success'] ) {
 			$refund_note = $data['message'] . ' (Transaction ID: ' . $data['transaction_id'] . ')';
 			$order->add_order_note( $refund_note );
-			$refund_type = $partial_refund ? __( 'Partial', 'blink-payment-checkout' ) : __( 'Full', 'blink-payment-checkout' );
-			$order->add_order_note( $refund_type . ' ' . __( 'refund of', 'blink-payment-checkout' ) . ' ' . wc_price( $amount ) . ' ' . __( 'processed successfully. Reason:', 'blink-payment-checkout' ) . ' ' . $reason );
+			$refund_type = $partial_refund ? __( 'Partial', 'blink-payment-gateway-for-woocommerce' ) : __( 'Full', 'blink-payment-gateway-for-woocommerce' );
+			$order->add_order_note( $refund_type . ' ' . __( 'refund of', 'blink-payment-gateway-for-woocommerce' ) . ' ' . wc_price( $amount ) . ' ' . __( 'processed successfully. Reason:', 'blink-payment-gateway-for-woocommerce' ) . ' ' . $reason );
 			if ( ( $amount + $previous_refund_amount ) >= $order->get_total() ) {
 				$order->update_status( 'refunded' );
 			}
 		} else {
 			$message = ! empty( $data['error'] ) ? $data['error'] : $data['message'];
-			$order->add_order_note( __( 'Refund request failed: ', 'blink-payment-checkout' ) . $message );
-			return new WP_Error( 'refund_failed', __( 'Refund request failed. ', 'blink-payment-checkout' ) . $message );
+			$order->add_order_note( __( 'Refund request failed: ', 'blink-payment-gateway-for-woocommerce' ) . $message );
+			return new WP_Error( 'refund_failed', __( 'Refund request failed. ', 'blink-payment-gateway-for-woocommerce' ) . $message );
 		}
 
 		// Return true on successful refund
@@ -94,8 +94,8 @@ class Blink_Refund_Handler {
 			if ( strtolower( $this->gateway->paymentStatus ) === 'captured' && blink_get_time_diff( $order ) !== true ) {
 				// If status is captured, display cancel button
 				echo '<div class="cancel-order-container">';
-				echo '<button type="button" class="button cancel-order" data-order-id="' . esc_attr( $order->get_id() ) . '">' . esc_html__( 'Cancel Order', 'blink-payment-checkout' ) . '</button>';
-				echo '<span class="cancel-order-tooltip" data-tip="' . esc_attr__( 'It will cancel the transaction.', 'blink-payment-checkout' ) . '">' . esc_html__( 'It will cancel the transaction.', 'blink-payment-checkout' ) . '</span>';
+				echo '<button type="button" class="button cancel-order" data-order-id="' . esc_attr( $order->get_id() ) . '">' . esc_html__( 'Cancel Order', 'blink-payment-gateway-for-woocommerce' ) . '</button>';
+				echo '<span class="cancel-order-tooltip" data-tip="' . esc_attr__( 'It will cancel the transaction.', 'blink-payment-gateway-for-woocommerce' ) . '">' . esc_html__( 'It will cancel the transaction.', 'blink-payment-gateway-for-woocommerce' ) . '</span>';
 				echo '</div>';
 			}
 		}
@@ -114,8 +114,8 @@ class Blink_Refund_Handler {
 
 		$this->token = $this->gateway->utils->blink_generate_access_token();
 		if ( empty( $this->token ) ) {
-			$order->add_order_note( __( 'Cancel request failed: check payment settings', 'blink-payment-checkout' ) );
-			return new WP_Error( 'cancel_failed', __( 'Cancel request failed.', 'blink-payment-checkout' ) );
+			$order->add_order_note( __( 'Cancel request failed: check payment settings', 'blink-payment-gateway-for-woocommerce' ) );
+			return new WP_Error( 'cancel_failed', __( 'Cancel request failed.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		// Prepare request headers
@@ -132,20 +132,20 @@ class Blink_Refund_Handler {
 
 		// Check if the cancel request was successful
 		if ( is_wp_error( $response ) ) {
-			$order->add_order_note( __( 'Cancel request failed: ', 'blink-payment-checkout' ) . $response->get_error_message() );
-			return new WP_Error( 'cancel_failed', __( 'Cancel request failed.', 'blink-payment-checkout' ) );
+			$order->add_order_note( __( 'Cancel request failed: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message() );
+			return new WP_Error( 'cancel_failed', __( 'Cancel request failed.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		// Add cancel notes to the order
 		if ( $data['success'] ) {
-			$order->add_order_note( __( 'Order cancelled successfully.', 'blink-payment-checkout' ) );
+			$order->add_order_note( __( 'Order cancelled successfully.', 'blink-payment-gateway-for-woocommerce' ) );
 			$order->update_status( 'cancelled' );
 		} else {
 			$message = ! empty( $data['error'] ) ? $data['error'] : $data['message'];
-			$order->add_order_note( __( 'Cancel request failed: ', 'blink-payment-checkout' ) . $message );
-			return new WP_Error( 'cancel_failed', __( 'Cancel request failed. ', 'blink-payment-checkout' ) . $message );
+			$order->add_order_note( __( 'Cancel request failed: ', 'blink-payment-gateway-for-woocommerce' ) . $message );
+			return new WP_Error( 'cancel_failed', __( 'Cancel request failed. ', 'blink-payment-gateway-for-woocommerce' ) . $message );
 		}
 
 		// Return true on successful cancel

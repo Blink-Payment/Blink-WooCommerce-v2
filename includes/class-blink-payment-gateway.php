@@ -163,24 +163,24 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 			$token       = get_option('blink_admin_token');
 
 			if (empty($this->api_key) || empty($this->secret_key)) {
-				$live = $this->testmode ? __('Test', 'blink-payment-checkout') : __('Live', 'blink-payment-checkout');
+				$live = $this->testmode ? __('Test', 'blink-payment-gateway-for-woocommerce') : __('Live', 'blink-payment-gateway-for-woocommerce');
 				if (! $adminnotice->has_notice('no-api')) {
 					/* translators: %s is either "Test" or "Live" depending on the mode. */
-					$adminnotice->add_custom_notice('no-api', '<div>' . sprintf(__('Please add %s API key and Secret Key', 'blink-payment-checkout'), $live) . '</div>');
+					$adminnotice->add_custom_notice('no-api', '<div>' . sprintf(__('Please add %s API key and Secret Key', 'blink-payment-gateway-for-woocommerce'), $live) . '</div>');
 				}
 			} else {
 				$adminnotice->remove_notice('no-api');
 				if (! empty($token['payment_types'])) {
 					if (empty($this->paymentMethods)) {
 						if (! $adminnotice->has_notice('no-payment-type-selected')) {
-							$adminnotice->add_custom_notice('no-payment-type-selected', '<div>' . __('Please select the Payment Methods and save the configuration!', 'blink-payment-checkout') . '</div>');
+							$adminnotice->add_custom_notice('no-payment-type-selected', '<div>' . __('Please select the Payment Methods and save the configuration!', 'blink-payment-gateway-for-woocommerce') . '</div>');
 						}
 					} else {
 						$adminnotice->remove_notice('no-payment-type-selected');
 					}
 					$adminnotice->remove_notice('no-payment-types');
 				} elseif (! $adminnotice->has_notice('no-payment-types')) {
-					$adminnotice->add_custom_notice('no-payment-types', '<div>' . __('There is no Payment Types Available.', 'blink-payment-checkout') . '</div>');
+					$adminnotice->add_custom_notice('no-payment-types', '<div>' . __('There is no Payment Types Available.', 'blink-payment-gateway-for-woocommerce') . '</div>');
 				}
 			}
 		}
@@ -305,7 +305,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		if ($order_id) {
 			$order = wc_get_order($order_id);
 			if ($order->has_status('failed')) {
-				return __('Order Failed', 'blink-payment-checkout');
+				return __('Order Failed', 'blink-payment-gateway-for-woocommerce');
 			}
 		}
 

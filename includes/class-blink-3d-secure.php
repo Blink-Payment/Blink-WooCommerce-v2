@@ -41,7 +41,7 @@ class Blink_3D_Secure {
 	private static function render_secure_form( $token ) {
 		ob_start();
 		?>
-		<div class="blink-loading"><?php esc_html_e( 'Loading...', 'blink-payment-checkout' ); ?></div>
+		<div class="blink-loading"><?php esc_html_e( 'Loading...', 'blink-payment-gateway-for-woocommerce' ); ?></div>
 		<div class="blink-3d-content">
 			<?php echo wp_kses( $token, blink_3d_allow_html() ); ?>
 		</div>
@@ -60,7 +60,7 @@ class Blink_3D_Secure {
 	 * @return string The error message HTML.
 	 */
 	private static function render_error_message() {
-		return '<div class="blink-error">' . esc_html__( 'Error: 3D Secure token not found.', 'blink-payment-checkout' ) . '</div>';
+		return '<div class="blink-error">' . esc_html__( 'Error: 3D Secure token not found.', 'blink-payment-gateway-for-woocommerce' ) . '</div>';
 	}
 }
 

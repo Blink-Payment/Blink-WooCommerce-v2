@@ -18,7 +18,7 @@ class Blink_Transaction_Handler {
 
 		$this->token = $this->gateway->utils->blink_generate_access_token();
 		if ( empty( $this->token ) ) {
-			return array( 'message' => __( 'Error creating access token', 'blink-payment-checkout' ) );
+			return array( 'message' => __( 'Error creating access token', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 		// Prepare request headers
 		$headers = array( 'Authorization' => 'Bearer ' . $this->token['access_token'] );
@@ -27,7 +27,7 @@ class Blink_Transaction_Handler {
 		Blink_Logger::log( 'cancel_transaction response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 		if ( is_wp_error( $response ) ) {
-			wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-checkout' ) . $response->get_error_message(), 'error' );
+			wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message(), 'error' );
 			return;
 		}
 
@@ -51,7 +51,7 @@ class Blink_Transaction_Handler {
 			Blink_Logger::log( 'get_transaction_status response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
-				wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-checkout' ) . $response->get_error_message(), 'error' );
+				wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message(), 'error' );
 				return;
 			}
 
@@ -148,7 +148,7 @@ class Blink_Transaction_Handler {
 		}
 		$response = array(
 			'transaction_id' => ! empty( $transaction_id ) ? $transaction_id : null,
-			'error'          => __( 'No order found with this transaction ID', 'blink-payment-checkout' ),
+			'error'          => __( 'No order found with this transaction ID', 'blink-payment-gateway-for-woocommerce' ),
 		);
 		echo wp_json_encode( $response );
 		exit();
@@ -210,10 +210,10 @@ class Blink_Transaction_Handler {
 			$wc_order->update_meta_data( 'payment_type', $source );
 			$wc_order->update_meta_data( '_blink_res_expired', 'true' );
 			$wc_order->set_transaction_id( $transaction_result['transaction_id'] );
-			$wc_order->add_order_note( __( 'Pay by ', 'blink-payment-checkout' ) . $source );
-			$wc_order->add_order_note( __( 'Transaction Note: ', 'blink-payment-checkout' ) . $message );
-				$wc_order->save();
-				Blink_Logger::log( 'webhook processed', array( 'order_id' => $order_id, 'status' => $status ) );
+			$wc_order->add_order_note( __( 'Pay by ', 'blink-payment-gateway-for-woocommerce' ) . $source );
+			$wc_order->add_order_note( __( 'Transaction Note: ', 'blink-payment-gateway-for-woocommerce' ) . $message );
+			$wc_order->save();
+			Blink_Logger::log( 'webhook processed', array( 'order_id' => $order_id, 'status' => $status ) );
 			blink_change_status( $wc_order, $transaction_result['transaction_id'], $status, $source, $message );
 		}
 	}
@@ -254,11 +254,6 @@ class Blink_Transaction_Handler {
 				$instance = new self( $payment_method );
 				$instance->check_response_for_order( $order_id );
 			}
-		} else {
-			$status    = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( $_GET['status'] ) ) : '';
-			$reference = isset( $_GET['reference'] ) ? sanitize_text_field( wp_unslash( $_GET['reference'] ) ) : '';
-			$message   = isset( $_GET['note'] ) ? sanitize_text_field( wp_unslash( $_GET['note'] ) ) : '';
-			blink_change_status( $wc_order, null, $status, $reference, $message );
 		}
 	}
 }

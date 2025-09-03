@@ -16,21 +16,21 @@ class Blink_Payment_Fields_Handler {
 
 		switch ( $payment_by ) {
 			case 'direct-debit':
-				$this->blink_validate_field( 'given_name', __( 'Given name is required for Direct Debit Payment with Blink', 'blink-payment-checkout' ) );
-				$this->blink_validate_field( 'family_name', __( 'Family name is required for Direct Debit Payment with Blink', 'blink-payment-checkout' ) );
+				$this->blink_validate_field( 'given_name', __( 'Given name is required for Direct Debit Payment with Blink', 'blink-payment-gateway-for-woocommerce' ) );
+				$this->blink_validate_field( 'family_name', __( 'Family name is required for Direct Debit Payment with Blink', 'blink-payment-gateway-for-woocommerce' ) );
 				$this->blink_validate_email( 'email' );
-				$this->blink_validate_field( 'account_holder_name', __( 'Account holder name is required for Direct Debit Payment with Blink', 'blink-payment-checkout' ) );
-				$this->blink_validate_field( 'branch_code', __( 'Branch code is required for Direct Debit Payment with Blink', 'blink-payment-checkout' ) );
-				$this->blink_validate_field( 'account_number', __( 'Account number is required for Direct Debit Payment with Blink', 'blink-payment-checkout' ) );
+				$this->blink_validate_field( 'account_holder_name', __( 'Account holder name is required for Direct Debit Payment with Blink', 'blink-payment-gateway-for-woocommerce' ) );
+				$this->blink_validate_field( 'branch_code', __( 'Branch code is required for Direct Debit Payment with Blink', 'blink-payment-gateway-for-woocommerce' ) );
+				$this->blink_validate_field( 'account_number', __( 'Account number is required for Direct Debit Payment with Blink', 'blink-payment-gateway-for-woocommerce' ) );
 				break;
 			case 'open-banking':
-				$this->blink_validate_field( 'customer_name', __( 'User name is required for Open Banking Payment with Blink', 'blink-payment-checkout' ) );
+				$this->blink_validate_field( 'customer_name', __( 'User name is required for Open Banking Payment with Blink', 'blink-payment-gateway-for-woocommerce' ) );
 				$this->blink_validate_email( 'customer_email' );
 				break;
 			case 'credit-card':
 				$parsed_data = array();
 				parse_str( sanitize_text_field( wp_unslash( $_REQUEST['credit-card-data'] ?? '' ) ), $parsed_data );
-				$this->blink_validate_field( 'customer_name', __( 'Name on the Card is required for Card Payment with Blink', 'blink-payment-checkout' ), $parsed_data );
+				$this->blink_validate_field( 'customer_name', __( 'Name on the Card is required for Card Payment with Blink', 'blink-payment-gateway-for-woocommerce' ), $parsed_data );
 				break;
 		}
 
@@ -49,7 +49,7 @@ class Blink_Payment_Fields_Handler {
 	private function blink_validate_email( $field ) {
 		$email = isset( $_POST[ $field ] ) ? sanitize_email( wp_unslash( $_POST[ $field ] ) ) : '';
 		if ( empty( $email ) || ! is_email( $email ) ) {
-			wc_add_notice( __( 'A valid email is required.', 'blink-payment-checkout' ), 'error' );
+			wc_add_notice( __( 'A valid email is required.', 'blink-payment-gateway-for-woocommerce' ), 'error' );
 			return false;
 		}
 		return true;
@@ -112,7 +112,7 @@ class Blink_Payment_Fields_Handler {
 		}
 
 		if ( empty( $this->gateway->paymentMethods ) || empty( $payment_by ) ) {
-			echo '<p>' . esc_html__( 'Unable to process any payment at this moment!', 'blink-payment-checkout' ) . '</p>';
+			echo '<p>' . esc_html__( 'Unable to process any payment at this moment!', 'blink-payment-gateway-for-woocommerce' ) . '</p>';
 		} elseif ( $this->gateway->description ) {
 			echo '<p>' . esc_html( $this->gateway->description ) . '</p>';
 		}

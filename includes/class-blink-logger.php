@@ -115,11 +115,11 @@ class Blink_Logger {
      */
     public static function handle_download() {
         if ( ! is_user_logged_in() ) {
-            wp_die( esc_html__( 'Unauthorized', 'blink-payment-checkout' ) );
+            wp_die( esc_html__( 'Unauthorized', 'blink-payment-gateway-for-woocommerce' ) );
         }
 
         if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Insufficient permissions', 'blink-payment-checkout' ) );
+            wp_die( esc_html__( 'Insufficient permissions', 'blink-payment-gateway-for-woocommerce' ) );
         }
 
         check_admin_referer( 'blink_download_log' );
@@ -128,17 +128,33 @@ class Blink_Logger {
         $filepath = self::get_log_file_path( $date );
 
         if ( ! file_exists( $filepath ) ) {
-            wp_die( esc_html__( 'Log file not found.', 'blink-payment-checkout' ) );
+            wp_die( esc_html__( 'Log file not found.', 'blink-payment-gateway-for-woocommerce' ) );
         }
 
         nocache_headers();
         header( 'Content-Description: File Transfer' );
-        header( 'Content-Type: text/plain' );
+        header( 'Content-Type: text/plain; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename=' . basename( $filepath ) );
         header( 'Content-Length: ' . filesize( $filepath ) );
 
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile
-        readfile( $filepath );
+        // Use WP_Filesystem instead of direct readfile()
+        global $wp_filesystem;
+        if ( empty( $wp_filesystem ) ) {
+            require_once ABSPATH . '/wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+
+        if ( $wp_filesystem->exists( $filepath ) ) {
+            $file_content = $wp_filesystem->get_contents( $filepath );
+            if ( false !== $file_content ) {
+                // Output raw content without HTML escaping for log files
+                echo wp_kses( $file_content, array() );
+            } else {
+                wp_die( esc_html__( 'Unable to read log file.', 'blink-payment-gateway-for-woocommerce' ) );
+            }
+        } else {
+            wp_die( esc_html__( 'Log file not found.', 'blink-payment-gateway-for-woocommerce' ) );
+        }
         exit;
     }
 }
