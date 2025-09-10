@@ -16,19 +16,19 @@ class Blink_Ajax_Handler {
 	public static function blink_cancel_transaction() {
 		Blink_Logger::log( 'blink_cancel_transaction AJAX called' );
 		if ( ! check_ajax_referer( 'cancel_order_nonce', 'cancel_order' ) ) {
-			wp_send_json_error( __( 'Security mismatch', 'blink-payment-checkout' ) );
+			wp_send_json_error( __( 'Security mismatch', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		$order_id = isset( $_POST['order_id'] ) ? intval( $_POST['order_id'] ) : 0;
 
 		if ( ! $order_id ) {
-			wp_send_json_error( __( 'Invalid order ID.', 'blink-payment-checkout' ) );
+			wp_send_json_error( __( 'Invalid order ID.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		$transaction_id = get_post_meta( $order_id, 'blink_res', true );
 
 		if ( ! $transaction_id ) {
-			wp_send_json_error( __( 'Transaction ID not found.', 'blink-payment-checkout' ) );
+			wp_send_json_error( __( 'Transaction ID not found.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		$gateWay = new Blink_Payment_Gateway();
@@ -40,16 +40,16 @@ class Blink_Ajax_Handler {
 		if ( $success ) {
 			// Cancel WooCommerce order
 			$order->update_status( 'cancelled' );
-			$order->add_order_note( __( 'Transaction cancelled successfully.', 'blink-payment-checkout' ) );
+			$order->add_order_note( __( 'Transaction cancelled successfully.', 'blink-payment-gateway-for-woocommerce' ) );
 			Blink_Logger::log( 'blink_cancel_transaction success', array( 'order_id' => $order_id, 'transaction_id' => $transaction_id ) );
 
-			wp_send_json_success( __( 'Transaction cancelled successfully.', 'blink-payment-checkout' ) );
+			wp_send_json_success( __( 'Transaction cancelled successfully.', 'blink-payment-gateway-for-woocommerce' ) );
 		} else {
 			/* translators: %s is the error message returned by the API. */
-			$order->add_order_note( sprintf( __( 'Failed to cancel transaction: [%s]', 'blink-payment-checkout' ), $data['message'] ) );
-			/* translators: %s is the error message returned by the API. */
+			$order->add_order_note( sprintf( __( 'Failed to cancel transaction: [%s]', 'blink-payment-gateway-for-woocommerce' ), $data['message'] ) );
 			Blink_Logger::log( 'blink_cancel_transaction failed', array( 'order_id' => $order_id, 'transaction_id' => $transaction_id, 'message' => isset( $data['message'] ) ? $data['message'] : '' ) );
-			wp_send_json_error( sprintf( __( '[%s]', 'blink-payment-checkout' ), $data['message'] ) );
+			/* translators: %s is the error message returned by the API. */
+			wp_send_json_error( sprintf( __( '[%s]', 'blink-payment-gateway-for-woocommerce' ), $data['message'] ) );
 		}
 	}
 
@@ -64,7 +64,7 @@ class Blink_Ajax_Handler {
 
 			wp_send_json_success( array( 'html' => $payment_fields_html ) );
 		} else {
-			wp_send_json_error( __( 'Payment gateway not found', 'blink-payment-checkout' ) );
+			wp_send_json_error( __( 'Payment gateway not found', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 	}
 }

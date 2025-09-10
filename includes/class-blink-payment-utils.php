@@ -93,7 +93,6 @@ class Blink_Payment_Utils {
 			}
 
 			$request_data = array(
-				'card_layout'      => 'single-line',
 				'amount'           => $amount,
 				'payment_type'     => $method,
 				'currency'         => get_woocommerce_currency(),

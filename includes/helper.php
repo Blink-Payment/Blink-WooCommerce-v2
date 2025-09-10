@@ -119,7 +119,7 @@ if (!function_exists('blink_get_payment_information')) {
 if (!function_exists('blink_error_payment_process')) {
     function blink_error_payment_process($apiBody = array())
     {
-        $error = __('Error! Something went wrong.', 'blink-payment-checkout');
+        $error = __('Error! Something went wrong.', 'blink-payment-gateway-for-woocommerce');
         if (is_array($apiBody) && !empty($apiBody)) {
             if (isset($apiBody['success']) && $apiBody['success'] === false) {
                 $error = $apiBody['message'] ?? $apiBody['error'] ?? $error;
@@ -140,7 +140,7 @@ if (!function_exists('blink_get_status')) {
     function blink_get_status($status = '', $source = '')
     {
         $status = urldecode($status);
-        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid'], true)) {
+        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid', 'approved'], true)) {
             return 'complete';
         } elseif (strpos(strtolower($source), 'direct debit') !== false || strtolower($status) === 'pending submission') {
             return 'hold';
@@ -152,13 +152,13 @@ if (!function_exists('blink_get_status')) {
 if (!function_exists('blink_change_status')) {
     function blink_change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null)
     {
-        $wc_order->add_order_note(__('Transaction status - ', 'blink-payment-checkout') . $status);
+        $wc_order->add_order_note(__('Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status);
         if (blink_get_status($status, $source) === 'complete') {
-            blink_payment_complete($wc_order, $transaction_id, $note ?: __('Blink payment completed', 'blink-payment-checkout'));
+            blink_payment_complete($wc_order, $transaction_id, $note ?: __('Blink payment completed', 'blink-payment-gateway-for-woocommerce'));
         } elseif (blink_get_status($status, $source) === 'hold') {
-            blink_payment_on_hold($wc_order, $note ?: __('Payment Pending (Transaction status - ', 'blink-payment-checkout') . $status . ')');
+            blink_payment_on_hold($wc_order, $note ?: __('Payment Pending (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
         } else {
-            blink_payment_failed($wc_order, $note ?: __('Payment Failed (Transaction status - ', 'blink-payment-checkout') . $status . ')');
+            blink_payment_failed($wc_order, $note ?: __('Payment Failed (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
         }
     }
 }
@@ -243,7 +243,7 @@ if (!function_exists('blink_add_notice')) {
      */
     function blink_add_notice($apiBody = array())
     {
-        $error = __('Error! Something went wrong.', 'blink-payment-checkout');
+        $error = __('Error! Something went wrong.', 'blink-payment-gateway-for-woocommerce');
         if (is_array($apiBody) && !empty($apiBody)) {
             if (isset($apiBody['success']) && $apiBody['success'] === false) {
                 $error = $apiBody['message'] ?? $apiBody['error'] ?? $error;
@@ -296,7 +296,7 @@ if (!function_exists('blink_generate_applepay_domains')) {
             return wp_send_json_success(array('message' => $apiBody['message']));
         }
 
-        return wp_send_json_error(array('message' => $apiBody['message'] ? $apiBody['message'] : __('Integration unsuccessful', 'blink-payment-checkout')));
+        return wp_send_json_error(array('message' => $apiBody['message'] ? $apiBody['message'] : __('Integration unsuccessful', 'blink-payment-gateway-for-woocommerce')));
 
         wp_die();
     }
@@ -341,7 +341,7 @@ if (!function_exists('blink_generate_access_token')) {
             return wp_send_json_success(array('access_token' => $apiBody['access_token']));
         }
 
-        return wp_send_json_error(array('message' => __('Failed to generate access token', 'blink-payment-checkout')));
+        return wp_send_json_error(array('message' => __('Failed to generate access token', 'blink-payment-gateway-for-woocommerce')));
 
         wp_die();
     }
