@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
@@ -11,7 +12,7 @@ class Blink_Payment_Fields_Handler {
 		$this->gateway = $gateway;
 	}
 
-	public function validate_fields() {
+	public function blink_validate_fields() {
 		$payment_by = isset( $_POST['payment_by'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_by'] ) ) : '';
 
 		switch ( $payment_by ) {
@@ -38,6 +39,7 @@ class Blink_Payment_Fields_Handler {
 	}
 
 	private function blink_validate_field( $field, $error_message, $source = null ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$value = isset( $source[ $field ] ) ? $source[ $field ] : ( isset( $_POST[ $field ] ) ? sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) : '' );
 		if ( empty( $value ) ) {
 			wc_add_notice( $error_message, 'error' );
@@ -55,23 +57,29 @@ class Blink_Payment_Fields_Handler {
 		return true;
 	}
 
-	public function render_payment_fields() {
+	public function blink_render_payment_fields() { 
 
-		if ( $this->gateway->is_hosted() ) {
+		if ( $this->gateway->blink_is_hosted() ) {
 			echo '<p>' . esc_html( $this->gateway->description ) . '</p>';
 			return;
 		}
-
 		$request        = $_POST;
-		$blink3dprocess = isset( $_GET['blink3dprocess'] ) ? sanitize_text_field( wp_unslash( $_GET['blink3dprocess'] ) ) : '';
+		$blink_3d_process = isset( $_GET['blink_3d_process'] ) ? sanitize_text_field( wp_unslash( $_GET['blink_3d_process'] ) ) : '';
 
-		if ( ! empty( $blink3dprocess ) ) {
+		if ( ! empty( $blink_3d_process ) ) {
+			return;
+		}
+
+		// Only render on checkout pages or order pay pages
+		$is_order_pay = is_wc_endpoint_url( 'order-pay' ) || ( ! empty( $request['order'] ) && is_numeric( $request['order'] ) );
+		if ( ! is_checkout() && ! $is_order_pay ) {
 			return;
 		}
 
 		if ( empty( $request['payment_method'] ) || $request['payment_method'] !== $this->gateway->id ) {
 			return;
 		}
+
 
 		$order = null;
 		if ( ! empty( $request['order'] ) ) {
@@ -82,8 +90,10 @@ class Blink_Payment_Fields_Handler {
 			$cart_amount = WC()->cart->get_total( 'raw' );
 		}
 
-		$intent  = $this->gateway->utils->setIntents( $request, $order, $cart_amount );
+		$intent  = $this->gateway->utils->blink_set_intents( $request, $order, $cart_amount );
 		$element = ! empty( $intent ) ? $intent['element'] : array();
+		$intent_id = ! empty( $intent ) ? $intent['id'] : '';
+		$intent_expiry_date = ! empty( $intent ) ? $intent['expiry_date'] : '';
 
 		$parsed_data = array();
 		if ( ! empty( $request['post_data'] ) ) {
@@ -103,7 +113,7 @@ class Blink_Payment_Fields_Handler {
 
 		if ( empty( $payment_by ) ) {
 			foreach ( $this->gateway->paymentMethods as $method ) {
-				$key = $this->get_element_key( $method );
+				$key = $this->blink_get_element_key( $method );
 				if ( ! empty( $element[ $key ] ) ) {
 					$payment_by = $method;
 					break;
@@ -118,10 +128,24 @@ class Blink_Payment_Fields_Handler {
 		}
 
 		if ( ! empty( $this->gateway->paymentMethods ) && ! empty( $payment_by ) ) {
+			// Filter payment methods if preauthorization is enabled
+			$available_methods = $this->gateway->paymentMethods;
+			if ( $this->gateway->preauthorize_payments ) {
+				$available_methods = array_filter( $this->gateway->paymentMethods, function( $method ) {
+					return $method === 'credit-card';
+				} );
+				
+				// Show preauthorization notice to customer
+				echo '<div class="blink-preauth-notice notice notice-info" style="background: #f0f6fc; border: 1px solid #c3d9ff; border-radius: 4px; padding: 15px; margin: 15px 0;">
+					<p style="margin: 0; font-weight: 600; color: #0073aa;"><strong>Preauthorization Mode:</strong></p>
+					<p style="margin: 5px 0 0 0;">Your payment will be preauthorized at checkout and charged when your order is processed. This ensures your payment method is valid and reserves the funds.</p>
+				</div>';
+			}
+			
 			$showGP = true;
 			$count  = 0;
-			foreach ( $this->gateway->paymentMethods as $method ) {
-				$key = $this->get_element_key( $method );
+			foreach ( $available_methods as $method ) {
+				$key = $this->blink_get_element_key( $method );
 				if ( ! empty( $element[ $key ] ) ) {
 					++$count;
 				}
@@ -146,9 +170,9 @@ class Blink_Payment_Fields_Handler {
 						<div class="form-group mb-4">
 							<div class="select-batch" style="width:100%;">
 								<div class="switches-container <?php echo esc_attr( $class ); ?>" id="selectBatch">
-									<?php foreach ( $this->gateway->paymentMethods as $method ) : ?>
+									<?php foreach ( $available_methods as $method ) : ?>
 										<?php
-										$key = $this->get_element_key( $method );
+										$key = $this->blink_get_element_key( $method );
 										if ( ! empty( $element[ $key ] ) ) :
 											?>
 											<input type="radio" id="<?php echo esc_attr( $method ); ?>" name="switchPayment" value="<?php echo esc_attr( $method ); ?>"
@@ -159,9 +183,9 @@ class Blink_Payment_Fields_Handler {
 											>
 										<?php endif; ?>
 									<?php endforeach; ?>
-									<?php foreach ( $this->gateway->paymentMethods as $method ) : ?>
+									<?php foreach ( $available_methods as $method ) : ?>
 										<?php
-										$key = $this->get_element_key( $method );
+										$key = $this->blink_get_element_key( $method );
 										if ( ! empty( $element[ $key ] ) ) :
 											?>
 											<label for="<?php echo esc_attr( $method ); ?>"><?php echo esc_html( blink_transform_word( $method ) ); ?></label>
@@ -169,9 +193,9 @@ class Blink_Payment_Fields_Handler {
 									<?php endforeach; ?>
 									<div class="switch-wrapper <?php echo esc_attr( $class ); ?>">
 										<div class="switch">
-											<?php foreach ( $this->gateway->paymentMethods as $method ) : ?>
+											<?php foreach ( $available_methods as $method ) : ?>
 												<?php
-												$key = $this->get_element_key( $method );
+												$key = $this->blink_get_element_key( $method );
 												if ( ! empty( $element[ $key ] ) ) :
 													?>
 													<div><?php echo esc_html( blink_transform_word( $method ) ); ?></div>
@@ -182,9 +206,9 @@ class Blink_Payment_Fields_Handler {
 								</div>
 							</div>
 						</div>
-						<?php foreach ( $this->gateway->paymentMethods as $method ) : ?>
+						<?php foreach ( $available_methods as $method ) : ?>
 							<?php
-							$key = $this->get_element_key( $method );
+							$key = $this->blink_get_element_key( $method );
 							if ( $method === $payment_by && ! empty( $element[ $key ] ) ) {
 								if ( 'credit-card' === $payment_by ) {
 									echo '<form name="blink-credit" action="" method="">' . wp_kses( $element[ $key ], blink_3d_allow_html() ) . '
@@ -199,6 +223,8 @@ class Blink_Payment_Fields_Handler {
 							?>
 						<?php endforeach; ?>
 						<input type="hidden" name="payment_by" id="payment_by" value="<?php echo esc_attr( $payment_by ); ?>">
+						<input type="hidden" name="intent_id" id="intent_id" value="<?php echo esc_attr( $intent_id ); ?>">
+						<input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value="<?php echo esc_attr( $intent_expiry_date ); ?>">
 					</div>
 				</div>
 			</div>
@@ -206,11 +232,13 @@ class Blink_Payment_Fields_Handler {
 		} else {
 			?>
 			<input type="hidden" name="payment_by" value="" />
+			<input type="hidden" name="intent_id" id="intent_id" value="<?php echo esc_attr( $intent_id ); ?>">
+			<input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value="<?php echo esc_attr( $intent_expiry_date ); ?>">
 			<?php
 		}
 	}
 
-	private function get_element_key( $method ) {
+	private function blink_get_element_key( $method ) {
 		$key = '';
 		if ( $method === 'credit-card' ) {
 			$key = 'ccElement';

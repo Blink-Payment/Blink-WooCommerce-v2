@@ -19,13 +19,18 @@ class Blink_3D_Secure {
 	 * @return void
 	 */
 	public static function form_submission() {
-		$process_key = isset( $_GET['blink3dprocess'] ) ? sanitize_text_field( wp_unslash( $_GET['blink3dprocess'] ) ) : '';
+		// Verify nonce for security
+		if ( ! isset( $_GET['blink_3d_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['blink_3d_nonce'] ) ), 'blink_3d_process' ) ) {
+			return;
+		}
+
+		$process_key = isset( $_GET['blink_3d_process'] ) ? sanitize_text_field( wp_unslash( $_GET['blink_3d_process'] ) ) : '';
 
 		if ( empty( $process_key ) ) {
 			return;
 		}
 
-		$token = get_transient( 'blink3dProcess' . $process_key );
+		$token = get_transient( 'blink_3d_process' . $process_key );
 
 		echo '<div class="blink-3d-container">';
 		echo $token ? wp_kses( self::render_secure_form( $token ), blink_3d_allow_html() ) : wp_kses( self::render_error_message(), blink_3d_allow_html() );

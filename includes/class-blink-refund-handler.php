@@ -12,7 +12,7 @@ class Blink_Refund_Handler {
 		$this->gateway = $gateway;
 	}
 
-	public function handle_refund( $order_id, $amount = null, $reason = '__' ) {
+	public function blink_handle_refund( $order_id, $amount = null, $reason = '__' ) {
 		$order = wc_get_order( $order_id );
 
 		// Get the transaction ID from order meta
@@ -25,10 +25,11 @@ class Blink_Refund_Handler {
 		}
 
 		// Check if there were previous partial refunds
-		$previous_refund_amount = isset( $_POST['refunded_amount'] ) ? wc_format_decimal( wp_unslash( $_POST['refunded_amount'] ) ) : 0;
+		// Get the total refunded amount from the order
+		$previous_refund_amount = $order->get_total_refunded();
 
 		// Determine if it's a partial refund
-		$partial_refund = ! empty( $previous_refund_amount ) ? true : ( $amount < $order->get_total() );
+		$partial_refund = ( $amount < $order->get_total() );
 
 		// Prepare refund request data
 		$request_data = array(
@@ -83,7 +84,7 @@ class Blink_Refund_Handler {
 		return true;
 	}
 
-	public function add_cancel_button( $order ) {
+	public function blink_add_cancel_button( $order ) {
 		$transaction_id = $order->get_meta( 'blink_res' );
 
 		if ( ! $transaction_id ) {
@@ -103,7 +104,7 @@ class Blink_Refund_Handler {
 		return;
 	}
 
-	public function cancel_order( $order_id ) {
+	public function blink_cancel_order( $order_id ) {
 		$order = wc_get_order( $order_id );
 
 		$transaction_id = $order->get_meta( 'blink_res' );
@@ -152,7 +153,7 @@ class Blink_Refund_Handler {
 		return true;
 	}
 
-	public function should_render_refunds( $render_refunds, $order, $wc_order ) {
+	public function blink_should_render_refunds( $render_refunds, $order, $wc_order ) {
 		$transaction_id = get_post_meta( $order, 'blink_res', true );
 		$WCOrder        = wc_get_order( $order );
 
@@ -162,7 +163,7 @@ class Blink_Refund_Handler {
 
 		$this->transactionID = $transaction_id;
 
-		$this->gateway->transaction_handler->get_transaction_status( $transaction_id );
+		$this->gateway->transaction_handler->blink_get_transaction_status( $transaction_id );
 
 		if ( blink_check_CCPayment( $this->gateway->paymentSource ) ) {
 			if ( strtolower( $this->gateway->paymentStatus ) === 'captured' ) {

@@ -38,7 +38,7 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 
 	public function get_payment_method_data() {
 
-		$cart_data = $this->get_elements_with_cart_amount();
+		$cart_data = $this->blink_get_elements_with_cart_amount();
 
 		return array(
 			'title'             => $this->get_setting( 'title' ),
@@ -49,6 +49,7 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 			'elements'          => $cart_data['element'] ?? array(),
 			'selected_methods'  => array_values($this->gateway->paymentMethods),
 			'apple_pay_enabled' => 'yes' === $this->get_setting( 'apple_pay_enabled' ),
+			'preauthorize_payments' => 'yes' === $this->get_setting( 'preauthorize_payments' ),
 			'isSafari'          => blink_is_safari(),
 			'makePayment'       => empty( $cart_data['element'] ) ? false : true,
 			'isHosted'       	=> 'direct' !== $this->get_setting( 'integration_type' ),
@@ -57,10 +58,12 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 											? number_format($cart_data['amount'], 2, '.', '')
 											: ''
 									),
+			'intentId'       	=> $cart_data['intent_id'],
+			'intentExpiryDate'  => $cart_data['intent_expiry_date'],
 		);
 	}
 
-	private function get_elements_with_cart_amount() {
+	private function blink_get_elements_with_cart_amount() {
 
 		if ( is_admin() ) {
 			return array();
@@ -70,12 +73,19 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 
 		$request['payment_by'] = '';
 
-		$intent = $paymentGateway->utils->setIntents( $request );
+		$cart_amount = null; 
+		if ( WC()->cart && method_exists( WC()->cart, 'get_total' ) ) {
+			$cart_amount = WC()->cart->get_total( 'raw' );
+		}
+
+		$intent = $paymentGateway->utils->blink_set_intents( $request, null, $cart_amount );
 
 		$element = ! empty( $intent ) ? $intent['element'] : '';
 		$amount = ! empty( $intent ) ? $intent['amount'] : '';
+		$intent_id = ! empty( $intent ) ? $intent['id'] : '';
+		$intent_expiry_date = ! empty( $intent ) ? $intent['expiry_date'] : '';
 
-		return array('element' => $element, 'amount' => $amount);
+		return array('element' => $element, 'amount' => $amount, 'intent_id' => $intent_id, 'intent_expiry_date' => $intent_expiry_date);
 	}
 
 }

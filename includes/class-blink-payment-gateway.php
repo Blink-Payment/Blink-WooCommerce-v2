@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
 if (! defined('ABSPATH')) {
 	exit; // Exit if accessed directly
 }
@@ -17,12 +18,14 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	public $settings_handler;
 	public $utils;
 	public $refund_handler;
+	public $rerun_handler;
 	public $transaction_handler;
 
 	public $api_key;
 	public $secret_key;
 	public $testmode;
 	public $apple_pay_enabled;
+	public $preauthorize_payments;
 	public $configs;
 	public $host_url;
 	public $integration_type;
@@ -50,11 +53,12 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		$this->title             = $this->get_option('title');
 		$this->description       = $this->get_option('description');
 		$this->enabled           = $this->get_option('enabled');
-		$this->integration_type  = $this->get_option('integration_type');
-		$this->testmode          = 'yes' === $this->get_option('testmode');
-		$this->apple_pay_enabled = 'yes' === $this->get_option('apple_pay_enabled');
-		$this->api_key           = $this->testmode ? $this->get_option('test_api_key') : $this->get_option('api_key');
-		$this->secret_key        = $this->testmode ? $this->get_option('test_secret_key') : $this->get_option('secret_key');
+		$this->integration_type      = $this->get_option('integration_type');
+		$this->testmode              = 'yes' === $this->get_option('testmode');
+		$this->apple_pay_enabled     = 'yes' === $this->get_option('apple_pay_enabled');
+		$this->preauthorize_payments = 'yes' === $this->get_option('preauthorize_payments');
+		$this->api_key               = $this->testmode ? $this->get_option('test_api_key') : $this->get_option('api_key');
+		$this->secret_key            = $this->testmode ? $this->get_option('test_secret_key') : $this->get_option('secret_key');
 		$token                   = get_option('blink_admin_token');
 
 		$this->fields_handler      = new Blink_Payment_Fields_Handler($this);
@@ -62,47 +66,52 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		$this->settings_handler    = new Blink_Settings_Handler($this->api_key, $this->secret_key);
 		$this->utils               = new Blink_Payment_Utils($this);
 		$this->refund_handler      = new Blink_Refund_Handler($this);
+		$this->rerun_handler       = new Blink_Rerun_Handler($this);
 		$this->transaction_handler = new Blink_Transaction_Handler($this);
 
 		// Method with all the options fields
-		$this->init_form_fields();
+		$this->blink_init_form_fields();
 
 		$selectedMethods = array();
 		if (is_array($token) && isset($token['payment_types'])) {
 			foreach ($token['payment_types'] as $type) {
+				// If preauth is enabled, only allow credit-card payment method
+				if ($this->preauthorize_payments && $type !== 'credit-card') {
+					continue;
+				}
 				$selectedMethods[] = ('yes' === $this->get_option($type)) ? $type : '';
 			}
 		}
 		$this->paymentMethods = array_filter($selectedMethods);
-		$this->add_error_notices();
+		$this->blink_add_error_notices();
 
 		// This action hook saves the settings
 		add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
 		add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'blink_process_admin_options'), 99);
 		// if needed we can use this webhook
-		add_action('woocommerce_api_blink_gateway', array($this->transaction_handler, 'webhook'));
-		add_action('woocommerce_thankyou_blink', array($this->transaction_handler, 'check_response_for_order'));
-		add_filter('woocommerce_endpoint_order-received_title', array($this, 'change_title'), 99);
+		add_action('woocommerce_api_blink_gateway', array($this->transaction_handler, 'blink_webhook'));
+		add_action('woocommerce_thankyou_blink', array($this->transaction_handler, 'blink_check_response_for_order'));
+		add_filter('woocommerce_endpoint_order-received_title', array($this, 'blink_change_title'), 99);
 
-		add_filter('woocommerce_admin_order_should_render_refunds', array($this->refund_handler, 'should_render_refunds'), 10, 3);
-		add_filter('woocommerce_order_item_add_action_buttons', array($this->refund_handler, 'add_cancel_button'), 10);
+		add_filter('woocommerce_admin_order_should_render_refunds', array($this->refund_handler, 'blink_should_render_refunds'), 10, 3);
+		add_filter('woocommerce_order_item_add_action_buttons', array($this->refund_handler, 'blink_add_cancel_button'), 10);
 		add_action('admin_enqueue_scripts', array($this, 'blink_enqueue_scripts'), 10);
 		add_action('wp_ajax_cancel_transaction', array($this->transaction_handler, 'blink_cancel_transaction'));
-		add_action('admin_footer', array($this, 'clear_admin_notice'));
-		add_action('woocommerce_before_thankyou', array($this, 'print_custom_notice'));
+		add_action('admin_footer', array($this, 'blink_clear_admin_notice'));
+		add_action('woocommerce_before_thankyou', array($this, 'blink_print_custom_notice'));
 
 		// We need custom JavaScript to obtain a token
-		add_action('wp_enqueue_scripts', array($this, 'payment_scripts'));
+		add_action('wp_enqueue_scripts', array($this, 'blink_payment_scripts'));
 	}
 
 	public function payment_fields()
 	{
-		$this->fields_handler->render_payment_fields();
+		$this->fields_handler->blink_render_payment_fields();
 	}
 
 	public function process_payment($order_id)
 	{
-		return $this->payment_handler->handle_payment($order_id);
+		return $this->payment_handler->blink_handle_payment($order_id);
 	}
 
 	public function blink_process_admin_options()
@@ -117,16 +126,21 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 
 		$token = $this->utils->blink_generate_access_token();
 		update_option('blink_admin_token', $token);
-		$this->utils->destroy_session_tokens();
+		$this->utils->blink_destroy_session_tokens();
 	}
 
 	public function process_refund($order_id, $amount = null, $reason = '__')
 	{
-		return $this->refund_handler->handle_refund($order_id, $amount, $reason);
+		return $this->refund_handler->blink_handle_refund($order_id, $amount, $reason);
 	}
 
 	public function blink_enqueue_scripts($hook)
 	{
+		// Only load admin scripts on relevant pages and for users with proper permissions
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+
 		wp_enqueue_script('woocommerce_blink_payment_admin_scripts', plugins_url('/../assets/js/admin-scripts.js', __FILE__), array('jquery'), $this->version, true);
 		wp_enqueue_style('woocommerce_blink_payment_admin_css', plugins_url('/../assets/css/admin.css', __FILE__), array(), $this->version);
 
@@ -145,7 +159,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		);
 	}
 
-	public function clear_admin_notice()
+	public function blink_clear_admin_notice()
 	{
 		$adminnotice = new WC_Admin_Notices();
 		$adminnotice->remove_notice('blink-error');
@@ -154,7 +168,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		$adminnotice->remove_notice('no-payment-types');
 	}
 
-	public function add_error_notices($payment_types = array())
+	public function blink_add_error_notices($payment_types = array())
 	{
 
 		if (blink_is_in_admin_section()) {
@@ -193,7 +207,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	 * @param WC_Order|null $order Order object.
 	 * @return string
 	 */
-	public function get_return_url($order = null)
+	public function blink_get_return_url($order = null)
 	{
 		if ($order) {
 			$return_url = $order->get_checkout_order_received_url();
@@ -208,17 +222,17 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	/**
 	 * Plugin options,
 	 */
-	public function init_form_fields($payment_types = array())
+	public function blink_init_form_fields($payment_types = array())
 	{
 		if (! blink_is_in_admin_section()) {
 			return;
 		}
 
-		$this->form_fields = $this->settings_handler->get_form_fields();
+		$this->form_fields = $this->settings_handler->blink_get_form_fields();
 	}
 
 
-	public function payment_scripts()
+	public function blink_payment_scripts()
 	{
 		// we need JavaScript to process a token only on cart/checkout pages, right?
 		if (! is_cart() && ! is_checkout() && ! isset($_GET['pay_for_order']) && !blink_is_checkout_block()) {
@@ -266,6 +280,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 					'order_id'           => $order->get_id(),
 					'ajaxurl'            => admin_url('admin-ajax.php'),
 					'remoteAddress'      => get_client_ipv4_address(),
+					'security'           => wp_create_nonce('blink_payment_fields_nonce'),
 				)
 			);
 			wp_enqueue_script('woocommerce_blink_payment_order_pay');
@@ -294,11 +309,11 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	public function validate_fields()
 	{
 
-		return $this->fields_handler->validate_fields();
+		return $this->fields_handler->blink_validate_fields();
 	}
 
 
-	public function change_title($title)
+	public function blink_change_title($title)
 	{
 		global $wp;
 		$order_id = $wp->query_vars['order-received'];
@@ -312,23 +327,18 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		return $title;
 	}
 
-	public function capture_payment()
-	{
-		return false;
-	}
-
-	public function print_custom_notice()
+	public function blink_print_custom_notice()
 	{
 		$status = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : '';
 		$note   = isset($_GET['note']) ? sanitize_text_field(wp_unslash($_GET['note'])) : '';
 
-		if ('failed' === $status && ! get_transient('custom_notice_shown')) {
+		if ('failed' === $status && ! get_transient('blink_custom_notice_shown')) {
 			wc_print_notice($note, 'error');
-			set_transient('custom_notice_shown', true, 15);
+			set_transient('blink_custom_notice_shown', true, 15);
 		}
 	}
 
-	public function is_hosted()
+	public function blink_is_hosted()
 	{
 		return ($this->integration_type !== 'direct');
 	}

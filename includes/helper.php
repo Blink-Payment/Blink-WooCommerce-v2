@@ -1,6 +1,10 @@
 <?php
 // phpcs:ignoreFile
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly
+}
+
 if (!function_exists('blink_insert_array_at_position')) {
     function blink_insert_array_at_position($array, $insert, $position)
     {
@@ -136,13 +140,45 @@ if (!function_exists('blink_error_payment_process')) {
     }
 }
 
+if (!function_exists('blink_is_preauth_transaction')) {
+    function blink_is_preauth_transaction($order) {
+        if (!$order || $order->get_payment_method() !== 'blink') {
+            return false;
+        }
+        
+        // Check if blink_preauth meta is set
+        $blink_preauth = $order->get_meta('blink_preauth', true);
+        if ('yes' === $blink_preauth) {
+            return true;
+        }
+        
+        // Fallback: check gateway settings if meta not set
+        $gateways = WC()->payment_gateways->payment_gateways();
+        $gateway = isset($gateways['blink']) ? $gateways['blink'] : null;
+        if ($gateway && isset($gateway->preauthorize_payments)) {
+            return $gateway->preauthorize_payments;
+        }
+        
+        return false;
+    }
+}
+
 if (!function_exists('blink_get_status')) {
-    function blink_get_status($status = '', $source = '')
+    function blink_get_status($status = '', $source = '', $order = null)
     {
         $status = urldecode($status);
-        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid', 'approved'], true)) {
+        
+        // Check if this order was processed with preauth
+        $is_preauth_mode = blink_is_preauth_transaction($order);
+        
+        // If preauth is enabled and status is 'paid', treat as hold
+        if ($is_preauth_mode && strtolower($status) === 'paid') {
+            return 'hold';
+        }
+        
+        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid', 'approved', 'received','payment attempted', 'payment+attempted'], true)) {
             return 'complete';
-        } elseif (strpos(strtolower($source), 'direct debit') !== false || strtolower($status) === 'pending submission') {
+        } elseif (strpos(strtolower($source), 'direct debit') !== false || strtolower($status) === 'pending submission' || strtolower($status) === 'authorized' || strtolower($status) === 'reversed') {
             return 'hold';
         }
         return 'failed';
@@ -152,10 +188,22 @@ if (!function_exists('blink_get_status')) {
 if (!function_exists('blink_change_status')) {
     function blink_change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null)
     {
+        // Set gateway_status meta field
+        $wc_order->update_meta_data('gateway_status', $status);
+        
+        // Check if this is a preauth transaction and set blink_preauth meta
+        $is_preauth = blink_is_preauth_transaction($wc_order);
+        $wc_order->update_meta_data('blink_preauth', $is_preauth ? 'yes' : 'no');
+        
+        $wc_order->save();
+        
         $wc_order->add_order_note(__('Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status);
-        if (blink_get_status($status, $source) === 'complete') {
+        if (blink_get_status($status, $source, $wc_order) === 'complete') {
             blink_payment_complete($wc_order, $transaction_id, $note ?: __('Blink payment completed', 'blink-payment-gateway-for-woocommerce'));
-        } elseif (blink_get_status($status, $source) === 'hold') {
+        } elseif (blink_get_status($status, $source, $wc_order) === 'hold') {
+            blink_payment_on_hold($wc_order, $note ?: __('Payment Pending (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
+        } elseif ($is_preauth && !in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid', 'approved', 'received', 'payment attempted', 'payment+attempted', 'reversed'])) {
+            // If preauth is enabled and status is not in standard lists, treat as hold
             blink_payment_on_hold($wc_order, $note ?: __('Payment Pending (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
         } else {
             blink_payment_failed($wc_order, $note ?: __('Payment Failed (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
@@ -265,6 +313,11 @@ if (!function_exists('blink_generate_applepay_domains')) {
      */
     function blink_generate_applepay_domains()
     {
+        // Check user permissions
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( __( 'Insufficient permissions', 'blink-payment-gateway-for-woocommerce' ) );
+        }
+
         $configs    = include __DIR__ . '/../config.php';
         $host_url   = $configs['host_url'] . '/api';
         $settings   = get_option('woocommerce_blink_settings');
@@ -308,6 +361,11 @@ if (!function_exists('blink_generate_access_token')) {
      */
     function blink_generate_access_token()
     {
+        // Check user permissions
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( __( 'Insufficient permissions', 'blink-payment-gateway-for-woocommerce' ) );
+        }
+
         $configs    = include __DIR__ . '/../config.php';
         $host_url   = $configs['host_url'] . '/api';
         $settings   = get_option('woocommerce_blink_settings');
@@ -380,14 +438,14 @@ if (!function_exists('blink_is_checkout_block')) {
     }
 }
 
-if (!function_exists('decodeUnicodeString')) {
+if (!function_exists('blink_decode_unicode_string')) {
     /**
      * Decode Unicode strings.
      *
      * @param string $string Unicode string.
      * @return string Decoded string.
      */
-    function decodeUnicodeString($string)
+    function blink_decode_unicode_string($string)
     {
         $string = urldecode($string);
         $string = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', function ($matches) {
@@ -397,20 +455,20 @@ if (!function_exists('decodeUnicodeString')) {
     }
 }
 
-if (!function_exists('decodeUnicodeJSON')) {
+if (!function_exists('blink_decode_unicode_json')) {
     /**
      * Decode Unicode JSON strings.
      *
      * @param string $jsonString JSON string.
      * @return array Decoded array.
      */
-    function decodeUnicodeJSON($jsonString)
+    function blink_decode_unicode_json($jsonString)
     {
         $data = json_decode(wp_unslash($jsonString), true);
 
         array_walk_recursive($data, function (&$item) {
             if (is_string($item)) {
-                $item = decodeUnicodeString($item);
+                $item = blink_decode_unicode_string($item);
             }
         });
 
@@ -418,11 +476,11 @@ if (!function_exists('decodeUnicodeJSON')) {
     }
 }
 
-if (!function_exists('pay_action')) {
+if (!function_exists('blink_pay_action')) {
     /**
      * Process payment action.
      */
-    function pay_action()
+    function blink_pay_action()
     {
         $checkout = WC_Checkout::instance();
         $response = $checkout->process_checkout();
@@ -536,5 +594,15 @@ if (!function_exists('get_client_ipv4_address')) {
         }
 
         return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? sanitize_text_field($ip) : '';
+    }
+}
+
+if (!function_exists('blink_is_rest_request')) {
+    function blink_is_rest_request()
+    {
+        if (strpos($_SERVER[ 'REQUEST_URI' ], '/blink/v1') !== false) {
+            return true;
+        }
+        return false;
     }
 }

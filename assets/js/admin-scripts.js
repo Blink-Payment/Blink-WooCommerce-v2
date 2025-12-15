@@ -1,4 +1,90 @@
 jQuery(function ($) {
+    // Preauthorization confirmation popup
+    jQuery(document).ready(function ($) {
+        // Handle preauthorization checkbox toggle
+        $('input[data-preauth-toggle="true"]').on('change', function() {
+            if ($(this).is(':checked')) {
+                showPreauthConfirmation();
+            }
+        });
+
+        function showPreauthConfirmation() {
+            // Create modal overlay
+            var modal = $('<div class="blink-preauth-modal-overlay"></div>');
+            var modalContent = $('<div class="blink-preauth-modal-content"></div>');
+            
+            modalContent.html(`
+                <div class="blink-preauth-modal-header">
+                    <h3>Enable preauthorisation and manual capture</h3>
+                </div>
+                <div class="blink-preauth-modal-body">
+                    <p>Enabling this the customer will Preauthorise the order at checkout, the payment is processed manually when processing the order.</p>
+                    <p><strong>This is only available for card payments.</strong></p>
+                    <div class="blink-preauth-warning">
+                        <p><strong>Note:</strong> When preauthorization is enabled:</p>
+                        <ul>
+                            <li>Open Banking will be disabled</li>
+                            <li>Direct Debit will be disabled</li>
+                            <li>Only credit card payments will be available</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="blink-preauth-modal-footer">
+                    <button type="button" class="button button-secondary blink-preauth-cancel">Cancel</button>
+                    <button type="button" class="button button-primary blink-preauth-confirm">Confirm</button>
+                </div>
+            `);
+            
+            modal.append(modalContent);
+            $('body').append(modal);
+            
+            // Handle cancel
+            $('.blink-preauth-cancel').on('click', function() {
+                $('input[data-preauth-toggle="true"]').prop('checked', false);
+                modal.remove();
+            });
+            
+            // Handle confirm
+            $('.blink-preauth-confirm').on('click', function() {
+                // Disable open banking and direct debit
+                disableNonCardPaymentMethods();
+                modal.remove();
+            });
+        }
+
+        function disableNonCardPaymentMethods() {
+            // Disable open banking and direct debit checkboxes
+            $('input[name*="open-banking"]').prop('checked', false).prop('disabled', true);
+            $('input[name*="direct-debit"]').prop('checked', false).prop('disabled', true);
+            
+            // Enable only credit card
+            $('input[name*="credit-card"]').prop('checked', true).prop('disabled', false);
+            
+            // Show admin notice
+            showPreauthAdminNotice();
+        }
+
+        function showPreauthAdminNotice() {
+            var notice = $('<div class="notice notice-info is-dismissible"><p><strong>Preauthorization Enabled:</strong> Open Banking and Direct Debit have been disabled. Only credit card payments are available.</p></div>');
+            $('.woocommerce-save-button').before(notice);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(function() {
+                notice.fadeOut();
+            }, 5000);
+        }
+
+        // Handle unchecking preauthorization
+        $('input[data-preauth-toggle="true"]').on('change', function() {
+            if (!$(this).is(':checked')) {
+                // Re-enable all payment methods
+                $('input[name*="open-banking"]').prop('disabled', false);
+                $('input[name*="direct-debit"]').prop('disabled', false);
+                $('input[name*="credit-card"]').prop('disabled', false);
+            }
+        });
+    });
+
     // JavaScript code to handle cancel transaction AJAX call
     jQuery(document).ready(function ($) {
         // Function to handle cancel transaction AJAX call
