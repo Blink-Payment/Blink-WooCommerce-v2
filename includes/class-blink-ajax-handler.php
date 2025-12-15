@@ -19,6 +19,11 @@ class Blink_Ajax_Handler {
 			wp_send_json_error( __( 'Security mismatch', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
+		// Check user permissions
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( __( 'Insufficient permissions', 'blink-payment-gateway-for-woocommerce' ) );
+		}
+
 		$order_id = isset( $_POST['order_id'] ) ? intval( $_POST['order_id'] ) : 0;
 
 		if ( ! $order_id ) {
@@ -33,7 +38,7 @@ class Blink_Ajax_Handler {
 
 		$gateWay = new Blink_Payment_Gateway();
 		// Call cancel API
-		$data    = $gateWay->transaction_handler->cancel_transaction( $transaction_id );
+		$data    = $gateWay->transaction_handler->blink_cancel_transaction( $transaction_id );
 		$success = isset( $data['success'] ) ? $data['success'] : false;
 		$order   = wc_get_order( $order_id );
 
@@ -54,11 +59,16 @@ class Blink_Ajax_Handler {
 	}
 
 	public static function blink_payment_fields_ajax() {
+		// Verify nonce for security
+		if ( ! check_ajax_referer( 'blink_payment_fields_nonce', 'security', false ) ) {
+			wp_send_json_error( __( 'Security check failed', 'blink-payment-gateway-for-woocommerce' ) );
+		}
+
 		// Make sure WooCommerce is available
 		if ( class_exists( 'Blink_Payment_Gateway' ) ) {
 			$gateway = new Blink_Payment_Gateway();
 			ob_start();
-			$gateway->utils->destroy_session_intent();
+			$gateway->utils->blink_destroy_session_intent();
 			$gateway->payment_fields();
 			$payment_fields_html = ob_get_clean();
 

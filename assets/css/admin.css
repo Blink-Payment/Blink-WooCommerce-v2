@@ -22,3 +22,90 @@
 .cancel-order-container:hover .cancel-order-tooltip {
 	display: block;
 }
+
+/* Preauthorization Modal Styles */
+.blink-preauth-modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 0.5);
+	z-index: 999999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.blink-preauth-modal-content {
+	background: #fff;
+	border-radius: 4px;
+	box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+	max-width: 500px;
+	width: 90%;
+	max-height: 80vh;
+	overflow-y: auto;
+}
+
+.blink-preauth-modal-header {
+	padding: 20px 20px 0 20px;
+	border-bottom: 1px solid #ddd;
+}
+
+.blink-preauth-modal-header h3 {
+	margin: 0 0 15px 0;
+	font-size: 18px;
+	color: #333;
+}
+
+.blink-preauth-modal-body {
+	padding: 20px;
+}
+
+.blink-preauth-modal-body p {
+	margin: 0 0 15px 0;
+	line-height: 1.5;
+}
+
+.blink-preauth-warning {
+	background: #f0f6fc;
+	border: 1px solid #c3d9ff;
+	border-radius: 4px;
+	padding: 15px;
+	margin: 15px 0;
+}
+
+.blink-preauth-warning p {
+	margin: 0 0 10px 0;
+	font-weight: 600;
+	color: #0073aa;
+}
+
+.blink-preauth-warning ul {
+	margin: 0;
+	padding-left: 20px;
+}
+
+.blink-preauth-warning li {
+	margin: 5px 0;
+	color: #555;
+}
+
+.blink-preauth-modal-footer {
+	padding: 15px 20px 20px 20px;
+	border-top: 1px solid #ddd;
+	text-align: right;
+}
+
+.blink-preauth-modal-footer .button {
+	margin-left: 10px;
+}
+
+/* Preauthorization admin notice */
+.blink-preauth-notice {
+	margin: 15px 0;
+}
+
+.blink-preauth-notice p {
+	margin: 0;
+}

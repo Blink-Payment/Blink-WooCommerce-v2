@@ -1,4 +1,5 @@
 <?php
+// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
@@ -12,7 +13,7 @@ class Blink_Transaction_Handler {
 		$this->gateway = $gateway;
 	}
 
-	public function cancel_transaction( $transaction_id ) {
+	public function blink_cancel_transaction( $transaction_id ) {
 		Blink_Logger::log( 'cancel_transaction called', array( 'transaction_id' => $transaction_id ) );
 		$url = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
 
@@ -38,7 +39,7 @@ class Blink_Transaction_Handler {
 	}
 
 	// New function to fetch transaction status
-	public function get_transaction_status( $transaction_id, $order = null ) {
+	public function blink_get_transaction_status( $transaction_id, $order = null ) {
 		Blink_Logger::log( 'get_transaction_status called', array( 'transaction_id' => $transaction_id, 'order_id' => is_object( $order ) ? $order->get_id() : $order ) );
 		$url         = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id;
 		$data        = array();
@@ -66,10 +67,19 @@ class Blink_Transaction_Handler {
 	/*
 	 * In case we need a webhook, like PayPal IPN etc
 	*/
-	public function webhook() {
+	public function blink_webhook() {
 		Blink_Logger::log( 'webhook called' );
 		global $wpdb;
 		$order_id = '';
+		
+		// Note: This is a webhook endpoint for external payment processors
+		// Nonce verification is not applicable for webhook endpoints as they come from external systems
+		// Basic security: only allow POST requests for webhooks
+		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || $_SERVER['REQUEST_METHOD'] !== 'POST' ) {
+			http_response_code( 405 );
+			exit( 'Method not allowed' );
+		}
+		
 		$request  = isset( $_REQUEST['transaction_id'] ) ? $_REQUEST : file_get_contents( 'php://input' );
 		if ( is_array( $request ) ) {
 			$data = isset( $request['merchant_data'] ) ? stripslashes( $request['merchant_data'] ) : '';
@@ -88,43 +98,57 @@ class Blink_Transaction_Handler {
 
 		$transaction_id = ! empty( $request['transaction_id'] ) ? sanitize_text_field( $request['transaction_id'] ) : '';
 
+		Blink_Logger::log( 'Webhook processing', array( 
+			'transaction_id' => $transaction_id,
+			'reference' => isset($request['reference']) ? $request['reference'] : 'not set',
+			'status' => isset($request['status']) ? $request['status'] : 'not set',
+			'merchant_data_type' => isset($request['merchant_data']) ? gettype($request['merchant_data']) : 'not set',
+			'event_type' => isset($request['event_type']) ? $request['event_type'] : 'not set'
+		) );
+
 		// Try to get order_id from merchant_data or reference
 		if ( $transaction_id ) {
 			$merchant_data = isset( $request['merchant_data'] ) ? $request['merchant_data'] : array();
+			
+			// Handle merchant_data as JSON string (direct payments) or array (hosted payments)
+			if ( is_string( $merchant_data ) && ! empty( $merchant_data ) ) {
+				$merchant_data = json_decode( $merchant_data, true );
+				Blink_Logger::log( 'Decoded merchant_data', array( 'merchant_data' => $merchant_data ) );
+			}
+			
 			if ( ! empty( $merchant_data ) && ! empty( $merchant_data['order_info']['order_id'] ) ) {
 				$order_id = sanitize_text_field( $merchant_data['order_info']['order_id'] );
+				Blink_Logger::log( 'Order ID from merchant_data', array( 'order_id' => $order_id, 'merchant_data' => $merchant_data ) );
 			} elseif ( ! empty( $request['reference'] ) ) {
 				// Try to extract order ID from reference, e.g. "WC-124"
 				if ( preg_match( '/WC-(\d+)/', $request['reference'], $matches ) ) {
 					$order_id = $matches[1];
+					Blink_Logger::log( 'Order ID from reference', array( 'order_id' => $order_id, 'reference' => $request['reference'] ) );
 				}
 			}
 
-			// Fallback: try to find order by transaction_id
 			if ( ! $order_id ) {
-				$order_id = wp_cache_get( 'order_id_' . $transaction_id, 'blink_payment' );
-				if ( false === $order_id ) {
-					$args = array(
-						'post_type'   => 'shop_order',
-						'meta_query'  => array(
-							'relation' => 'OR',
-							array(
-								'key'   => '_transaction_id',
-								'value' => $transaction_id,
-							),
-							array(
-								'key'   => 'blink_res',
-								'value' => $transaction_id,
-							),
-						),
-						'fields'      => 'ids',
-						'numberposts' => 1,
-					);
-					$order_ids = get_posts( $args );
-					if ( ! empty( $order_ids ) ) {
-						$order_id = $order_ids[0];
+				
+				$recent_orders = wc_get_orders( array(
+					'limit'  => 20, // Limit to very recent orders only
+					'return' => 'ids',
+					'status' => array( 'wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed' ),
+					'orderby' => 'date',
+					'order'   => 'DESC',
+				) );
+				
+				$order_id = null;
+				if ( ! empty( $recent_orders ) ) {
+					// Check each order's meta data efficiently
+					foreach ( $recent_orders as $order_id_candidate ) {
+						$transaction_id_meta = get_post_meta( $order_id_candidate, '_transaction_id', true );
+						$blink_res_meta = get_post_meta( $order_id_candidate, 'blink_res', true );
+						
+						if ( $transaction_id_meta === $transaction_id || $blink_res_meta === $transaction_id ) {
+							$order_id = $order_id_candidate;
+							break;
+						}
 					}
-					wp_cache_set( 'order_id_' . $transaction_id, $order_id, 'blink_payment', HOUR_IN_SECONDS );
 				}
 			}
 
@@ -132,11 +156,37 @@ class Blink_Transaction_Handler {
 			$note    = ! empty( $request['note'] ) ? $request['note'] : '';
 			$order   = wc_get_order( $order_id );
 			if ( $order ) {
+				Blink_Logger::log( 'Order found and updating', array( 
+					'order_id' => $order_id,
+					'transaction_id' => $transaction_id,
+					'status' => $status,
+					'payment_method' => $order->get_payment_method()
+				) );
+				
 				$order->update_meta_data( '_debug', $request );
 				$order->update_meta_data( 'blink_res', $transaction_id );
 				$order->set_transaction_id( $transaction_id );
 				$order->update_meta_data( 'status', $status );
+
+				$is_preauth = blink_is_preauth_transaction($order);
+				$order->update_meta_data('blink_preauth', $is_preauth ? 'yes' : 'no');
+				
+				// Check if this is a preauth order and add the preauth note
+				$blink_preauth = $order->get_meta( 'blink_preauth', true );
+				if ( $is_preauth && strtolower( $status ) !== 'captured' ) {
+					$preauth_note = __('Blink payment preauthorized (Transaction ID: ', 'blink-payment-gateway-for-woocommerce') . $transaction_id . '). ' . 
+								   __('Process order to take payment, or cancel to remove the pre-authorization. ', 'blink-payment-gateway-for-woocommerce') .
+								   __('Refunding is unavailable until payment has been captured. ', 'blink-payment-gateway-for-woocommerce');
+					$order->add_order_note( $preauth_note );
+				}
+				
 				blink_change_status( $order, $transaction_id, $status, '', $note );
+
+				Blink_Logger::log( 'Order updated successfully', array( 
+					'order_id' => $order_id,
+					'blink_res' => $order->get_meta('blink_res', true),
+					'gateway_status' => $order->get_meta('gateway_status', true),
+				) );
 
 				$response = array(
 					'order_id'     => $order_id,
@@ -144,6 +194,8 @@ class Blink_Transaction_Handler {
 				);
 				echo wp_json_encode( $response );
 				exit();
+			} else {
+				Blink_Logger::log( 'Order not found', array( 'order_id' => $order_id ) );
 			}
 		}
 		$response = array(
@@ -154,7 +206,7 @@ class Blink_Transaction_Handler {
 		exit();
 	}
 
-	public function validate_transaction( $order, $transaction ) {
+	public function blink_validate_transaction( $order, $transaction ) {
 		$token        = $this->gateway->utils->blink_generate_access_token();
 		$responseCode = ! empty( $transaction ) ? $transaction : '';
 		$url          = $this->gateway->host_url . '/pay/v1/transactions/' . $responseCode;
@@ -182,7 +234,7 @@ class Blink_Transaction_Handler {
 
 		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		$this->gateway->utils->destroy_session_tokens();
+		$this->gateway->utils->blink_destroy_session_tokens();
 		if ( 200 == wp_remote_retrieve_response_code( $response ) ) {
 			return ! empty( $api_body['data'] ) ? $api_body['data'] : array();
 		} else {
@@ -192,7 +244,7 @@ class Blink_Transaction_Handler {
 		return array();
 	}
 
-	public function check_response_for_order( $order_id ) {
+	public function blink_check_response_for_order( $order_id ) {
 		if ( $order_id ) {
 			$wc_order = wc_get_order( $order_id );
 			if ( ! $wc_order->needs_payment() ) {
@@ -202,7 +254,9 @@ class Blink_Transaction_Handler {
 				return;
 			}
 			$transaction        = $wc_order->get_meta( 'blink_res', true );
-			$transaction_result = $this->validate_transaction( $wc_order, $transaction );
+			$transaction_result = $this->blink_validate_transaction( $wc_order, $transaction );
+			// Note: $_GET usage is for webhook processing from external payment processors
+			// Nonce verification is not applicable for webhook endpoints
 			$status             = isset( $transaction_result['status'] ) ? $transaction_result['status'] : ( isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( $_GET['status'] ) ) : '' );
 			$source             = ! empty( $transaction_result['payment_source'] ) ? $transaction_result['payment_source'] : '';
 			$message            = isset( $transaction_result['message'] ) ? $transaction_result['message'] : ( isset( $_GET['note'] ) ? sanitize_text_field( wp_unslash( $_GET['note'] ) ) : '' );
@@ -218,7 +272,7 @@ class Blink_Transaction_Handler {
 		}
 	}
 
-	public static function check_order_response() {
+	public static function blink_capture_order_response() {
 		global $wp;
 		$wc_order = null;
 		$order_id = null;
@@ -234,6 +288,8 @@ class Blink_Transaction_Handler {
 		}
 
 		$transaction_id = '';
+		// Note: $_REQUEST usage is for webhook processing from external payment processors
+		// Nonce verification is not applicable for webhook endpoints
 		if ( isset( $_REQUEST['transaction_id'] ) && ! empty( $_REQUEST['transaction_id'] ) ) {
 			$transaction_id = sanitize_text_field( wp_unslash( $_REQUEST['transaction_id'] ) );
 		} elseif ( $wc_order && $wc_order->get_transaction_id() ) {
@@ -252,8 +308,85 @@ class Blink_Transaction_Handler {
 
 			if ( $payment_method && $payment_method_id === 'blink' ) {
 				$instance = new self( $payment_method );
-				$instance->check_response_for_order( $order_id );
+				$instance->blink_check_response_for_order( $order_id );
 			}
+		}
+	}
+
+	/**
+	 * Handle order status change to trigger rerun for preauthorized orders
+	 *
+	 * @param int $order_id Order ID
+	 * @param string $old_status Old order status
+	 * @param string $new_status New order status
+	 */
+	public static function blink_handle_order_status_change($order_id, $old_status, $new_status) {
+		// Only process when changing to 'processing' from 'on-hold'
+		if ($new_status !== 'processing' || $old_status !== 'on-hold') {
+			return;
+		}
+
+		$order = wc_get_order($order_id);
+		if (!$order) {
+			return;
+		}
+
+		// Check if this is a Blink payment method
+		if ($order->get_payment_method() !== 'blink') {
+			return;
+		}
+
+		// Get the gateway instance
+		$gateways = WC()->payment_gateways->payment_gateways();
+		$gateway = isset($gateways['blink']) ? $gateways['blink'] : null;
+		
+		if (!$gateway || !isset($gateway->rerun_handler) || !is_object($gateway->rerun_handler)) {
+			return;
+		}
+
+		// Check if order is eligible for rerun
+		if (!$gateway->rerun_handler->is_eligible_for_rerun($order)) {
+			return;
+		}
+
+		// Process the rerun
+		try {
+			$result = $gateway->rerun_handler->process_rerun($order);
+
+			if ($result && isset($result['success']) && $result['success']) {
+				Blink_Logger::log('Rerun successful for order', array(
+					'order_id' => $order_id,
+					'transaction_id' => $result['transaction_id'],
+					'amount' => $result['amount']
+				));
+			} else {
+				$error_message = isset($result['error']) ? $result['error'] : 'Unknown error occurred';
+				Blink_Logger::log('Rerun failed for order', array(
+					'order_id' => $order_id,
+					'error' => $error_message
+				));
+				
+				// Add error note to order
+				$order->add_order_note(
+					sprintf(
+						__('Blink rerun failed: %s', 'blink-payment-gateway-for-woocommerce'),
+						$error_message
+					)
+				);
+			}
+		} catch (Exception $e) {
+			Blink_Logger::log('Rerun exception for order', array(
+				'order_id' => $order_id,
+				'error' => $e->getMessage()
+			));
+			
+			// Add error note to order
+			$order->add_order_note(
+				sprintf(
+					__('Blink rerun failed: %s', 'blink-payment-gateway-for-woocommerce'),
+					$e->getMessage()
+				)
+			);
 		}
 	}
 }

@@ -608,6 +608,29 @@ input:focus,
 	}
 
 	.payment_method_blink input {
-	height: 38px;
+		height: 38px;
 	}
+}
+
+/* Preauthorization customer notice styles */
+.blink-preauth-notice {
+	background: #f0f6fc !important;
+	border: 1px solid #c3d9ff !important;
+	border-radius: 4px;
+	padding: 15px;
+	margin: 15px 0;
+}
+
+.blink-preauth-notice p {
+	margin: 0;
+}
+
+.blink-preauth-notice p:first-child {
+	font-weight: 600;
+	color: #0073aa;
+}
+
+.blink-preauth-notice p:last-child {
+	margin-top: 5px;
+	color: #555;
 }

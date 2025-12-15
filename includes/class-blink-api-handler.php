@@ -23,11 +23,13 @@ class Blink_Api_Handler {
         Blink_Logger::log( 'REST set_intent called' );
 
 		$cart_amount = $request->get_param('cartAmount');
+        $intent_id = $request->get_param('intentId');
+        $intent_expiry_date = $request->get_param('intentExpiryDate');
 		$gateWay = new Blink_Payment_Gateway();
 
-        $gateWay->utils->setTokens();
+        $gateWay->utils->blink_set_tokens();
         // Use setIntents to always get the latest intent based on current cart
-        $intent = $gateWay->utils->setIntents( array( 'payment_by' => 'credit-card' ), null, $cart_amount );
+        $intent = $gateWay->utils->blink_set_intents( array( 'payment_by' => 'credit-card', 'intent_id' => $intent_id, 'intent_expiry_date' => $intent_expiry_date ), null, $cart_amount );
         Blink_Logger::log( 'REST set_intent result', array( 'has_intent' => ! empty( $intent ) ) );
 
         return array(

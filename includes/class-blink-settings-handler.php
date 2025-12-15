@@ -16,7 +16,7 @@ class Blink_Settings_Handler {
 	/**
 	 * Generate form fields for the settings.
 	 */
-	public function get_form_fields() {
+	public function blink_get_form_fields() {
 		// Basic fields
 		$fields = array(
 			'enabled'         => array(
@@ -96,11 +96,22 @@ class Blink_Settings_Handler {
 
 			$fields = array_merge( $fields, $pay_methods );
 			foreach ( $token['payment_types'] as $type ) {
+				// Check if preauth is enabled
+				$preauth_enabled = get_option( 'woocommerce_blink_settings' );
+				$is_preauth_mode = isset($preauth_enabled['preauthorize_payments']) && 'yes' === $preauth_enabled['preauthorize_payments'];
+				
+				// If preauth is enabled, disable non-credit card methods
+				$disabled_attributes = array();
+				if ( $is_preauth_mode && $type !== 'credit-card' ) {
+					$disabled_attributes = array( 'disabled' => 'disabled' );
+				}
+				
 				$fields[ $type ] = array(
-					'title'   => '',
-					'label'   => ucwords( str_replace( '-', ' ', $type ) ),
-					'type'    => 'checkbox',
-					'default' => 'no',
+					'title'             => '',
+					'label'             => ucwords( str_replace( '-', ' ', $type ) ),
+					'type'              => 'checkbox',
+					'default'           => 'no',
+					'custom_attributes' => $disabled_attributes,
 				);
 			}
 		}
@@ -116,7 +127,7 @@ class Blink_Settings_Handler {
 				/* translators: 1: URL to download the domain verification file, 2: Server domain name. */
 				__(
 					'To enable Apple Pay please:<br>
-                Download the domain verification file (DVF) <a href="%1$s" target="_blank">here</a>.<br>
+                Download the domain verification file (DVF) <a href="%1$s">here</a>.<br>
                 Upload it to your domain as follows: "https://%2$s/.well-known/apple-developer-merchantid-domain-association".<br>
                 <button id="enable-apple-pay" class="button">Click here to enable</button>',
 					'blink-payment-gateway-for-woocommerce'
@@ -132,6 +143,35 @@ class Blink_Settings_Handler {
 			'default'           => 'yes',
 			'custom_attributes' => $disabled,
 		);
+
+		// Preauthorization settings
+		$fields['preauthorize_payments'] = array(
+			'title'       => __( 'Preauthorise Payments', 'blink-payment-gateway-for-woocommerce' ),
+			'label'       => __( 'Enable preauthorisation and manual capture', 'blink-payment-gateway-for-woocommerce' ),
+			'type'        => 'checkbox',
+			'description' => __( 'Preauthorise your customer\'s order at checkout and charge later', 'blink-payment-gateway-for-woocommerce' ),
+			'default'     => 'no',
+			'desc_tip'    => true,
+			'custom_attributes' => array(
+				'data-preauth-toggle' => 'true'
+			),
+		);
+
+		// Add admin notice when preauthorization is enabled
+		if ( $this->api_key && $this->secret_key ) {
+			$preauth_enabled = get_option( 'woocommerce_blink_preauthorize_payments' );
+			if ( 'yes' === $preauth_enabled ) {
+				$fields['preauth_notice'] = array(
+					'title'       => __( 'Preauthorization Active', 'blink-payment-gateway-for-woocommerce' ),
+					'type'        => 'title',
+					'description' => sprintf(
+						'<div class="notice notice-warning inline"><p><strong>%s</strong> %s</p></div>',
+						__( 'Preauthorization Mode Enabled:', 'blink-payment-gateway-for-woocommerce' ),
+						__( 'Only credit card payments are available. Open Banking and Direct Debit are disabled. Customers will be charged when you manually process their orders.', 'blink-payment-gateway-for-woocommerce' )
+					),
+				);
+			}
+		}
 
 		// Debug settings
 		$fields['debug_mode'] = array(

@@ -55,6 +55,7 @@ jQuery(function ($) {
                 type: 'POST',
                 data: {
                     action: 'blink_payment_fields',
+                    security: order_params.security,
                     payment_method: selectedMethod,
                     order: order_params.order_id,
                     payment_by: paymentBy

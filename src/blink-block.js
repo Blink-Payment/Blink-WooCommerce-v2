@@ -27,6 +27,30 @@ const Content = (props) => {
   return decodeEntities(settings.description || '');
 };
 
+const PreauthNotice = (props) => {
+  const { settings } = props;
+  if (!settings.preauthorize_payments) {
+    return null;
+  }
+  
+  return (
+    <div className="blink-preauth-notice notice notice-info" style={{
+      background: '#f0f6fc',
+      border: '1px solid #c3d9ff',
+      borderRadius: '4px',
+      padding: '15px',
+      margin: '15px 0'
+    }}>
+      <p style={{ margin: '0', fontWeight: '600', color: '#0073aa' }}>
+        <strong>Preauthorization Mode:</strong>
+      </p>
+      <p style={{ margin: '5px 0 0 0' }}>
+        Your payment will be preauthorized at checkout and charged when your order is processed. This ensures your payment method is valid and reserves the funds.
+      </p>
+    </div>
+  );
+};
+
 const BlinkPayment = (props) => {
   const { settings, eventRegistration, emitResponse, billing } = props;
   const [selectedTab, setSelectedTab] = useState(
@@ -42,6 +66,8 @@ const BlinkPayment = (props) => {
   const selectedTabRef = useRef(selectedTab);
   const [elements, setElements] = useState(settings.elements);
   const [cartAmount, setCartAmount] = useState(settings.cartAmount);
+  const [intentId, setIntentId] = useState(settings.intentId);
+  const [intentExpiryDate, setIntentExpiryDate] = useState(settings.intentExpiryDate);
   const { onCheckoutValidation, onPaymentSetup, onCheckoutFail } = eventRegistration;
   const { billingAddress } = billing;
   const billingName = `${billingAddress.first_name} ${billingAddress.last_name}`;
@@ -71,12 +97,14 @@ const BlinkPayment = (props) => {
           const intentRes = await fetch('/wp-json/blink/v1/set-intent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cartAmount: formattedTotal }),
+            body: JSON.stringify({ cartAmount: formattedTotal, intentId: intentId, intentExpiryDate: intentExpiryDate }),
           });
           const intentData = await intentRes.json();
           if (intentData.intent?.element) {
             setElements(intentData.intent.element);
             setCartAmount(formattedTotal);
+            setIntentId(intentData.intent.id);
+            setIntentExpiryDate(intentData.intent.expiry_date);
           }
         } catch (e) {}
       })();
@@ -352,17 +380,22 @@ const BlinkPayment = (props) => {
 
   return (
     <div className="blink-gutenberg payment_method_blink">
+      <PreauthNotice settings={settings} />
       <div className="form-container">
         <>
           {settings.isSafari && settings.apple_pay_enabled ? (
             <form ref={appleFormRef}>
               <div dangerouslySetInnerHTML={{ __html: elements?.apElement }} />
               <input type="hidden" name="payment_by" id="payment_by" value="apple-pay" />
+              <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
+              <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
             </form>
           ) : (
             <form ref={googleFormRef}>
               <div dangerouslySetInnerHTML={{ __html: elements?.gpElement }} />
               <input type="hidden" name="payment_by" id="payment_by" value="google-pay" />
+              <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
+              <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
             </form>
           )}
         </>
@@ -425,6 +458,8 @@ const BlinkPayment = (props) => {
                 <form ref={formRef} name="blink-credit" id="blink-credit-form" method="POST" className="wc-block-checkout__form blink-credit">
                   <div dangerouslySetInnerHTML={{ __html: elements?.ccElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="credit-card" />
+                  <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
+                  <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
                 </form>
               </>
             )}
@@ -433,6 +468,8 @@ const BlinkPayment = (props) => {
                 <form ref={ddFormRef}>
                   <div dangerouslySetInnerHTML={{ __html: elements?.ddElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="direct-debit" />
+                  <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
+                  <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
                 </form>
               </>
             )}
@@ -441,6 +478,8 @@ const BlinkPayment = (props) => {
                 <form ref={obFormRef}>
                   <div dangerouslySetInnerHTML={{ __html: elements?.obElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="open-banking" />
+                  <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
+                  <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
                 </form>
               </>
             )}

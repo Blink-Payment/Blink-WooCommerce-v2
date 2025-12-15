@@ -5,8 +5,9 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.2.5
+ * Version: 1.3.0
  * Text Domain: blink-payment-gateway-for-woocommerce
+ * Requires Plugins: woocommerce
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
@@ -91,6 +92,7 @@ function blink_init_gateway_class() {
 	require_once __DIR__ . '/includes/class-blink-payment-fields-handler.php';
 	require_once __DIR__ . '/includes/class-blink-payment-handler.php';
 	require_once __DIR__ . '/includes/class-blink-refund-handler.php';
+	require_once __DIR__ . '/includes/class-blink-rerun-handler.php';
 	require_once __DIR__ . '/includes/class-blink-transaction-handler.php';
 
 	add_filter( 'plugin_action_links', 'blink_payment_plugin_action_links', 10, 5 );
@@ -103,5 +105,7 @@ add_action( 'woocommerce_blocks_loaded', 'blink_gateway_block_support' );
 add_action( 'before_woocommerce_init', 'blink_cart_checkout_blocks_compatibility' );
 
 // Only add transaction handler if the class exists.
-add_action( 'wp', [ 'Blink_Transaction_Handler', 'check_order_response' ], 999 );
+add_action( 'wp', [ 'Blink_Transaction_Handler', 'blink_capture_order_response' ], 999 );
 add_action( 'admin_post_blink_download_log', [ 'Blink_Logger', 'handle_download' ] );
+add_action('woocommerce_order_status_changed', array('Blink_Transaction_Handler', 'blink_handle_order_status_change'), 10, 3);
+
