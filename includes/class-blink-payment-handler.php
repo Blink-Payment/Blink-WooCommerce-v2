@@ -234,27 +234,8 @@ class Blink_Payment_Handler {
 				if ( isset( $api_body['acsform'] ) ) {
 						$threedToken = $api_body['acsform'];
 					set_transient( 'blink_3d_process' . $order_id, $threedToken, 300 );
-					
-					// Generate nonce for 3D Secure process
 					$nonce = wp_create_nonce( 'blink_3d_process' );
-					
-					if ( is_wc_endpoint_url( 'order-pay' ) ) {
-						$return_arr['redirect_url'] = add_query_arg( 
-							array( 
-								'blink_3d_process' => $order_id,
-								'blink_3d_nonce' => $nonce
-							), 
-							$order->get_checkout_payment_url() 
-						);
-					} else {
-						$return_arr['redirect_url'] = add_query_arg( 
-							array( 
-								'blink_3d_process' => $order_id,
-								'blink_3d_nonce' => $nonce
-							), 
-							wc_get_checkout_url() 
-						);
-					}
+					$return_arr['redirect_url'] = blink_get_3ds_challenge_url( $order_id, $nonce );
 				} elseif ( isset( $api_body['url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['url'];
 				}
@@ -275,8 +256,10 @@ class Blink_Payment_Handler {
 		Blink_Logger::log( 'handle_payment called', array( 'order_id' => $order_id ) );
 		$order   = wc_get_order( $order_id );
 		$request = $_POST;
-		$this->token  = $this->gateway->utils->blink_set_tokens();
-
+		$intent_id = ! empty( $request['intent_id'] ) ? $request['intent_id'] : '';
+		$this->token  = $this->gateway->utils->blink_set_tokens($intent_id);
+		$order->add_meta_data( '_blink_intent_id', $intent_id );
+		$order->save();
 		if ( method_exists( $this->gateway, 'blink_is_hosted' ) && $this->gateway->blink_is_hosted() ) {
 			return $this->blink_handle_hosted_payment( $order, $request );
 		}
@@ -332,7 +315,7 @@ class Blink_Payment_Handler {
 
 		if ( ! $response['success'] ) {
 			Blink_Logger::log( 'handle_payment failed', array( 'error' => $response['error'] ) );
-			$this->gateway->utils->blink_destroy_session_tokens();
+			$this->gateway->utils->blink_destroy_session_tokens($intent_id);
 			return blink_error_payment_process( $response['error'] );
 		}
 

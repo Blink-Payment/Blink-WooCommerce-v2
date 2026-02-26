@@ -64,11 +64,31 @@ class Blink_Transaction_Handler {
 		Blink_Logger::log( 'get_transaction_status result', array( 'payment_source' => $this->gateway->paymentSource, 'status' => $this->gateway->paymentStatus ) );
 	}
 
+	/**
+	 * Get client IP address for logging purposes.
+	 * 
+	 * @return string Client IP address.
+	 */
+	private function blink_get_client_ip() {
+		$ip_keys = array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' );
+		foreach ( $ip_keys as $key ) {
+			if ( ! empty( $_SERVER[ $key ] ) ) {
+				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
+				// Handle comma-separated IPs (from X-Forwarded-For)
+				if ( strpos( $ip, ',' ) !== false ) {
+					$ip = trim( explode( ',', $ip )[0] );
+				}
+				return $ip;
+			}
+		}
+		return 'unknown';
+	}
+
 	/*
 	 * In case we need a webhook, like PayPal IPN etc
 	*/
 	public function blink_webhook() {
-		Blink_Logger::log( 'webhook called' );
+		Blink_Logger::log( 'webhook called', array( 'ip' => $this->blink_get_client_ip() ) );
 		global $wpdb;
 		$order_id = '';
 		
@@ -97,6 +117,14 @@ class Blink_Transaction_Handler {
 		}
 
 		$transaction_id = ! empty( $request['transaction_id'] ) ? sanitize_text_field( $request['transaction_id'] ) : '';
+		
+		// Security: Validate transaction_id exists and is not empty
+		if ( empty( $transaction_id ) ) {
+			Blink_Logger::log( 'webhook rejected: missing transaction_id', array( 'ip' => $this->blink_get_client_ip() ) );
+			http_response_code( 400 );
+			echo wp_json_encode( array( 'error' => 'Missing transaction_id' ) );
+			exit();
+		}
 
 		Blink_Logger::log( 'Webhook processing', array( 
 			'transaction_id' => $transaction_id,
@@ -156,6 +184,33 @@ class Blink_Transaction_Handler {
 			$note    = ! empty( $request['note'] ) ? $request['note'] : '';
 			$order   = wc_get_order( $order_id );
 			if ( $order ) {
+				// Security: Verify order belongs to Blink payment method
+				$payment_method = $order->get_payment_method();
+				if ( $payment_method !== 'blink' ) {
+					Blink_Logger::log( 'webhook rejected: order does not belong to Blink', array( 
+						'order_id' => $order_id,
+						'payment_method' => $payment_method,
+						'transaction_id' => $transaction_id,
+						'ip' => $this->blink_get_client_ip()
+					) );
+					http_response_code( 403 );
+					echo wp_json_encode( array( 'error' => 'Forbidden: Order does not belong to Blink payment method' ) );
+					exit();
+				}
+
+				// Security: Validate transaction_id against Blink API to ensure it's legitimate
+				$transaction_valid = $this->blink_validate_webhook_transaction( $transaction_id );
+				if ( ! $transaction_valid ) {
+					Blink_Logger::log( 'webhook rejected: transaction validation failed', array( 
+						'order_id' => $order_id,
+						'transaction_id' => $transaction_id,
+						'ip' => $this->blink_get_client_ip()
+					) );
+					http_response_code( 403 );
+					echo wp_json_encode( array( 'error' => 'Forbidden: Invalid transaction ID' ) );
+					exit();
+				}
+
 				Blink_Logger::log( 'Order found and updating', array( 
 					'order_id' => $order_id,
 					'transaction_id' => $transaction_id,
@@ -164,15 +219,10 @@ class Blink_Transaction_Handler {
 				) );
 				
 				$order->update_meta_data( '_debug', $request );
-				$order->update_meta_data( 'blink_res', $transaction_id );
 				$order->set_transaction_id( $transaction_id );
 				$order->update_meta_data( 'status', $status );
 
 				$is_preauth = blink_is_preauth_transaction($order);
-				$order->update_meta_data('blink_preauth', $is_preauth ? 'yes' : 'no');
-				
-				// Check if this is a preauth order and add the preauth note
-				$blink_preauth = $order->get_meta( 'blink_preauth', true );
 				if ( $is_preauth && strtolower( $status ) !== 'captured' ) {
 					$preauth_note = __('Blink payment preauthorized (Transaction ID: ', 'blink-payment-gateway-for-woocommerce') . $transaction_id . '). ' . 
 								   __('Process order to take payment, or cancel to remove the pre-authorization. ', 'blink-payment-gateway-for-woocommerce') .
@@ -180,12 +230,13 @@ class Blink_Transaction_Handler {
 					$order->add_order_note( $preauth_note );
 				}
 				
+				Blink_Logger::log( 'Webhook processed', array( 'order_id' => $order_id, 'status' => $status ) );
 				blink_change_status( $order, $transaction_id, $status, '', $note );
 
 				Blink_Logger::log( 'Order updated successfully', array( 
 					'order_id' => $order_id,
 					'blink_res' => $order->get_meta('blink_res', true),
-					'gateway_status' => $order->get_meta('gateway_status', true),
+					'gateway_status' => $order->get_meta('_gateway_status', true),
 				) );
 
 				$response = array(
@@ -206,8 +257,62 @@ class Blink_Transaction_Handler {
 		exit();
 	}
 
+	/**
+	 * Validate webhook transaction ID against Blink API.
+	 * This ensures the transaction_id is legitimate before updating order status.
+	 * 
+	 * @param string $transaction_id Transaction ID from webhook.
+	 * @return bool True if transaction exists and is valid, false otherwise.
+	 */
+	private function blink_validate_webhook_transaction( $transaction_id ) {
+		if ( empty( $transaction_id ) || empty( $this->gateway->secret_key ) ) {
+			return false;
+		}
+
+		// Generate access token
+		$token = $this->gateway->utils->blink_generate_access_token();
+		if ( empty( $token ) || empty( $token['access_token'] ) ) {
+			Blink_Logger::log( 'webhook transaction validation: failed to get access token' );
+			// If we can't validate, allow through but log warning (fail-open for reliability)
+			// In production, you may want to fail-closed by returning false
+			return true;
+		}
+
+		// Validate transaction exists in Blink system
+		$url = $this->gateway->host_url . '/pay/v1/transactions/' . sanitize_text_field( $transaction_id );
+		$response = wp_remote_get(
+			$url,
+			array(
+				'method'  => 'GET',
+				'headers' => array( 'Authorization' => 'Bearer ' . $token['access_token'] ),
+				'timeout' => 10, // Shorter timeout for webhook validation
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			Blink_Logger::log( 'webhook transaction validation: API error', array( 'error' => $response->get_error_message() ) );
+			// Fail-open: if API is down, allow webhook through to prevent order processing delays
+			return true;
+		}
+
+		$response_code = wp_remote_retrieve_response_code( $response );
+		if ( 200 === $response_code ) {
+			$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
+			// Transaction exists and is valid
+			return ! empty( $api_body['data'] );
+		}
+
+		// Transaction not found or invalid
+		Blink_Logger::log( 'webhook transaction validation: transaction not found', array( 
+			'transaction_id' => $transaction_id,
+			'response_code' => $response_code
+		) );
+		return false;
+	}
+
 	public function blink_validate_transaction( $order, $transaction ) {
-		$token        = $this->gateway->utils->blink_generate_access_token();
+		$intent_id 	  = $order->get_meta( '_blink_intent_id', true );
+		$token        = $this->gateway->utils->blink_set_tokens($intent_id);
 		$responseCode = ! empty( $transaction ) ? $transaction : '';
 		$url          = $this->gateway->host_url . '/pay/v1/transactions/' . $responseCode;
 		$response     = wp_remote_get(
@@ -234,8 +339,9 @@ class Blink_Transaction_Handler {
 
 		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		$this->gateway->utils->blink_destroy_session_tokens();
+		$this->gateway->utils->blink_destroy_session_tokens($intent_id);
 		if ( 200 == wp_remote_retrieve_response_code( $response ) ) {
+			Blink_Logger::log( 'Transaction validated' );
 			return ! empty( $api_body['data'] ) ? $api_body['data'] : array();
 		} else {
 			$error = ! empty( $api_body['error'] ) ? $api_body : $response['response'];
@@ -267,7 +373,7 @@ class Blink_Transaction_Handler {
 			$wc_order->add_order_note( __( 'Pay by ', 'blink-payment-gateway-for-woocommerce' ) . $source );
 			$wc_order->add_order_note( __( 'Transaction Note: ', 'blink-payment-gateway-for-woocommerce' ) . $message );
 			$wc_order->save();
-			Blink_Logger::log( 'webhook processed', array( 'order_id' => $order_id, 'status' => $status ) );
+			Blink_Logger::log( 'Transaction handler processed', array( 'order_id' => $order_id, 'status' => $status ) );
 			blink_change_status( $wc_order, $transaction_result['transaction_id'], $status, $source, $message );
 		}
 	}

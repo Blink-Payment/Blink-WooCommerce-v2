@@ -104,8 +104,19 @@ add_action( 'plugins_loaded', 'blink_init_gateway_class', 20 ); // Lower priorit
 add_action( 'woocommerce_blocks_loaded', 'blink_gateway_block_support' );
 add_action( 'before_woocommerce_init', 'blink_cart_checkout_blocks_compatibility' );
 
+// 3DS challenge page.
+add_action( 'init', array( 'Blink_3D_Secure', 'register_endpoint' ) );
+add_action( 'template_redirect', array( 'Blink_3D_Secure', 'serve_minimal_3ds_page' ), 1 );
+
 // Only add transaction handler if the class exists.
 add_action( 'wp', [ 'Blink_Transaction_Handler', 'blink_capture_order_response' ], 999 );
 add_action( 'admin_post_blink_download_log', [ 'Blink_Logger', 'handle_download' ] );
 add_action('woocommerce_order_status_changed', array('Blink_Transaction_Handler', 'blink_handle_order_status_change'), 10, 3);
+
+register_activation_hook( __FILE__, function () {
+	require_once __DIR__ . '/includes/class-blink-3d-secure.php';
+	Blink_3D_Secure::register_endpoint();
+	flush_rewrite_rules();
+} );
+register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );
 

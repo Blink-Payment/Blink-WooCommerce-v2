@@ -126,7 +126,6 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 
 		$token = $this->utils->blink_generate_access_token();
 		update_option('blink_admin_token', $token);
-		$this->utils->blink_destroy_session_tokens();
 	}
 
 	public function process_refund($order_id, $amount = null, $reason = '__')
