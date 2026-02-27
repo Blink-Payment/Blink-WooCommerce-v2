@@ -344,7 +344,7 @@ class Blink_Payment_Utils {
 		return $this->intent;
 	}
 
-	public function blink_destroy_session_tokens($intent_id) {
+	public function blink_destroy_session_tokens( $intent_id = '' ) {
 		delete_transient( 'blink_token' );
 		delete_transient( $this->blink_get_token_transient_key( $intent_id ) );
 		$this->blink_destroy_session_intent($intent_id);
@@ -354,7 +354,7 @@ class Blink_Payment_Utils {
 	 * Destroy session-specific payment intent (deletes session-scoped transient).
 	 * Also cleans up the old global transient for backward compatibility.
 	 */
-	public function blink_destroy_session_intent($intent_id) {
+	public function blink_destroy_session_intent( $intent_id = '' ) {
 		delete_transient( 'blink_intent' );
 		delete_transient( $this->blink_get_intent_transient_key( $intent_id ) );
 	}

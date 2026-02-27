@@ -219,6 +219,7 @@ class Blink_Transaction_Handler {
 				) );
 				
 				$order->update_meta_data( '_debug', $request );
+				$order->update_meta_data( 'blink_res', $transaction_id );
 				$order->set_transaction_id( $transaction_id );
 				$order->update_meta_data( 'status', $status );
 

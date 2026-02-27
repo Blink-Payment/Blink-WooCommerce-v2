@@ -68,7 +68,6 @@ class Blink_Ajax_Handler {
 		if ( class_exists( 'Blink_Payment_Gateway' ) ) {
 			$gateway = new Blink_Payment_Gateway();
 			ob_start();
-			$gateway->utils->blink_destroy_session_intent();
 			$gateway->payment_fields();
 			$payment_fields_html = ob_get_clean();
 

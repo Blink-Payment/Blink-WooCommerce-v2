@@ -92,7 +92,7 @@ class Blink_Rerun_Handler {
 			$new_transaction_id = $api_body['transaction_id'];
 			$order->set_transaction_id( $new_transaction_id );
 			$order->update_meta_data( 'blink_rerun_id', $new_transaction_id );
-			$order->update_meta_data( 'gateway_status', $api_body['status'] );
+			$order->update_meta_data( '_gateway_status', $api_body['status'] ); 
 			$order->save();
 
 			// Add order note
