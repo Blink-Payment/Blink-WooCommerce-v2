@@ -146,8 +146,8 @@ if (!function_exists('blink_is_preauth_transaction')) {
             return false;
         }
         
-        // Check if blink_preauth meta is set
-        $blink_preauth = $order->get_meta('blink_preauth', true);
+        // Check if _blink_preauth meta is set
+        $blink_preauth = $order->get_meta('_blink_preauth', true);
         if ('yes' === $blink_preauth) {
             return true;
         }
@@ -188,12 +188,12 @@ if (!function_exists('blink_get_status')) {
 if (!function_exists('blink_change_status')) {
     function blink_change_status($wc_order, $transaction_id, $status = '', $source = '', $note = null)
     {
-        // Set gateway_status meta field
-        $wc_order->update_meta_data('gateway_status', $status);
+        // Set _gateway_status meta field
+        $wc_order->update_meta_data('_gateway_status', $status);
         
-        // Check if this is a preauth transaction and set blink_preauth meta
+        // Check if this is a preauth transaction and set _blink_preauth meta
         $is_preauth = blink_is_preauth_transaction($wc_order);
-        $wc_order->update_meta_data('blink_preauth', $is_preauth ? 'yes' : 'no');
+        $wc_order->update_meta_data('_blink_preauth', $is_preauth ? 'yes' : 'no');
         
         $wc_order->save();
         
@@ -221,14 +221,29 @@ if (!function_exists('blink_payment_complete')) {
      */
     function blink_payment_complete($order, $txn_id = '', $note = '')
     {
-        if (!$order->has_status(array('processing', 'completed'))) {
-            if ($note) {
-                $order->add_order_note($note);
-            }
-            $order->payment_complete($txn_id);
-            if (isset(WC()->cart)) {
-                WC()->cart->empty_cart();
-            }
+		$order_id = $order->get_id();
+		$opt_key = 'blink_payment_done_' . $order_id;
+        if ( ! add_option( $opt_key, 'yes' ) ) {
+            return;
+        }
+        if ( $order->get_meta( '_blink_payment_complete_done', true ) === 'yes' ) {
+            return;
+        }
+		$order->update_meta_data( '_blink_payment_complete_done', 'yes' );
+		$order->save();
+
+        if ( $order->has_status( array( 'processing', 'completed' ) ) ) {
+            return;
+        }
+        
+        if ( $note ) {
+            $order->add_order_note( $note );
+        }
+        $order->payment_complete( $txn_id );
+		delete_option( $opt_key );
+		
+        if ( isset( WC()->cart ) ) {
+            WC()->cart->empty_cart();
         }
     }
 }
@@ -242,11 +257,28 @@ if (!function_exists('blink_payment_on_hold')) {
      */
     function blink_payment_on_hold($order, $reason = '')
     {
+		$order_id = $order->get_id();
+		$opt_key = 'blink_payment_done_' . $order_id;
+        if ( ! add_option( $opt_key, 'yes' ) ) {
+            return;
+        }
+        if ( $order->get_meta( '_blink_payment_hold_done', true ) === 'yes' ) {
+            return;
+        }
+		$order->update_meta_data( '_blink_payment_hold_done', 'yes' );
+		$order->save();
+
+        if ( $order->has_status( array( 'on-hold' ) ) ) {
+            return;
+        }
+        
         $order->update_status('on-hold', $reason);
         if ($reason) {
             $order->add_order_note($reason);
         }
-        if (isset(WC()->cart)) {
+		delete_option( $opt_key );
+		
+        if ( isset( WC()->cart ) ) {
             WC()->cart->empty_cart();
         }
     }
@@ -261,10 +293,19 @@ if (!function_exists('blink_payment_failed')) {
      */
     function blink_payment_failed($order, $reason = '')
     {
+        $order_id = $order->get_id();
+		$opt_key = 'blink_payment_done_' . $order_id;
+        if ( ! add_option( $opt_key, 'yes' ) ) {
+            return;
+        }
+        if ( $order->has_status( array( 'failed' ) ) ) {
+            return;
+        }
         $order->update_status('failed', $reason);
         if ($reason) {
             $order->add_order_note($reason);
         }
+		delete_option( $opt_key );
     }
 }
 
@@ -280,6 +321,25 @@ if (!function_exists('blink_is_in_admin_section')) {
             return true;
         }
         return false;
+    }
+}
+
+if ( ! function_exists( 'blink_get_3ds_challenge_url' ) ) {
+    /**
+     * URL for the minimal 3DS challenge page.
+     *
+     * @param int    $order_id Order ID (blink_3d_process).
+     * @param string $nonce    Nonce (blink_3d_nonce).
+     * @return string
+     */
+    function blink_get_3ds_challenge_url( $order_id, $nonce ) {
+        return add_query_arg(
+            array(
+                'blink_3d_process' => $order_id,
+                'blink_3d_nonce'   => $nonce,
+            ),
+            home_url( '/blink-3ds-challenge/' )
+        );
     }
 }
 

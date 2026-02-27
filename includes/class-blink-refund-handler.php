@@ -16,7 +16,7 @@ class Blink_Refund_Handler {
 		$order = wc_get_order( $order_id );
 
 		// Get the transaction ID from order meta
-		$transaction_id = $order->get_meta( 'blink_res' );
+		$transaction_id = $order->get_meta( 'blink_res', true );
 
 		// Exit if transaction ID is not found
 		if ( ! $transaction_id ) {
@@ -85,7 +85,7 @@ class Blink_Refund_Handler {
 	}
 
 	public function blink_add_cancel_button( $order ) {
-		$transaction_id = $order->get_meta( 'blink_res' );
+		$transaction_id = $order->get_meta( 'blink_res', true );
 
 		if ( ! $transaction_id ) {
 			return; // Exit if transaction ID is not found
@@ -107,7 +107,7 @@ class Blink_Refund_Handler {
 	public function blink_cancel_order( $order_id ) {
 		$order = wc_get_order( $order_id );
 
-		$transaction_id = $order->get_meta( 'blink_res' );
+		$transaction_id = $order->get_meta( 'blink_res', true );
 
 		if ( ! $transaction_id ) {
 			return; // Exit if transaction ID is not found

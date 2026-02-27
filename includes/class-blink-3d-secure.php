@@ -13,60 +13,70 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Blink_3D_Secure {
 
+	const MINIMAL_PAGE_QUERY_VAR = 'blink_3ds_challenge';
+
 	/**
-	 * Handles the 3D Secure form submission process.
-	 *
-	 * @return void
+	 * Register rewrite rule and query var for the minimal 3DS page.
 	 */
-	public static function form_submission() {
-		// Verify nonce for security
-		if ( ! isset( $_GET['blink_3d_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['blink_3d_nonce'] ) ), 'blink_3d_process' ) ) {
+	public static function register_endpoint() {
+		add_rewrite_rule( '^blink-3ds-challenge/?$', 'index.php?' . self::MINIMAL_PAGE_QUERY_VAR . '=1', 'top' );
+		add_filter( 'query_vars', array( __CLASS__, 'add_query_vars' ) );
+	}
+
+	/**
+	 * @param array $vars Existing query vars.
+	 * @return array
+	 */
+	public static function add_query_vars( $vars ) {
+		$vars[] = self::MINIMAL_PAGE_QUERY_VAR;
+		return $vars;
+	}
+
+	/**
+	 * Serve the minimal 3DS challenge page. Exits after output.
+	 */
+	public static function serve_minimal_3ds_page() {
+		if ( ! get_query_var( self::MINIMAL_PAGE_QUERY_VAR ) ) {
 			return;
+		}
+
+		if ( ! isset( $_GET['blink_3d_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['blink_3d_nonce'] ) ), 'blink_3d_process' ) ) {
+			wp_safe_redirect( wc_get_checkout_url() );
+			exit;
 		}
 
 		$process_key = isset( $_GET['blink_3d_process'] ) ? sanitize_text_field( wp_unslash( $_GET['blink_3d_process'] ) ) : '';
-
 		if ( empty( $process_key ) ) {
-			return;
+			wp_safe_redirect( wc_get_checkout_url() );
+			exit;
 		}
 
 		$token = get_transient( 'blink_3d_process' . $process_key );
-
-		echo '<div class="blink-3d-container">';
-		echo $token ? wp_kses( self::render_secure_form( $token ), blink_3d_allow_html() ) : wp_kses( self::render_error_message(), blink_3d_allow_html() );
-		echo '</div>';
+		self::output_minimal_3ds_page( $token );
+		exit;
 	}
 
 	/**
-	 * Renders the 3D Secure form if the token is valid.
+	 * Get path to the minimal 3DS challenge template (plugin only; no theme override).
 	 *
-	 * @param string $token The 3D Secure form HTML content.
-	 * @return string The rendered HTML content.
+	 * @return string
 	 */
-	private static function render_secure_form( $token ) {
-		ob_start();
-		?>
-		<div class="blink-loading"><?php esc_html_e( 'Loading...', 'blink-payment-gateway-for-woocommerce' ); ?></div>
-		<div class="blink-3d-content">
-			<?php echo wp_kses( $token, blink_3d_allow_html() ); ?>
-		</div>
-		<script nonce="2020">
-			jQuery(document).ready(function () {
-				jQuery('#form3ds22').submit();
-			});
-		</script>
-		<?php
-		return ob_get_clean();
+	public static function get_minimal_template_path() {
+		return dirname( __DIR__ ) . '/templates/blink-3ds-challenge.php';
 	}
 
 	/**
-	 * Renders the error message when no valid token is found.
+	 * Output minimal HTML page by loading the plugin template.
 	 *
-	 * @return string The error message HTML.
+	 * @param string|false $token Transient 3DS form HTML, or false if missing.
 	 */
-	private static function render_error_message() {
-		return '<div class="blink-error">' . esc_html__( 'Error: 3D Secure token not found.', 'blink-payment-gateway-for-woocommerce' ) . '</div>';
+	public static function output_minimal_3ds_page( $token ) {
+		header( 'Content-Type: text/html; charset=' . get_bloginfo( 'charset' ) );
+		set_query_var( 'blink_3ds_token', $token );
+		$css_path = dirname( __DIR__ ) . '/assets/css/blink-3ds-challenge.css';
+		set_query_var( 'blink_3ds_challenge_css_url', dirname( plugin_dir_url( __FILE__ ) ) . '/assets/css/blink-3ds-challenge.css' );
+		set_query_var( 'blink_3ds_challenge_css_version', file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1' );
+		load_template( self::get_minimal_template_path(), false );
 	}
+
 }
-
-add_action( 'wp_footer', array( 'Blink_3D_Secure', 'form_submission' ) );

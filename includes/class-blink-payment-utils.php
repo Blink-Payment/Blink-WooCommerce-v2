@@ -208,36 +208,62 @@ class Blink_Payment_Utils {
 	}
 
 
-	public function blink_set_tokens() {
-		Blink_Logger::log( 'setTokens called' );
-			$token = $this->blink_generate_access_token();
-			$this->token = $token;
-			Blink_Logger::log( 'setTokens result', array( 'has_token' => ! empty( $this->token ) ) );
+	public function blink_set_tokens( $intent_id = '' ) {
+		Blink_Logger::log( 'setTokens called', array( 'intent_id' => $intent_id ) );
+		$token_key = $this->blink_get_token_transient_key( $intent_id );
+		$cached    = ! empty( $token_key ) ? get_transient( $token_key ) : array();
 
+		if ( ! empty( $cached['access_token'] ) ) {
+			$this->token = $cached;
+			if ( $this->blink_is_token_valid() ) {
+				Blink_Logger::log( 'setTokens result', array( 'has_token' => true, 'from' => 'transient' ) );
+				return $this->token;
+			}
+		}
+		$token = $this->blink_generate_access_token();
+		$this->token = $token;
+		Blink_Logger::log( 'setTokens result', array( 'has_token' => ! empty( $this->token ) ) );
 		return $this->token;
+	}
+	/**
+	 * Whether the current token exists and is not expired.
+	 * @return bool
+	 */
+	private function blink_is_token_valid() {
+		if ( empty( $this->token['access_token'] ) ) {
+			return false;
+		}
+		$t = $this->token;
+		if ( ! empty( $t['expired_on'] ) && function_exists( 'blink_check_timestamp_expired' ) ) {
+			return 0 === blink_check_timestamp_expired( $t['expired_on'] );
+		}
+		return true;
 	}
 
 	/**
-	 * Get a unique transient key for storing payment intent.
-	 * @return string Transient key.
+	 * Get transient key for storing access token.
+	 * @param string $intent_id Optional intent id from request.
+	 * @return string Non-empty transient key.
 	 */
-	private function blink_get_intent_transient_key() {
-		
-		if ( is_user_logged_in() ) {
-			return 'blink_intent_user_' . absint( get_current_user_id() );
+	private function blink_get_token_transient_key( $intent_id = '' ) {
+		if ( ! empty( $intent_id ) ) {
+			return 'blink_token_id_' . sanitize_key( $intent_id );
 		}
+		return '';
+	}
 
-		if ( function_exists( 'WC' ) && WC()->session ) {
-			$session_key = WC()->session->get( 'blink_intent_session_key' );
-			if ( empty( $session_key ) ) {
-				$session_key = wp_generate_uuid4();
-				WC()->session->set( 'blink_intent_session_key', $session_key );
-			}
-			return 'blink_intent_session_' . sanitize_key( $session_key );
+	/**
+	 * Get transient key for storing payment intent.
+	 * When intent_id is provided, key is per-intent. When empty, key is per session/user.
+	 *
+	 * @param string $intent_id Optional intent id from request.
+	 * @return string Non-empty transient key.
+	 */
+	private function blink_get_intent_transient_key( $intent_id = '' ) {
+		if ( ! empty( $intent_id ) ) {
+			return 'blink_intent_id_' . sanitize_key( $intent_id );
 		}
-
-		$unique_id = wp_generate_uuid4();
-		return 'blink_intent_unique_' . sanitize_key( $unique_id );
+		return '';
 	}
 
 	/**
@@ -254,17 +280,11 @@ class Blink_Payment_Utils {
 			return;
 		}
 
-		if ( isset( $_GET['blink_3d_nonce'] ) ) {
-			return;
-		}
-
 		if ( ! empty( $order ) ) {
 			$amount = (float) $order->get_total();
 		}
 
 		Blink_Logger::log( 'setIntents called', array( 'request_keys' => is_array( $request ) ? array_keys( $request ) : array(), 'order_id' => is_object( $order ) ? $order->get_id() : $order, 'amount' => $amount ) );
-
-		$this->blink_set_tokens();
 
 		// Default to 'credit-card' for unsupported or missing payment methods.
 		$payment_method = !empty( $request['payment_by'] ) && ! in_array( $request['payment_by'], array( 'google-pay', 'apple-pay' ) )
@@ -281,12 +301,17 @@ class Blink_Payment_Utils {
 				'expiry_date' => $intent_expiry_date,
 			);
 		}
-		$transient_key = '';
-		if ( empty( $intent ) ) {
-			$transient_key = $this->blink_get_intent_transient_key();
-			$intent = get_transient( $transient_key );
+
+		if ( ! $this->blink_is_token_valid() ) {
+			$this->blink_set_tokens( $intent_id );
 		}
 
+		$transient_key        = '';
+		if ( empty( $intent ) ) {
+			$transient_key        = $this->blink_get_intent_transient_key( $intent_id );
+			$intent               = ! empty( $transient_key ) ? get_transient( $transient_key ) : array();
+		
+		}
 
 		$intent_expired = 1;
 
@@ -309,36 +334,29 @@ class Blink_Payment_Utils {
 
 		$this->intent = $intent;
 
-		if ( ! empty( $transient_key ) ) {
-			set_transient( $transient_key, $intent, 15 * MINUTE_IN_SECONDS );
-		}
+		$transient_key = $this->blink_get_intent_transient_key( $intent['id'] );
+		set_transient( $transient_key, $intent, 15 * MINUTE_IN_SECONDS );
+		
+		$token_transient_key = $this->blink_get_token_transient_key( $intent['id'] );
+		set_transient( $token_transient_key, $this->token, 15 * MINUTE_IN_SECONDS );
+
 		Blink_Logger::log( 'setIntents result', array( 'has_intent' => ! empty( $this->intent ), 'intent_id' => isset( $this->intent['id'] ) ? $this->intent['id'] : null, 'transient_key' => $transient_key ) );
 		return $this->intent;
 	}
 
-	public function blink_destroy_session_tokens() {
+	public function blink_destroy_session_tokens( $intent_id = '' ) {
 		delete_transient( 'blink_token' );
-		$this->blink_destroy_session_intent();
+		delete_transient( $this->blink_get_token_transient_key( $intent_id ) );
+		$this->blink_destroy_session_intent($intent_id);
 	}
 
 	/**
-	 * Destroy session-specific payment intent.
+	 * Destroy session-specific payment intent (deletes session-scoped transient).
 	 * Also cleans up the old global transient for backward compatibility.
-	 * @param WC_Order|null $order Optional order object to destroy order-specific intent.
 	 */
-	public function blink_destroy_session_intent( $order = null ) {
-		// Delete the old global transient for backward compatibility
+	public function blink_destroy_session_intent( $intent_id = '' ) {
 		delete_transient( 'blink_intent' );
-
-		// Delete session/order-specific transient if provided
-		if ( ! empty( $order ) ) {
-			$transient_key = $this->blink_get_intent_transient_key( $order );
-			delete_transient( $transient_key );
-		} else {
-			// Try to delete current session's intent
-			$transient_key = $this->blink_get_intent_transient_key();
-			delete_transient( $transient_key );
-		}
+		delete_transient( $this->blink_get_intent_transient_key( $intent_id ) );
 	}
 }
 

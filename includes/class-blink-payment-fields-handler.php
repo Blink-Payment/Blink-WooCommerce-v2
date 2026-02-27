@@ -64,11 +64,6 @@ class Blink_Payment_Fields_Handler {
 			return;
 		}
 		$request        = $_POST;
-		$blink_3d_process = isset( $_GET['blink_3d_process'] ) ? sanitize_text_field( wp_unslash( $_GET['blink_3d_process'] ) ) : '';
-
-		if ( ! empty( $blink_3d_process ) ) {
-			return;
-		}
 
 		// Only render on checkout pages or order pay pages
 		$is_order_pay = is_wc_endpoint_url( 'order-pay' ) || ( ! empty( $request['order'] ) && is_numeric( $request['order'] ) );
