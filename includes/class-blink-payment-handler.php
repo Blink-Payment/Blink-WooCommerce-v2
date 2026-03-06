@@ -35,6 +35,7 @@ class Blink_Payment_Handler {
 				'merchant_data'     => blink_get_payment_information( $order_id ),
 			);
 			$url          = $this->gateway->host_url . '/pay/v1/openbankings';
+			Blink_Logger::log( 'blink_process_open_banking() POST openbankings', $request_data );
 			$response     = wp_remote_post(
 				$url,
 				array(
@@ -49,7 +50,7 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'process_open_banking response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+			Blink_Logger::log( 'blink_process_open_banking() POST openbankings', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -103,6 +104,7 @@ class Blink_Payment_Handler {
 				'merchant_data'       => blink_get_payment_information( $order_id ),
 			);
 			$url          = $this->gateway->host_url . '/pay/v1/directdebits';
+			Blink_Logger::log( 'blink_process_direct_debit() POST directdebits', $request_data );
 			$response     = wp_remote_post(
 				$url,
 				array(
@@ -117,7 +119,7 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'process_direct_debit response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+			Blink_Logger::log( 'blink_process_direct_debit() POST directdebits', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -206,7 +208,7 @@ class Blink_Payment_Handler {
 			$request_data['device_ip_address']        = $ip;
 
 			$url = $this->gateway->host_url . '/pay/v1/' . $endpoint;
-
+			Blink_Logger::log( 'blink_process_credit_card() POST ' . $endpoint, $request_data );
 			$response = wp_remote_post(
 				$url,
 				array(
@@ -221,7 +223,7 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'process_credit_card response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+			Blink_Logger::log( 'blink_process_credit_card() POST ' . $endpoint, array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -366,7 +368,7 @@ class Blink_Payment_Handler {
 		);
 
 		$url = $this->gateway->host_url . '/paylink/v1/paylinks';
-
+		Blink_Logger::log( 'handle_hosted_payment() POST paylinks', $paylink_data );
 		$response = wp_remote_post(
 			$url,
 			array(
@@ -379,7 +381,7 @@ class Blink_Payment_Handler {
 				'timeout' => 30,
 			)
 		);
-		Blink_Logger::log( 'handle_hosted_payment response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+		Blink_Logger::log( 'handle_hosted_payment() POST paylinks', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 
 		if ( is_wp_error( $response ) ) {

@@ -54,7 +54,7 @@ class Blink_Rerun_Handler {
 
 		// Make rerun API call
 		$url = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id . '/reruns';
-		
+		Blink_Logger::log( 'process_rerun() POST reruns', $rerun_data );
 		$response = wp_remote_post(
 			$url,
 			array(
@@ -67,11 +67,9 @@ class Blink_Rerun_Handler {
 				'timeout' => 30,
 			)
 		);
-
-		Blink_Logger::log( 'Rerun API response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
-
+		Blink_Logger::log( 'process_rerun() POST reruns', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );	
 		if ( is_wp_error( $response ) ) {
-			Blink_Logger::log( 'Rerun API error', array( 'error' => $response->get_error_message() ) );
+			Blink_Logger::log( 'process_rerun() POST reruns', array( 'error' => $response->get_error_message() ) );
 			return array(
 				'success' => false,
 				'error'   => $response->get_error_message()

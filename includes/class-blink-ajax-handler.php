@@ -30,7 +30,11 @@ class Blink_Ajax_Handler {
 			wp_send_json_error( __( 'Invalid order ID.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
-		$transaction_id = get_post_meta( $order_id, 'blink_res', true );
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			wp_send_json_error( __( 'Invalid order ID.', 'blink-payment-gateway-for-woocommerce' ) );
+		}
+		$transaction_id = $order->get_meta( 'blink_res', true );
 
 		if ( ! $transaction_id ) {
 			wp_send_json_error( __( 'Transaction ID not found.', 'blink-payment-gateway-for-woocommerce' ) );
@@ -40,7 +44,6 @@ class Blink_Ajax_Handler {
 		// Call cancel API
 		$data    = $gateWay->transaction_handler->blink_cancel_transaction( $transaction_id );
 		$success = isset( $data['success'] ) ? $data['success'] : false;
-		$order   = wc_get_order( $order_id );
 
 		if ( $success ) {
 			// Cancel WooCommerce order

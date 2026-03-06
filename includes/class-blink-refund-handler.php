@@ -154,14 +154,15 @@ class Blink_Refund_Handler {
 	}
 
 	public function blink_should_render_refunds( $render_refunds, $order, $wc_order ) {
-		$transaction_id = get_post_meta( $order, 'blink_res', true );
 		$WCOrder        = wc_get_order( $order );
+		if ( ! $WCOrder ) {
+			return $render_refunds;
+		}
+		$transaction_id = $WCOrder->get_meta( 'blink_res', true );
 
 		if ( ! $transaction_id ) {
 			return $render_refunds; // No Blink transaction, use default behavior
 		}
-
-		$this->transactionID = $transaction_id;
 
 		$this->gateway->transaction_handler->blink_get_transaction_status( $transaction_id );
 
