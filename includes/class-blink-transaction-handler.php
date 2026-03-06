@@ -169,8 +169,12 @@ class Blink_Transaction_Handler {
 				if ( ! empty( $recent_orders ) ) {
 					// Check each order's meta data efficiently
 					foreach ( $recent_orders as $order_id_candidate ) {
-						$transaction_id_meta = get_post_meta( $order_id_candidate, '_transaction_id', true );
-						$blink_res_meta = get_post_meta( $order_id_candidate, 'blink_res', true );
+						$candidate_order = wc_get_order( $order_id_candidate );
+						if ( ! $candidate_order ) {
+							continue;
+						}
+						$transaction_id_meta = $candidate_order->get_transaction_id();
+						$blink_res_meta      = $candidate_order->get_meta( 'blink_res', true );
 						
 						if ( $transaction_id_meta === $transaction_id || $blink_res_meta === $transaction_id ) {
 							$order_id = $order_id_candidate;
@@ -316,6 +320,7 @@ class Blink_Transaction_Handler {
 		$token        = $this->gateway->utils->blink_set_tokens($intent_id);
 		$responseCode = ! empty( $transaction ) ? $transaction : '';
 		$url          = $this->gateway->host_url . '/pay/v1/transactions/' . $responseCode;
+		Blink_Logger::log( 'blink_validate_transaction() GET transactions', $url );
 		$response     = wp_remote_get(
 			$url,
 			array(
@@ -323,6 +328,7 @@ class Blink_Transaction_Handler {
 				'headers' => array( 'Authorization' => 'Bearer ' . $token['access_token'] ),
 			)
 		);
+		Blink_Logger::log( 'blink_validate_transaction() GET transactions', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 		$redirect     = trailingslashit( wc_get_checkout_url() );
 
 		$headers = wp_remote_retrieve_headers( $response );

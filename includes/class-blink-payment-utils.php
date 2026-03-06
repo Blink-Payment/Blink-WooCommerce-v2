@@ -27,6 +27,7 @@ class Blink_Payment_Utils {
 			'application_name'        => 'Woocommerce Blink ' . $this->gateway->version,
 			'application_description' => 'WP-' . get_bloginfo( 'version' ) . ' WC-' . WC_VERSION,
 		);
+		Blink_Logger::log( 'blink_generate_access_token() POST tokens', $request_data );
 		$response     = wp_remote_post(
 			$url,
 			array(
@@ -35,7 +36,7 @@ class Blink_Payment_Utils {
 				'body'    => $request_data,
 			)
 		);
-		Blink_Logger::log( 'Access token response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+		Blink_Logger::log( 'blink_generate_access_token() POST tokens', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 		if ( is_wp_error( $response ) ) {
 			return array();
@@ -104,6 +105,7 @@ class Blink_Payment_Utils {
 				'notification_url' => WC()->api_request_url( 'blink_gateway' ),
 			);
 			$url          = $this->gateway->host_url . '/pay/v1/intents';
+			Blink_Logger::log( 'create_payment_intent() POST intents', $request_data );
 			$response     = wp_remote_post(
 				$url,
 				array(
@@ -112,7 +114,7 @@ class Blink_Payment_Utils {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'create_payment_intent response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+			Blink_Logger::log( 'create_payment_intent() POST intents', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -161,6 +163,7 @@ class Blink_Payment_Utils {
 			);
 			if ( $id ) {
 				$url      = $this->gateway->host_url . '/pay/v1/intents/' . $id;
+				Blink_Logger::log( 'update_payment_intent() PATCH intents', $request_data );
 				$response = wp_remote_post(
 					$url,
 					array(
@@ -169,7 +172,7 @@ class Blink_Payment_Utils {
 						'body'    => $request_data,
 					)
 				);
-				Blink_Logger::log( 'update_payment_intent response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+				Blink_Logger::log( 'update_payment_intent() PATCH intents', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
 
 				if ( is_wp_error( $response ) ) {
 					return array();

@@ -97,10 +97,11 @@ if (!function_exists('blink_get_customer_data')) {
 if (!function_exists('blink_get_order_data')) {
     function blink_get_order_data($order)
     {
+        $order_date = $order->get_date_created();
         return array(
             'order_id'           => $order->get_id(),
             'order_number'       => $order->get_order_number(),
-            'order_date'         => gmdate('Y-m-d H:i:s', strtotime(get_post($order->get_id())->post_date)),
+            'order_date'         => $order_date ? $order_date->format('Y-m-d H:i:s') : '',
             'order_total'        => wc_format_decimal($order->get_total(), 2),
             'order_currency'     => $order->get_currency(),
         );
