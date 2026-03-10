@@ -67,7 +67,7 @@ class Blink_Rerun_Handler {
 				'timeout' => 30,
 			)
 		);
-		Blink_Logger::log( 'process_rerun() POST reruns', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );	
+		Blink_Logger::log( 'process_rerun() POST reruns', Blink_Logger::http_response_context( $response ) );	
 		if ( is_wp_error( $response ) ) {
 			Blink_Logger::log( 'process_rerun() POST reruns', array( 'error' => $response->get_error_message() ) );
 			return array(

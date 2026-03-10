@@ -14,7 +14,10 @@ class Blink_Ajax_Handler {
 	}
 
 	public static function blink_cancel_transaction() {
-		Blink_Logger::log( 'blink_cancel_transaction AJAX called' );
+		Blink_Logger::log(
+			'blink_cancel_transaction AJAX called',
+			array( 'order_id' => isset( $_POST['order_id'] ) ? intval( $_POST['order_id'] ) : 0 )
+		);
 		if ( ! check_ajax_referer( 'cancel_order_nonce', 'cancel_order' ) ) {
 			wp_send_json_error( __( 'Security mismatch', 'blink-payment-gateway-for-woocommerce' ) );
 		}
@@ -25,6 +28,7 @@ class Blink_Ajax_Handler {
 		}
 
 		$order_id = isset( $_POST['order_id'] ) ? intval( $_POST['order_id'] ) : 0;
+		Blink_Logger::set_context( array( 'order_id' => $order_id ) );
 
 		if ( ! $order_id ) {
 			wp_send_json_error( __( 'Invalid order ID.', 'blink-payment-gateway-for-woocommerce' ) );

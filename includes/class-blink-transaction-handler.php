@@ -25,7 +25,7 @@ class Blink_Transaction_Handler {
 		$headers = array( 'Authorization' => 'Bearer ' . $this->token['access_token'] );
 
 		$response = wp_remote_post( $url, array( 'headers' => $headers ) );
-		Blink_Logger::log( 'cancel_transaction response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+		Blink_Logger::log( 'cancel_transaction response code', Blink_Logger::http_response_context( $response ) );
 
 		if ( is_wp_error( $response ) ) {
 			wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message(), 'error' );
@@ -49,7 +49,7 @@ class Blink_Transaction_Handler {
 			$headers = array( 'Authorization' => 'Bearer ' . $this->token['access_token'] );
 
 			$response = wp_remote_get( $url, array( 'headers' => $headers ) );
-			Blink_Logger::log( 'get_transaction_status response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+			Blink_Logger::log( 'get_transaction_status response code', Blink_Logger::http_response_context( $response ) );
 
 			if ( is_wp_error( $response ) ) {
 				wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message(), 'error' );
@@ -308,14 +308,27 @@ class Blink_Transaction_Handler {
 		}
 
 		// Transaction not found or invalid
+		$response_context = Blink_Logger::http_response_context( $response );
 		Blink_Logger::log( 'webhook transaction validation: transaction not found', array( 
 			'transaction_id' => $transaction_id,
-			'response_code' => $response_code
+			'response_code' => $response_code,
+			'body'          => isset( $response_context['body'] ) ? $response_context['body'] : '',
 		) );
 		return false;
 	}
 
 	public function blink_validate_transaction( $order, $transaction ) {
+		$email = '';
+		if ( is_object( $order ) && method_exists( $order, 'get_billing_email' ) ) {
+			$email = sanitize_email( $order->get_billing_email() );
+		}
+		Blink_Logger::set_context(
+			array(
+				'order_id'       => is_object( $order ) ? $order->get_id() : $order,
+				'transaction_id' => $transaction,
+				'billing_email'  => $email,
+			)
+		);
 		$intent_id 	  = $order->get_meta( '_blink_intent_id', true );
 		$token        = $this->gateway->utils->blink_set_tokens($intent_id);
 		$responseCode = ! empty( $transaction ) ? $transaction : '';
@@ -328,7 +341,7 @@ class Blink_Transaction_Handler {
 				'headers' => array( 'Authorization' => 'Bearer ' . $token['access_token'] ),
 			)
 		);
-		Blink_Logger::log( 'blink_validate_transaction() GET transactions', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+		Blink_Logger::log( 'blink_validate_transaction() GET transactions', Blink_Logger::http_response_context( $response ) );
 		$redirect     = trailingslashit( wc_get_checkout_url() );
 
 		$headers = wp_remote_retrieve_headers( $response );
