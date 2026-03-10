@@ -36,7 +36,7 @@ class Blink_Payment_Utils {
 				'body'    => $request_data,
 			)
 		);
-		Blink_Logger::log( 'blink_generate_access_token() POST tokens', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+		Blink_Logger::log( 'blink_generate_access_token() POST tokens', Blink_Logger::http_response_context( $response ) );
 
 		if ( is_wp_error( $response ) ) {
 			return array();
@@ -54,7 +54,7 @@ class Blink_Payment_Utils {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'Access token retry response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+			Blink_Logger::log( 'Access token retry response code', Blink_Logger::http_response_context( $response ) );
 		}
 		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 
@@ -114,7 +114,7 @@ class Blink_Payment_Utils {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'create_payment_intent() POST intents', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+			Blink_Logger::log( 'create_payment_intent() POST intents', Blink_Logger::http_response_context( $response ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
@@ -132,7 +132,7 @@ class Blink_Payment_Utils {
 						'body'    => $request_data,
 					)
 				);
-				Blink_Logger::log( 'create_payment_intent retry response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+				Blink_Logger::log( 'create_payment_intent retry response code', Blink_Logger::http_response_context( $response ) );
 			}
 
 			$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -172,7 +172,7 @@ class Blink_Payment_Utils {
 						'body'    => $request_data,
 					)
 				);
-				Blink_Logger::log( 'update_payment_intent() PATCH intents', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+				Blink_Logger::log( 'update_payment_intent() PATCH intents', Blink_Logger::http_response_context( $response ) );
 
 				if ( is_wp_error( $response ) ) {
 					return array();
@@ -190,7 +190,7 @@ class Blink_Payment_Utils {
 							'body'    => $request_data,
 						)
 					);
-					Blink_Logger::log( 'update_payment_intent retry response code', array( 'code' => wp_remote_retrieve_response_code( $response ) ) );
+					Blink_Logger::log( 'update_payment_intent retry response code', Blink_Logger::http_response_context( $response ) );
 				}
 
 				$api_body = json_decode( wp_remote_retrieve_body( $response ), true );

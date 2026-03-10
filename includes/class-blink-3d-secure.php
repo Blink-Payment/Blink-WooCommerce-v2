@@ -42,13 +42,19 @@ class Blink_3D_Secure {
 
         self::send_no_cache_headers();
 
-        if ( ! isset( $_GET['blink_3d_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['blink_3d_nonce'] ) ), 'blink_3d_process' ) ) {
+        $process_key = isset( $_GET['blink_3d_process'] ) ? sanitize_text_field( wp_unslash( $_GET['blink_3d_process'] ) ) : '';
+        if ( empty( $process_key ) ) {
             wp_safe_redirect( wc_get_checkout_url() );
             exit;
         }
 
-        $process_key = isset( $_GET['blink_3d_process'] ) ? sanitize_text_field( wp_unslash( $_GET['blink_3d_process'] ) ) : '';
-        if ( empty( $process_key ) ) {
+        $challenge_token = isset( $_GET['blink_3d_nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['blink_3d_nonce'] ) ) : '';
+        $stored_token    = get_transient( 'blink_3d_challenge_token_' . $process_key );
+        $tokens_match    = function_exists( 'hash_equals' )
+            ? hash_equals( (string) $stored_token, (string) $challenge_token )
+            : ( (string) $stored_token === (string) $challenge_token );
+
+        if ( empty( $challenge_token ) || empty( $stored_token ) || ! $tokens_match ) {
             wp_safe_redirect( wc_get_checkout_url() );
             exit;
         }

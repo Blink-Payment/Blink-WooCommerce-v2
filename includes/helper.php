@@ -122,16 +122,11 @@ if (!function_exists('blink_get_payment_information')) {
 }
 
 if (!function_exists('blink_error_payment_process')) {
-    function blink_error_payment_process($apiBody = array())
+    function blink_error_payment_process($error = '')
     {
-        $error = __('Error! Something went wrong.', 'blink-payment-gateway-for-woocommerce');
-        if (is_array($apiBody) && !empty($apiBody)) {
-            if (isset($apiBody['success']) && $apiBody['success'] === false) {
-                $error = $apiBody['message'] ?? $apiBody['error'] ?? $error;
-            } else {
-                $error = $apiBody['error'] ?? $apiBody['message'] ?? $error;
-            }
-        }
+        $error = $error ?: __('Error! Something went wrong.', 'blink-payment-gateway-for-woocommerce');
+        wc_add_notice( $error, 'error' );
+        
         return array(
             'result'   => 'failure',
             'messages' => $error,
