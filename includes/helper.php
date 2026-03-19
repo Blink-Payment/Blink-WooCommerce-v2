@@ -222,13 +222,21 @@ if (!function_exists('blink_payment_complete')) {
         if ( ! add_option( $opt_key, 'yes' ) ) {
             return;
         }
+
+		$fresh_order = wc_get_order( $order_id );
+		if ( $fresh_order ) {
+			$order = $fresh_order;
+		}
+
         if ( $order->get_meta( '_blink_payment_complete_done', true ) === 'yes' ) {
+			delete_option( $opt_key );
             return;
         }
 		$order->update_meta_data( '_blink_payment_complete_done', 'yes' );
 		$order->save();
 
         if ( $order->has_status( array( 'processing', 'completed' ) ) ) {
+			delete_option( $opt_key );
             return;
         }
         
@@ -259,12 +267,14 @@ if (!function_exists('blink_payment_on_hold')) {
             return;
         }
         if ( $order->get_meta( '_blink_payment_hold_done', true ) === 'yes' ) {
+			delete_option( $opt_key );
             return;
         }
 		$order->update_meta_data( '_blink_payment_hold_done', 'yes' );
 		$order->save();
 
         if ( $order->has_status( array( 'on-hold' ) ) ) {
+			delete_option( $opt_key );
             return;
         }
         
@@ -295,6 +305,7 @@ if (!function_exists('blink_payment_failed')) {
             return;
         }
         if ( $order->has_status( array( 'failed' ) ) ) {
+			delete_option( $opt_key );
             return;
         }
         $order->update_status('failed', $reason);

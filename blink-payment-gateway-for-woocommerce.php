@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.3.3
+ * Version: 1.3.4
  * Text Domain: blink-payment-gateway-for-woocommerce
  * Requires Plugins: woocommerce
  * License: GPLv2 or later
