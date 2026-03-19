@@ -1,5 +1,9 @@
 *** WooCommerce - Blink Changelog ***
 
+2026-03-19 - version 1.3.4
+
+* Fix to update status for reattempted order
+
 2026-03-10 - version 1.3.3
 
 * Added handling for nonce except wp session
