@@ -395,6 +395,8 @@ class Blink_Transaction_Handler {
 			$wc_order->save();
 			Blink_Logger::log( 'Transaction handler processed', array( 'order_id' => $order_id, 'status' => $status ) );
 			blink_change_status( $wc_order, $transaction_result['transaction_id'], $status, $source, $message );
+			delete_transient( 'blink_3d_process' . $order_id );
+			delete_transient( 'blink_3d_challenge_token_' . $order_id );
 		}
 	}
 

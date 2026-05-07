@@ -361,7 +361,6 @@ class Blink_Payment_Handler {
 			'transaction_type'   => $transaction_type,
 			'full_name'          => $customer_name,
 			'email'              => $order->get_billing_email(),
-			'mobile_number'      => $order->get_billing_phone(),
 			'transaction_unique' => 'WC-' . $order_id,
 			'is_decide_amount'   => false,
 			'amount'             => $amount,
