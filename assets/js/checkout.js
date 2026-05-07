@@ -150,8 +150,6 @@ jQuery(function ($) {
     
                     $paymentData = $('form[name="blink-credit"]').serialize();
                     $('#credit-card-data').val($paymentData);
-
-                    blink_checkout_form.$form.trigger('submit');
     
                   } else {
                     // Show an alert if payment was unsuccessful
