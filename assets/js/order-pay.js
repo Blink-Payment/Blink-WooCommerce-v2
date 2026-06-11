@@ -22,6 +22,77 @@ jQuery(function ($) {
         return getCreditContainer().find('iframe').length > 0;
     };
 
+    const serializedDataHasValue = (serializedData, fieldName) => {
+        const pairs = serializedData ? serializedData.split('&') : [];
+
+        for (let i = 0; i < pairs.length; i++) {
+            const pair = pairs[i].split('=');
+            const name = decodeURIComponent((pair.shift() || '').replace(/\+/g, ' '));
+            const value = decodeURIComponent(pair.join('=').replace(/\+/g, ' '));
+
+            if (name === fieldName && value) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const collectCreditCardData = () => {
+        const $orderForm = jQuery(orderForm);
+        const $creditContainer = getCreditContainer();
+        const requiredFormFields = [
+            'paymentToken',
+            'paymenttoken',
+            'type',
+            'merchantID',
+            'customer_name',
+            'customer_email',
+            'customer_address',
+            'customer_postcode',
+            'device_timezone',
+            'device_capabilities',
+            'device_accept_language',
+            'device_screen_resolution',
+            'remote_address',
+            'device_ip_address',
+            'payment_by',
+            'intent_id',
+            'intent_expiry_date'
+        ];
+        const fields = [];
+
+        const addField = function () {
+            if (!this.name || this.disabled || fields.indexOf(this) !== -1) {
+                return;
+            }
+
+            fields.push(this);
+        };
+
+        $creditContainer.find(':input[name]').each(addField);
+        $orderForm.find(':input[name]').filter(function () {
+            return requiredFormFields.indexOf(this.name) !== -1;
+        }).each(addField);
+
+        return $(fields).serialize();
+    };
+
+    const ensureCreditCardDataField = () => {
+        const $orderForm = jQuery(orderForm);
+        if ($orderForm.find('input[name="credit-card-data"]').length) {
+            return;
+        }
+
+        const $paymentBox = jQuery(targetDiv);
+        ($paymentBox.length ? $paymentBox : $orderForm).append($('<input>', {
+            type: 'hidden',
+            name: 'credit-card-data',
+            id: 'credit-card-data',
+            value: ''
+        }));
+    };
+
     const initialiseHostedFields = () => {
         const $creditContainer = getCreditContainer();
         const $orderForm = jQuery(orderForm);
@@ -246,10 +317,24 @@ jQuery(function ($) {
                   if (paymentDetails.success) {
                     const paymentToken = paymentDetails.paymentToken;
                     console.log('Payment token:', paymentToken);
+                    if (!paymentToken) {
+                        $(orderForm).unblock();
+                        alert('There was an issue processing the payment. Please try again.');
+                        return false;
+                    }
+
                     // Set the payment token in a hidden input field (or another required field)
                     hostedForm.addPaymentToken(paymentToken);
-    
-                    $paymentData = getCreditContainer().find(':input').serialize();
+
+                    ensureCreditCardDataField();
+                    const $paymentData = collectCreditCardData();
+
+                    if (!serializedDataHasValue($paymentData, 'paymentToken') && !serializedDataHasValue($paymentData, 'paymenttoken')) {
+                        $(orderForm).unblock();
+                        alert('There was an issue processing the payment. Please try again.');
+                        return false;
+                    }
+
                     $('#credit-card-data').val($paymentData);
     
                     // Submit the main form
