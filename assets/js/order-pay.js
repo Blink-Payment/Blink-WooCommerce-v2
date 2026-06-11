@@ -1,7 +1,7 @@
 jQuery(function ($) {
 
     const targetDiv = '.payment_box.payment_method_blink';
-    const creditContainer = '[data-blink-credit], form[name="blink-credit"]';
+    const creditContainer = '[data-blink-credit]';
     const orderForm = 'form[id="order_review"]';
 
     const getCreditContainer = () => jQuery(targetDiv).find(creditContainer).first();

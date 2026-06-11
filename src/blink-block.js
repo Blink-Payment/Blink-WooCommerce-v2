@@ -194,6 +194,23 @@ const BlinkPayment = (props) => {
     return formRef.current;
   };
 
+  const getHostedFormTarget = (container = formRef.current) => {
+    if (!container) {
+      return null;
+    }
+
+    if (container.tagName === 'FORM') {
+      return container;
+    }
+
+    const closestForm = container.closest('form');
+    if (closestForm) {
+      return closestForm;
+    }
+
+    return document.querySelector('form.wc-block-checkout__form, form.checkout, form[name="checkout"]');
+  };
+
   const createPaymentError = (message) => ({
     type: emitResponse.responseTypes.ERROR,
     message,
@@ -202,9 +219,10 @@ const BlinkPayment = (props) => {
   });
 
   const destroyHostedForm = (targetForm) => {
-    const formElement = targetForm || hostedFormElementRef.current || formRef.current;
+    const formElement = targetForm || hostedFormElementRef.current || getHostedFormTarget();
+    const hostedFormElement = getHostedFormTarget(formElement);
 
-    if (!formElement) {
+    if (!hostedFormElement) {
       hostedFormElementRef.current = null;
       hostedFormIntentRef.current = '';
       return;
@@ -216,7 +234,7 @@ const BlinkPayment = (props) => {
       return;
     }
 
-    const hostedFormTarget = window.jQuery(formElement);
+    const hostedFormTarget = window.jQuery(hostedFormElement);
 
     try {
       const hostedForm = hostedFormTarget.hostedForm('instance');
@@ -229,7 +247,7 @@ const BlinkPayment = (props) => {
     hostedFormTarget.removeData('hostedform');
     hostedFormTarget.removeData('hostedForm');
 
-    if (!targetForm || targetForm === hostedFormElementRef.current) {
+    if (!targetForm || hostedFormElement === hostedFormElementRef.current) {
       hostedFormElementRef.current = null;
       hostedFormIntentRef.current = '';
     }
@@ -316,16 +334,23 @@ const BlinkPayment = (props) => {
       return null;
     }
 
+    // The Blink SDK requires a FORM, but formRef is intentionally a div so
+    // the block checkout does not render a nested blink-credit form.
+    const hostedFormElement = getHostedFormTarget();
+    if (!hostedFormElement) {
+      return null;
+    }
+
     const formIntentKey = `${intentId}:${intentExpiryDate}`;
 
-    if (hostedFormElementRef.current && hostedFormElementRef.current !== formRef.current) {
+    if (hostedFormElementRef.current && hostedFormElementRef.current !== hostedFormElement) {
       destroyHostedForm(hostedFormElementRef.current);
     }
 
-    const currentForm = window.jQuery(formRef.current);
+    const currentForm = window.jQuery(hostedFormElement);
 
     if (hostedFormIntentRef.current && hostedFormIntentRef.current !== formIntentKey) {
-      destroyHostedForm(formRef.current);
+      destroyHostedForm(hostedFormElement);
     }
 
     try {
@@ -340,7 +365,7 @@ const BlinkPayment = (props) => {
         hostedForm.autoSetup();
       }
 
-      hostedFormElementRef.current = formRef.current;
+      hostedFormElementRef.current = hostedFormElement;
       hostedFormIntentRef.current = formIntentKey;
       return hostedForm || null;
     } catch (error) {
@@ -367,7 +392,11 @@ const BlinkPayment = (props) => {
         return createPaymentError('There was an issue preparing the card fields. Please try again.');
       }
 
+      const hostedFormElement = getHostedFormTarget();
       window.jQuery(formRef.current).find('input[name=paymentToken], input[name=paymenttoken]').remove();
+      if (hostedFormElement) {
+        window.jQuery(hostedFormElement).find('input[name=paymentToken], input[name=paymenttoken]').remove();
+      }
 
       let paymentDetails;
 
@@ -380,7 +409,7 @@ const BlinkPayment = (props) => {
           throw error;
         }
 
-        destroyHostedForm(formRef.current);
+        destroyHostedForm(hostedFormElement);
         await wait(300);
 
         const refreshedHostedForm = initializeHostedForm();
@@ -400,8 +429,12 @@ const BlinkPayment = (props) => {
         return createPaymentError('Invalid Payment Token!');
       }
 
-      const formForToken = window.jQuery(formRef.current).hostedForm('instance') || hostedForm;
+      const formForToken = (hostedFormElement ? window.jQuery(hostedFormElement).hostedForm('instance') : null) || hostedForm;
       formForToken.addPaymentToken(paymentDetails.paymentToken);
+      const currentFormData = getCurrentFormData();
+      if (!currentFormData.paymentToken && !currentFormData.paymenttoken) {
+        return createPaymentError('Invalid Payment Token!');
+      }
       return true;
     } catch (error) {
       return createPaymentError('An error occurred while processing payment details.');
@@ -413,16 +446,31 @@ const BlinkPayment = (props) => {
       setFormValues();
     }
     const currentForm = getCurrentForm();
-    const inputs = currentForm?.querySelectorAll('input, select, textarea');
     const formDataArray = [];
-    if (!inputs) {
+    if (!currentForm) {
       return formDataArray;
     }
-    inputs.forEach(input => {
-      if (input.name) {
-        formDataArray.push({ name: input.name, value: input.value });
+
+    const addInput = (input) => {
+      if (!input.name) {
+        return;
       }
-    });
+
+      formDataArray.push({ name: input.name, value: input.value });
+    };
+
+    currentForm.querySelectorAll('input, select, textarea').forEach(addInput);
+
+    if (selectedTabRef.current === 'credit-card') {
+      const hostedFormElement = getHostedFormTarget();
+      const hostedTokenInputs = hostedFormElement?.querySelectorAll('input[name=paymentToken], input[name=paymenttoken]');
+      hostedTokenInputs?.forEach(input => {
+        if (!formRef.current?.contains(input)) {
+          addInput(input);
+        }
+      });
+    }
+
     return formDataArray;
   };
 
@@ -678,12 +726,12 @@ const BlinkPayment = (props) => {
           <div id={selectedTab}>
             {selectedTab === 'credit-card' && (
               <>
-                <form ref={formRef} name="blink-credit" id="blink-credit-form" method="POST" className="wc-block-checkout__form blink-credit">
+                <div ref={formRef} className="blink-credit" data-blink-credit="1">
                   <div dangerouslySetInnerHTML={{ __html: elements?.ccElement }} />
                   <input type="hidden" name="payment_by" id="payment_by" value="credit-card" />
                   <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
                   <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
-                </form>
+                </div>
               </>
             )}
             {selectedTab === 'direct-debit' && (
