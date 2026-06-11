@@ -173,6 +173,15 @@ class Blink_Payment_Handler {
 			$request['paymentToken'] = $request['paymenttoken'];
 		}
 
+		if ( empty( $request['paymentToken'] ) ) {
+			Blink_Logger::log( 'process_credit_card: missing payment token' );
+			return array(
+				'success'      => false,
+				'redirect_url' => false,
+				'error'        => __( 'Invalid Payment Token!', 'blink-payment-gateway-for-woocommerce' ),
+			);
+		}
+
 		$order_id = $order->get_id();
 		if ( ! empty( $this->token['access_token'] ) && ! empty( $this->intent['payment_intent'] ) ) {
 			// Determine transaction type based on preauthorization setting

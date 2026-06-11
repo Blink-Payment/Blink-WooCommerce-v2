@@ -88,7 +88,7 @@ class Blink_Payment_Utils {
 
 			$amount       = ! empty( $order ) ? $order->get_total() : $cart_amount;
 
-			if ( empty( $amount ) ) {
+			if ( null !== $amount && (float) $amount <= 0 ) {
 				Blink_Logger::log( 'create_payment_intent: empty amount, aborting' );
 				return array();
 			}
@@ -298,6 +298,15 @@ class Blink_Payment_Utils {
 		$intent_id = ! empty( $request['intent_id'] ) ? $request['intent_id'] : '';
 		$intent_expiry_date = ! empty( $request['intent_expiry_date'] ) ? $request['intent_expiry_date'] : '';
 
+		if ( null !== $amount && (float) $amount <= 0 ) {
+			if ( ! empty( $intent_id ) ) {
+				$this->blink_destroy_session_tokens( $intent_id );
+			}
+			$this->intent = array();
+			Blink_Logger::log( 'setIntents result: no payment intent required for zero amount' );
+			return array();
+		}
+
 		if ( ! empty( $intent_id ) && ! empty( $intent_expiry_date ) ) {
 			$intent = array(
 				'id' => $intent_id,
@@ -333,6 +342,12 @@ class Blink_Payment_Utils {
 		} else {
 			// Create a new payment intent if none exists.
 			$intent = $this->blink_create_payment_intent( $payment_method, $order, $amount );
+		}
+
+		if ( empty( $intent ) || empty( $intent['id'] ) ) {
+			$this->intent = array();
+			Blink_Logger::log( 'setIntents result: empty intent' );
+			return array();
 		}
 
 		$this->intent = $intent;

@@ -64,6 +64,7 @@ class Blink_Payment_Fields_Handler {
 			return;
 		}
 		$request        = $_POST;
+		$parsed_data    = $this->blink_get_parsed_checkout_data( $request );
 
 		// Only render on checkout pages or order pay pages
 		$is_order_pay = is_wc_endpoint_url( 'order-pay' ) || ( ! empty( $request['order'] ) && is_numeric( $request['order'] ) );
@@ -71,7 +72,18 @@ class Blink_Payment_Fields_Handler {
 			return;
 		}
 
-		if ( empty( $request['payment_method'] ) || $request['payment_method'] !== $this->gateway->id ) {
+		$selected_payment_method = '';
+		if ( ! empty( $request['payment_method'] ) ) {
+			$selected_payment_method = sanitize_text_field( wp_unslash( $request['payment_method'] ) );
+		} elseif ( ! empty( $parsed_data['payment_method'] ) ) {
+			$selected_payment_method = sanitize_text_field( $parsed_data['payment_method'] );
+		}
+
+		if ( ! empty( $selected_payment_method ) && $selected_payment_method !== $this->gateway->id ) {
+			return;
+		}
+
+		if ( empty( $selected_payment_method ) && isset( $this->gateway->chosen ) && ! $this->gateway->chosen ) {
 			return;
 		}
 
@@ -80,28 +92,28 @@ class Blink_Payment_Fields_Handler {
 		if ( ! empty( $request['order'] ) ) {
 			$order = wc_get_order( sanitize_text_field( $request['order'] ) );
 		}
-		$cart_amount = null; 
-		if ( WC()->cart && method_exists( WC()->cart, 'get_total' ) ) {
+		$cart_amount = null;
+		if ( ! empty( $order ) ) {
+			$cart_amount = (float) $order->get_total();
+		} elseif ( WC()->cart && method_exists( WC()->cart, 'get_total' ) ) {
 			$cart_amount = WC()->cart->get_total( 'raw' );
 		}
 
-		$intent  = $this->gateway->utils->blink_set_intents( $request, $order, $cart_amount );
+		if ( null !== $cart_amount && (float) $cart_amount <= 0 ) {
+			return;
+		}
+
+		$intent_request = array_merge( $parsed_data, $request );
+		$intent  = $this->gateway->utils->blink_set_intents( $intent_request, $order, $cart_amount );
 		$element = ! empty( $intent ) ? $intent['element'] : array();
 		$intent_id = ! empty( $intent ) ? $intent['id'] : '';
 		$intent_expiry_date = ! empty( $intent ) ? $intent['expiry_date'] : '';
-
-		$parsed_data = array();
-		if ( ! empty( $request['post_data'] ) ) {
-			parse_str( sanitize_text_field( $request['post_data'] ), $parsed_data );
-		} else {
-			$parsed_data = $request;
-		}
 
 		$payment_by = '';
 		if ( ! empty( $parsed_data['payment_by'] ) ) {
 			$candidate = sanitize_text_field( $parsed_data['payment_by'] );
 			// Only use if not google-pay or apple-pay
-			if ( ! in_array( $candidate, array( 'google-pay', 'apple-pay' ), true ) ) {
+			if ( ! in_array( $candidate, array( 'google-pay', 'apple-pay' ), true ) && $this->blink_method_has_element( $candidate, $element ) ) {
 				$payment_by = $candidate;
 			}
 		}
@@ -153,11 +165,11 @@ class Blink_Payment_Fields_Handler {
 				if ( blink_is_safari() ) {
 					if ( ! empty( $element['apElement'] ) && ! empty( $this->gateway->apple_pay_enabled ) ) {
 						$showGP = false;
-						echo wp_kses( $element['apElement'], blink_3d_allow_html() );
+						echo wp_kses( $element['apElement'], $this->blink_get_payment_box_allowed_html() );
 					}
 				}
 				if ( $showGP && ! empty( $element['gpElement'] ) ) {
-					echo wp_kses( $element['gpElement'], blink_3d_allow_html() );
+					echo wp_kses( $element['gpElement'], $this->blink_get_payment_box_allowed_html() );
 				}
 				?>
 				<div class="batch-upload-wrap pb-3">
@@ -206,13 +218,12 @@ class Blink_Payment_Fields_Handler {
 							$key = $this->blink_get_element_key( $method );
 							if ( $method === $payment_by && ! empty( $element[ $key ] ) ) {
 								if ( 'credit-card' === $payment_by ) {
-									echo '<form name="blink-credit" action="" method="">' . wp_kses( $element[ $key ], blink_3d_allow_html() ) . '
-                                        <div style="display:none"><input type="submit" name="submit" id="blink-credit-submit" value="check" /></div>
-                                        </form>
+									echo '<div class="blink-credit" data-blink-credit="1">' . wp_kses( $element[ $key ], $this->blink_get_payment_box_allowed_html() ) . '
+                                        </div>
                                         <input type="hidden" name="credit-card-data" id="credit-card-data" value="" />
                                         ';
 								} else {
-									echo wp_kses( $element[ $key ], blink_3d_allow_html() );
+									echo wp_kses( $element[ $key ], $this->blink_get_payment_box_allowed_html() );
 								}
 							}
 							?>
@@ -231,6 +242,48 @@ class Blink_Payment_Fields_Handler {
 			<input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value="<?php echo esc_attr( $intent_expiry_date ); ?>">
 			<?php
 		}
+	}
+
+	private function blink_get_parsed_checkout_data( $request ) {
+		$parsed_data = array();
+		if ( ! empty( $request['post_data'] ) ) {
+			parse_str( sanitize_text_field( wp_unslash( $request['post_data'] ) ), $parsed_data );
+			return is_array( $parsed_data ) ? $parsed_data : array();
+		}
+
+		return is_array( $request ) ? $request : array();
+	}
+
+	private function blink_method_has_element( $method, $element ) {
+		if ( empty( $method ) || empty( $element ) || ! in_array( $method, $this->gateway->paymentMethods, true ) ) {
+			return false;
+		}
+
+		$key = $this->blink_get_element_key( $method );
+		return ! empty( $key ) && ! empty( $element[ $key ] );
+	}
+
+	private function blink_get_payment_box_allowed_html() {
+		$allowed_html = blink_3d_allow_html();
+		unset( $allowed_html['form'] );
+
+		if ( isset( $allowed_html['div'] ) ) {
+			$allowed_html['div']['data-blink-credit'] = true;
+		}
+
+		if ( isset( $allowed_html['input'] ) ) {
+			$allowed_html['input']['autocomplete']                = true;
+			$allowed_html['input']['disabled']                    = true;
+			$allowed_html['input']['readonly']                    = true;
+			$allowed_html['input']['required']                    = true;
+			$allowed_html['input']['style']                       = true;
+			$allowed_html['input']['data-hostedfield']            = true;
+			$allowed_html['input']['data-hostedfield-type']       = true;
+			$allowed_html['input']['data-hostedfield-tokenise']   = true;
+			$allowed_html['input']['data-validation-message']     = true;
+		}
+
+		return $allowed_html;
 	}
 
 	private function blink_get_element_key( $method ) {
