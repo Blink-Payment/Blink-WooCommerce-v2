@@ -513,7 +513,7 @@ const BlinkPayment = (props) => {
     if (selectedTabRef.current === 'credit-card') {
       creditContainer?.querySelectorAll('input, select, textarea').forEach(addInput);
       hostedFormTarget?.querySelectorAll(
-        'input[name="paymentToken"], input[name="paymenttoken"], input[name="payment_by"], input[name="intent_id"], input[name="intent_expiry_date"], input[name="customer_name"], input[name="customer_email"], input[name="customer_address"], input[name="customer_postcode"], input[name="device_timezone"], input[name="device_capabilities"], input[name="device_accept_language"], input[name="device_screen_resolution"], input[name="remote_address"], input[name="device_ip_address"]'
+        'input[name="paymentToken"], input[name="paymenttoken"]'
       ).forEach(addInput);
     }
 
@@ -526,9 +526,19 @@ const BlinkPayment = (props) => {
   const getCurrentFormData = () => {
     const formDataArray = getFormDataArray();
     const currentFormData = {};
+
     formDataArray.forEach(field => {
       currentFormData[field.name] = field.value;
     });
+
+    if (!currentFormData.payment_by) {
+      currentFormData.payment_by = selectedTabRef.current;
+    }
+
+    if (currentFormData.payment_by === 'card') {
+      currentFormData.payment_by = 'credit-card';
+    }
+
     return currentFormData;
   };
 
@@ -598,8 +608,13 @@ const BlinkPayment = (props) => {
         customer_address: currentFormData.customer_address || billingFullAddress,
         customer_postcode: currentFormData.customer_postcode || billingAddress.postcode,
       };
-      if (selectedTabRef.current === 'credit-card' || selectedTabRef.current === 'google-pay' || selectedTabRef.current === 'apple-pay') {
-        if (!currentFormData.paymentToken && !currentFormData.paymenttoken) {
+      paymentData.payment_by = selectedTabRef.current;
+
+      if (paymentData.payment_by === 'card') {
+        paymentData.payment_by = 'credit-card';
+      }
+      if (selectedTabRef.current === 'credit-card') {
+        if (!paymentData.paymentToken && !paymentData.paymenttoken) {
           return createPaymentError('Invalid Payment Token!');
         }
       }
@@ -854,7 +869,6 @@ const BlinkPayment = (props) => {
 
 const settings = getSetting('blink_data', {});
 const label = decodeEntities(settings?.title || 'Blink');
-const enabled = settings?.makePayment || false;
 const selectedMethods = Array.isArray(settings.selected_methods) ? settings.selected_methods : [];
 const methodCount = selectedMethods.length;
 const containerClass = methodCount === 1 ? 'one' : methodCount === 2 ? 'two' : '';
@@ -864,7 +878,7 @@ const canMakeBlinkPayment = (paymentMethodData = {}) => {
   const hasConfiguredMethods = selectedMethods.length > 0;
   const hasPayableAmount = total !== undefined && total !== null && parseFloat(total) > 0;
 
-  return enabled && hasConfiguredMethods && hasPayableAmount;
+  return hasConfiguredMethods && hasPayableAmount;
 };
 
 registerPaymentMethod({

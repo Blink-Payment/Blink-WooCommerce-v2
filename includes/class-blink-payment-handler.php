@@ -324,6 +324,11 @@ class Blink_Payment_Handler {
 		if ( ! empty( $this->gateway->paymentMethods ) && is_array( $this->gateway->paymentMethods ) ) {
 			$supported_methods = $this->gateway->paymentMethods;
 		}
+		if ( in_array( 'credit-card', $supported_methods, true ) ) {
+			$supported_methods[] = 'google-pay';
+			$supported_methods[] = 'apple-pay';
+		}
+		$supported_methods = array_unique( $supported_methods );
 
 		if ( empty( $payment_by ) ) {
 			Blink_Logger::log( 'handle_payment error: missing payment_by', array( 'order_id' => $order_id ) );
