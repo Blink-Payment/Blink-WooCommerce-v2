@@ -82,10 +82,14 @@ const BlinkPayment = (props) => {
   const selectedTabRef = useRef(selectedTab);
   const hostedFormElementRef = useRef(null);
   const hostedFormIntentRef = useRef('');
+  const intentFailureAmountRef = useRef('');
+  const intentLoadingAmountRef = useRef('');
   const [elements, setElements] = useState(settings.elements || {});
   const [cartAmount, setCartAmount] = useState(settings.cartAmount || '');
   const [intentId, setIntentId] = useState(settings.intentId || '');
   const [intentExpiryDate, setIntentExpiryDate] = useState(settings.intentExpiryDate || '');
+  const [isIntentLoading, setIsIntentLoading] = useState(false);
+  const [intentError, setIntentError] = useState('');
   const { onCheckoutValidation, onPaymentSetup, onCheckoutFail } = eventRegistration;
   const { billingAddress } = billing;
   const billingName = `${billingAddress.first_name} ${billingAddress.last_name}`;
@@ -118,12 +122,25 @@ const BlinkPayment = (props) => {
       return;
     }
 
+    if (intentError && intentFailureAmountRef.current !== formattedTotal) {
+      setIntentError('');
+      intentFailureAmountRef.current = '';
+    }
+
     const hasRenderableElements = Object.values(elements || {}).some(Boolean);
+    if (intentError && intentFailureAmountRef.current === formattedTotal) {
+      return;
+    }
+    if (isIntentLoading && intentLoadingAmountRef.current === formattedTotal) {
+      return;
+    }
     if (cartAmount === formattedTotal && intentId && intentExpiryDate && hasRenderableElements) {
       return;
     }
 
     let isCurrentRequest = true;
+    setIsIntentLoading(true);
+    intentLoadingAmountRef.current = formattedTotal;
 
     (async () => {
       document.querySelectorAll('#gpay-button-online-api-id').forEach(el => el.remove());
@@ -142,7 +159,11 @@ const BlinkPayment = (props) => {
         }
 
         if (intentData.payment_required === false || !intentData.intent?.element || !intentData.intent?.id || !intentData.intent?.expiry_date) {
+          intentLoadingAmountRef.current = '';
+          setIsIntentLoading(false);
           resetBlinkPaymentState(intentData.amount || formattedTotal);
+          setIntentError('Unable to prepare Blink payment fields. Please try again.');
+          intentFailureAmountRef.current = formattedTotal;
           return;
         }
 
@@ -151,13 +172,26 @@ const BlinkPayment = (props) => {
         setCartAmount(intentData.amount || formattedTotal);
         setIntentId(intentData.intent.id);
         setIntentExpiryDate(intentData.intent.expiry_date);
-      } catch (e) { }
+        setIntentError('');
+        setIsIntentLoading(false);
+        intentFailureAmountRef.current = '';
+        intentLoadingAmountRef.current = '';
+      } catch (e) {
+        if (!isCurrentRequest) {
+          return;
+        }
+
+        resetBlinkPaymentState(formattedTotal);
+        setIntentError('Unable to prepare Blink payment fields. Please try again.');
+        intentFailureAmountRef.current = formattedTotal;
+        intentLoadingAmountRef.current = '';
+      }
     })();
 
     return () => {
       isCurrentRequest = false;
     };
-  }, [formattedTotal, cartAmount, intentId, intentExpiryDate, elements]);
+  }, [formattedTotal, cartAmount, intentId, intentExpiryDate, elements, intentError, isIntentLoading]);
 
   if (settings.isHosted) {
     return null;
@@ -290,6 +324,14 @@ const BlinkPayment = (props) => {
     if (intentExpiryDate) {
       setIntentExpiryDate('');
     }
+    if (isIntentLoading) {
+      setIsIntentLoading(false);
+    }
+    if (intentError) {
+      setIntentError('');
+    }
+    intentFailureAmountRef.current = '';
+    intentLoadingAmountRef.current = '';
   };
 
   const setFormValues = () => {
@@ -447,15 +489,13 @@ const BlinkPayment = (props) => {
   };
 
   const getFormDataArray = () => {
-    if (selectedTabRef.current === 'google-pay' || selectedTabRef.current === 'apple-pay') {
-      setFormValues();
-    }
     const formDataArray = [];
+    const selectedForm = getCurrentForm();
     const creditContainer = getCreditContainer();
     const hostedFormTarget = getHostedFormTarget();
 
     const addInput = (input) => {
-      if (!input.name) {
+      if (!input.name || input.disabled) {
         return;
       }
 
@@ -466,10 +506,16 @@ const BlinkPayment = (props) => {
       formDataArray.push(input);
     };
 
-    creditContainer?.querySelectorAll('input, select, textarea').forEach(addInput);
-    hostedFormTarget?.querySelectorAll(
-      'input[name="paymentToken"], input[name="paymenttoken"], input[name="payment_by"], input[name="intent_id"], input[name="intent_expiry_date"], input[name="customer_name"], input[name="customer_email"], input[name="customer_address"], input[name="customer_postcode"], input[name="device_timezone"], input[name="device_capabilities"], input[name="device_accept_language"], input[name="device_screen_resolution"], input[name="remote_address"], input[name="device_ip_address"]'
-    ).forEach(addInput);
+    if (selectedForm) {
+      selectedForm.querySelectorAll('input, select, textarea').forEach(addInput);
+    }
+
+    if (selectedTabRef.current === 'credit-card') {
+      creditContainer?.querySelectorAll('input, select, textarea').forEach(addInput);
+      hostedFormTarget?.querySelectorAll(
+        'input[name="paymentToken"], input[name="paymenttoken"], input[name="payment_by"], input[name="intent_id"], input[name="intent_expiry_date"], input[name="customer_name"], input[name="customer_email"], input[name="customer_address"], input[name="customer_postcode"], input[name="device_timezone"], input[name="device_capabilities"], input[name="device_accept_language"], input[name="device_screen_resolution"], input[name="remote_address"], input[name="device_ip_address"]'
+      ).forEach(addInput);
+    }
 
     return formDataArray.map((input) => ({
       name: input.name,
@@ -494,6 +540,9 @@ const BlinkPayment = (props) => {
       if (isZeroTotal(cartAmount)) {
         return true;
       }
+      if (intentError) {
+        return createPaymentError(intentError);
+      }
       if (!paymentRequired) {
         return createPaymentError('There was an issue preparing the Blink payment fields. Please try again.');
       }
@@ -513,7 +562,7 @@ const BlinkPayment = (props) => {
       return true;
     });
     return unsubscribe;
-  }, [onCheckoutValidation, cartAmount, paymentRequired, elements, intentId, intentExpiryDate]);
+  }, [onCheckoutValidation, cartAmount, paymentRequired, elements, intentId, intentExpiryDate, intentError, isIntentLoading]);
 
   useEffect(() => {
     const unsubscribe = eventRegistration.onPaymentSetup(async () => {
@@ -536,6 +585,9 @@ const BlinkPayment = (props) => {
             paymentMethodData: {},
           },
         };
+      }
+      if (intentError) {
+        return createPaymentError(intentError);
       }
       if (!paymentRequired) {
         return createPaymentError('There was an issue preparing the Blink payment fields. Please try again.');
@@ -561,7 +613,7 @@ const BlinkPayment = (props) => {
     return () => {
       unsubscribe();
     };
-  }, [onPaymentSetup, selectedTab, cartAmount, paymentRequired, billingAddress, elements]);
+  }, [onPaymentSetup, selectedTab, cartAmount, paymentRequired, billingAddress, elements, intentError, isIntentLoading]);
 
   useEffect(() => {
     if (!paymentRequired || !window.jQuery) {
@@ -651,8 +703,41 @@ const BlinkPayment = (props) => {
     }
   }, [elements, paymentRequired]);
 
+  if (isIntentLoading && cartAmount !== formattedTotal) {
+    return (
+      <div className="blink-gutenberg payment_method_blink">
+        <div className="blink-intent-loading" style={{ padding: '12px 0' }}>
+          Preparing Blink payment fields...
+        </div>
+      </div>
+    );
+  }
+
   if (!paymentRequired) {
-    return <div className="blink-gutenberg payment_method_blink" />;
+    return (
+      <div className="blink-gutenberg payment_method_blink">
+        {intentError ? (
+          <div className="blink-intent-error" role="alert" style={{ padding: '12px 0' }}>
+            <p style={{ margin: 0 }}>{intentError}</p>
+            <button
+              type="button"
+              className="button"
+              style={{ marginTop: '10px' }}
+              onClick={() => {
+                intentFailureAmountRef.current = '';
+                setIntentError('');
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        ) : isIntentLoading ? (
+          <div className="blink-intent-loading" style={{ padding: '12px 0' }}>
+            Preparing Blink payment fields...
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -776,12 +861,10 @@ const containerClass = methodCount === 1 ? 'one' : methodCount === 2 ? 'two' : '
 const canMakeBlinkPayment = (paymentMethodData = {}) => {
   const cartTotals = paymentMethodData.cartTotals || paymentMethodData.cart?.cartTotals || paymentMethodData.cartData?.totals || {};
   const total = cartTotals.total_price;
+  const hasConfiguredMethods = selectedMethods.length > 0;
+  const hasPayableAmount = total !== undefined && total !== null && parseFloat(total) > 0;
 
-  if (total !== undefined && total !== null) {
-    return parseFloat(total) > 0 && (enabled || selectedMethods.length > 0);
-  }
-
-  return enabled;
+  return enabled && hasConfiguredMethods && hasPayableAmount;
 };
 
 registerPaymentMethod({
