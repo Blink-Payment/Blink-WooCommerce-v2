@@ -234,7 +234,11 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	public function blink_payment_scripts()
 	{
 		// we need JavaScript to process a token only on cart/checkout pages, right?
-		if (! is_cart() && ! is_checkout() && ! isset($_GET['pay_for_order']) && !blink_is_checkout_block()) {
+		$is_order_pay_endpoint = is_wc_endpoint_url( 'order-pay' );
+		$is_order_pay          = $is_order_pay_endpoint || isset( $_GET['pay_for_order'] );
+		$is_checkout_block     = function_exists( 'blink_is_checkout_block' ) && blink_is_checkout_block();
+
+		if (! is_cart() && ! is_checkout() && ! $is_order_pay && ! $is_checkout_block) {
 			return;
 		}
 		// if our payment gateway is disabled, we do not have to enqueue JS too
@@ -260,7 +264,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		wp_enqueue_script('blink_hosted_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', array('jquery'), $this->version, false);
 		wp_register_style('woocommerce_blink_payment_style', plugins_url('../assets/css/style.css', __FILE__), array(), $this->version);
 		// and this is our custom JS in your plugin directory that works with token.js
-		if (is_wc_endpoint_url('order-pay')) {
+		if ($is_order_pay_endpoint) {
 			wp_register_script('woocommerce_blink_payment_order_pay', plugins_url('../assets/js/order-pay.js', __FILE__), array('jquery'), $this->version, true);
 
 			$order = wc_get_order(get_query_var('order-pay'));
@@ -283,7 +287,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 				)
 			);
 			wp_enqueue_script('woocommerce_blink_payment_order_pay');
-		} else {
+		} elseif (is_checkout() && ! $is_checkout_block) {
 			wp_register_script('woocommerce_blink_payment_checkout', plugins_url('../assets/js/checkout.js', __FILE__), array('jquery'), $this->version, true);
 			wp_localize_script(
 				'woocommerce_blink_payment_checkout',

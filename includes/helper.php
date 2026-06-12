@@ -501,7 +501,17 @@ if (!function_exists('blink_is_checkout_block')) {
      */
     function blink_is_checkout_block()
     {
-        return WC_Blocks_Utils::has_block_in_page(get_queried_object_id(), 'woocommerce/checkout');
+        $page_id = get_queried_object_id();
+
+        if (empty($page_id)) {
+            return false;
+        }
+
+        if (class_exists('WC_Blocks_Utils') && method_exists('WC_Blocks_Utils', 'has_block_in_page')) {
+            return WC_Blocks_Utils::has_block_in_page($page_id, 'woocommerce/checkout');
+        }
+
+        return function_exists('has_block') && has_block('woocommerce/checkout', $page_id);
     }
 }
 

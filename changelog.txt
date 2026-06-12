@@ -1,8 +1,15 @@
 *** WooCommerce - Blink Changelog ***
 
+2026-06-10 - version 1.3.6
+
+* Fixed Blink card fields not reloading after checkout total changes from £0.00 back to a payable amount.
+* Fixed malformed checkout layout caused by nested Blink card form markup.
+* Improved hosted card field reinitialisation during WooCommerce checkout updates.
+* Improved validation for missing Blink payment tokens during card checkout.
+
 2026-05-07 - version 1.3.5
 
-* Removed phone number requiremnt from Paylink API in Hosted version.
+* Removed phone number requirement from Paylink API in Hosted version.
 * Reattempting failed errors update order successfully.
 
 2026-03-19 - version 1.3.4
@@ -77,5 +84,3 @@
 2023-05-23 - version 1.0.11
 
 * Initial release
-
-

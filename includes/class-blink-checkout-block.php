@@ -32,6 +32,14 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 			time(),
 			true
 		);
+		wp_localize_script(
+			'blink-checkout-block-integration',
+			'blink_params',
+			array(
+				'ajaxurl'       => admin_url( 'admin-ajax.php' ),
+				'remoteAddress' => function_exists( 'get_client_ipv4_address' ) ? get_client_ipv4_address() : '',
+			)
+		);
 
 		return array( 'blink-checkout-block-integration' );
 	}
@@ -58,8 +66,8 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 											? number_format($cart_data['amount'], 2, '.', '')
 											: ''
 									),
-			'intentId'       	=> $cart_data['intent_id'],
-			'intentExpiryDate'  => $cart_data['intent_expiry_date'],
+			'intentId'       	=> $cart_data['intent_id'] ?? '',
+			'intentExpiryDate'  => $cart_data['intent_expiry_date'] ?? '',
 		);
 	}
 
@@ -76,6 +84,15 @@ final class Blink_Checkout_Block extends AbstractPaymentMethodType {
 		$cart_amount = null; 
 		if ( WC()->cart && method_exists( WC()->cart, 'get_total' ) ) {
 			$cart_amount = WC()->cart->get_total( 'raw' );
+		}
+
+		if ( null !== $cart_amount && (float) $cart_amount <= 0 ) {
+			return array(
+				'element'            => array(),
+				'amount'             => number_format( (float) $cart_amount, 2, '.', '' ),
+				'intent_id'          => '',
+				'intent_expiry_date' => '',
+			);
 		}
 
 		$intent = $paymentGateway->utils->blink_set_intents( $request, null, $cart_amount );

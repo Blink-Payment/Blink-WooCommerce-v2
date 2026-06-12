@@ -173,6 +173,15 @@ class Blink_Payment_Handler {
 			$request['paymentToken'] = $request['paymenttoken'];
 		}
 
+		if ( empty( $request['paymentToken'] ) ) {
+			Blink_Logger::log( 'process_credit_card: missing payment token' );
+			return array(
+				'success'      => false,
+				'redirect_url' => false,
+				'error'        => __( 'Invalid Payment Token!', 'blink-payment-gateway-for-woocommerce' ),
+			);
+		}
+
 		$order_id = $order->get_id();
 		if ( ! empty( $this->token['access_token'] ) && ! empty( $this->intent['payment_intent'] ) ) {
 			// Determine transaction type based on preauthorization setting
@@ -263,7 +272,21 @@ class Blink_Payment_Handler {
 
 		Blink_Logger::log( 'handle_payment called', array( 'order_id' => $order_id ) );
 		$order   = wc_get_order( $order_id );
+		if ( ! $order ) {
+			Blink_Logger::log( 'handle_payment error: invalid order', array( 'order_id' => $order_id ) );
+			return blink_error_payment_process( __( 'Invalid order.', 'blink-payment-gateway-for-woocommerce' ) );
+		}
+
 		$request = $_POST;
+		$order_total = (float) $order->get_total();
+		if ( $order_total <= 0 ) {
+			Blink_Logger::log( 'handle_payment zero total order', array( 'order_id' => $order_id ) );
+			return array(
+				'result'   => 'success',
+				'redirect' => $this->gateway->blink_get_return_url( $order ),
+			);
+		}
+
 		$intent_id = ! empty( $request['intent_id'] ) ? $request['intent_id'] : '';
 		$this->token  = $this->gateway->utils->blink_set_tokens($intent_id);
 		$order->add_meta_data( '_blink_intent_id', $intent_id );
@@ -296,35 +319,63 @@ class Blink_Payment_Handler {
 			}
 		}
 
-		$response = array();
+		$payment_by = isset( $request['payment_by'] ) ? sanitize_text_field( wp_unslash( $request['payment_by'] ) ) : '';
+		$supported_methods = array();
+		if ( ! empty( $this->gateway->paymentMethods ) && is_array( $this->gateway->paymentMethods ) ) {
+			$supported_methods = $this->gateway->paymentMethods;
+		}
+		if ( in_array( 'credit-card', $supported_methods, true ) ) {
+			$supported_methods[] = 'google-pay';
+			$supported_methods[] = 'apple-pay';
+		}
+		$supported_methods = array_unique( $supported_methods );
 
-		if ( isset( $request['payment_by'] ) && $request['payment_by'] === 'credit-card' ) {
-			if ( isset( $_REQUEST['credit-card-data'] ) ) {
-				parse_str( sanitize_text_field( wp_unslash( $_REQUEST['credit-card-data'] ) ), $parsed_data );
-				$parsed_data['customer_name']  = sanitize_text_field( $request['customer_name'] );
-				$parsed_data['customer_email'] = sanitize_email( $request['customer_email'] );
-				$request                       = array_merge( $request, $parsed_data );
-			}
-			$response = $this->blink_process_credit_card( $order, $request );
+		if ( empty( $payment_by ) ) {
+			Blink_Logger::log( 'handle_payment error: missing payment_by', array( 'order_id' => $order_id ) );
+			return blink_error_payment_process( __( 'Unable to determine Blink payment method.', 'blink-payment-gateway-for-woocommerce' ) );
+		}
 
+		if ( empty( $supported_methods ) || ! in_array( $payment_by, $supported_methods, true ) ) {
+			Blink_Logger::log( 'handle_payment error: unsupported payment_by', array( 'order_id' => $order_id, 'payment_by' => $payment_by ) );
+			return blink_error_payment_process( __( 'Unsupported Blink payment method.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
-		if ( isset( $request['payment_by'] ) && $request['payment_by'] === 'google-pay' ) {
-			$response = $this->blink_process_credit_card( $order, $request, 'googlepay' );
+
+		$response = null;
+
+		switch ( $payment_by ) {
+			case 'credit-card':
+				if ( isset( $_REQUEST['credit-card-data'] ) ) {
+					parse_str( sanitize_text_field( wp_unslash( $_REQUEST['credit-card-data'] ) ), $parsed_data );
+					$parsed_data['customer_name']  = sanitize_text_field( $request['customer_name'] );
+					$parsed_data['customer_email'] = sanitize_email( $request['customer_email'] );
+					$request = array_merge( $request, $parsed_data );
+				}
+				$response = $this->blink_process_credit_card( $order, $request );
+				break;
+			case 'google-pay':
+				$response = $this->blink_process_credit_card( $order, $request, 'googlepay' );
+				break;
+			case 'apple-pay':
+				$response = $this->blink_process_credit_card( $order, $request, 'applepay' );
+				break;
+			case 'direct-debit':
+				$response = $this->blink_process_direct_debit( $order, $request );
+				break;
+			case 'open-banking':
+				$response = $this->blink_process_open_banking( $order, $request );
+				break;
 		}
-		if ( isset( $request['payment_by'] ) && $request['payment_by'] === 'apple-pay' ) {
-			$response = $this->blink_process_credit_card( $order, $request, 'applepay' );
-		}
-		if ( isset( $request['payment_by'] ) && $request['payment_by'] === 'direct-debit' ) {
-			$response = $this->blink_process_direct_debit( $order, $request );
-		}
-		if ( isset( $request['payment_by'] ) && $request['payment_by'] === 'open-banking' ) {
-			$response = $this->blink_process_open_banking( $order, $request );
+
+		if ( ! is_array( $response ) || ! array_key_exists( 'success', $response ) ) {
+			Blink_Logger::log( 'handle_payment failed: invalid processor response', array( 'payment_by' => $payment_by ) );
+			$this->gateway->utils->blink_destroy_session_tokens( $intent_id );
+			return blink_error_payment_process( __( 'Unable to complete Blink payment. Please try again.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		if ( ! $response['success'] ) {
 			Blink_Logger::log( 'handle_payment failed', array( 'error' => $response['error'] ) );
 			$this->gateway->utils->blink_destroy_session_tokens($intent_id);
-			return blink_error_payment_process( $response['error'] );
+			return blink_error_payment_process( ! empty( $response['error'] ) ? $response['error'] : __( 'Unable to complete Blink payment. Please try again.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		Blink_Logger::log( 'handle_payment success', array( 'redirect' => $response['redirect_url'] ) );

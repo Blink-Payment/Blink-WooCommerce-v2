@@ -23,17 +23,34 @@ class Blink_Api_Handler {
         Blink_Logger::log( 'REST set_intent called' );
 
 		$cart_amount = $request->get_param('cartAmount');
-        $intent_id = $request->get_param('intentId');
-        $intent_expiry_date = $request->get_param('intentExpiryDate');
+        $intent_id = sanitize_text_field( (string) $request->get_param('intentId') );
+        $cart_amount_value = is_numeric( $cart_amount ) ? (float) $cart_amount : 0.0;
 		$gateWay = new Blink_Payment_Gateway();
 
+        if ( $cart_amount_value <= 0 ) {
+            if ( ! empty( $intent_id ) ) {
+                $gateWay->utils->blink_destroy_session_tokens( $intent_id );
+            }
+
+            Blink_Logger::log( 'REST set_intent zero amount; no payment intent required' );
+
+            return array(
+                'intent'           => null,
+                'payment_required' => false,
+                'amount'           => number_format( $cart_amount_value, 2, '.', '' ),
+            );
+        }
+
         $gateWay->utils->blink_set_tokens();
-        // Use setIntents to always get the latest intent based on current cart
-        $intent = $gateWay->utils->blink_set_intents( array( 'payment_by' => 'credit-card', 'intent_id' => $intent_id, 'intent_expiry_date' => $intent_expiry_date ), null, $cart_amount );
+        // Blocks cart updates should receive a current payable intent, not reuse
+        // stale hosted fields from a previous payable state.
+        $intent = $gateWay->utils->blink_set_intents( array( 'payment_by' => 'credit-card' ), null, $cart_amount_value );
         Blink_Logger::log( 'REST set_intent result', array( 'has_intent' => ! empty( $intent ) ) );
 
         return array(
-            'intent' => $intent,
+            'intent'           => $intent,
+            'payment_required' => ! empty( $intent ),
+            'amount'           => number_format( $cart_amount_value, 2, '.', '' ),
         );
     }
 

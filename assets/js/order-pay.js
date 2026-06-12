@@ -1,8 +1,133 @@
 jQuery(function ($) {
 
     const targetDiv = '.payment_box.payment_method_blink';
-    const creditForm = 'form[name="blink-credit"]';
+    const creditContainer = '[data-blink-credit]';
     const orderForm = 'form[id="order_review"]';
+
+    const getCreditContainer = () => jQuery(targetDiv).find(creditContainer).first();
+
+    const getHostedFormInstance = () => {
+        if (!jQuery.fn.hostedForm || !jQuery(orderForm).length) {
+            return null;
+        }
+
+        try {
+            return jQuery(orderForm).hostedForm('instance') || null;
+        } catch (error) {
+            return null;
+        }
+    };
+
+    const hostedFieldsMounted = () => {
+        return getCreditContainer().find('iframe').length > 0;
+    };
+
+    const serializedDataHasValue = (serializedData, fieldName) => {
+        const pairs = serializedData ? serializedData.split('&') : [];
+
+        for (let i = 0; i < pairs.length; i++) {
+            const pair = pairs[i].split('=');
+            const name = decodeURIComponent((pair.shift() || '').replace(/\+/g, ' '));
+            const value = decodeURIComponent(pair.join('=').replace(/\+/g, ' '));
+
+            if (name === fieldName && value) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const collectCreditCardData = () => {
+        const $orderForm = jQuery(orderForm);
+        const $creditContainer = getCreditContainer();
+        const requiredFormFields = [
+            'paymentToken',
+            'paymenttoken',
+            'type',
+            'merchantID',
+            'customer_name',
+            'customer_email',
+            'customer_address',
+            'customer_postcode',
+            'device_timezone',
+            'device_capabilities',
+            'device_accept_language',
+            'device_screen_resolution',
+            'remote_address',
+            'device_ip_address',
+            'payment_by',
+            'intent_id',
+            'intent_expiry_date'
+        ];
+        const fields = [];
+
+        const addField = function () {
+            if (!this.name || this.disabled || fields.indexOf(this) !== -1) {
+                return;
+            }
+
+            fields.push(this);
+        };
+
+        $creditContainer.find(':input[name]').each(addField);
+        $orderForm.find(':input[name]').filter(function () {
+            return requiredFormFields.indexOf(this.name) !== -1;
+        }).each(addField);
+
+        return $(fields).serialize();
+    };
+
+    const ensureCreditCardDataField = () => {
+        const $orderForm = jQuery(orderForm);
+        if ($orderForm.find('input[name="credit-card-data"]').length) {
+            return;
+        }
+
+        const $paymentBox = jQuery(targetDiv);
+        ($paymentBox.length ? $paymentBox : $orderForm).append($('<input>', {
+            type: 'hidden',
+            name: 'credit-card-data',
+            id: 'credit-card-data',
+            value: ''
+        }));
+    };
+
+    const initialiseHostedFields = () => {
+        const $creditContainer = getCreditContainer();
+        const $orderForm = jQuery(orderForm);
+        if (!$creditContainer.length || !$orderForm.length || !jQuery.fn.hostedForm || hostedFieldsMounted() || $creditContainer.data('blink-hosted-form-initialising')) {
+            return;
+        }
+
+        $creditContainer.data('blink-hosted-form-initialising', true);
+
+        const auto = {
+            autoSetup: true,
+            autoSubmit: false,
+            stylesheets: '#hostedfield-stylesheet',
+            classes: {
+                invalid: 'error'
+            }
+        };
+
+        try {
+            const hostedForm = getHostedFormInstance();
+            if (hostedForm && typeof hostedForm.autoSetup === 'function') {
+                hostedForm.autoSetup();
+            } else {
+                $orderForm.hostedForm(auto);
+            }
+        } catch (error) {
+            console.error("An error occurred:", error);
+        }
+
+        window.setTimeout(function () {
+            if (!hostedFieldsMounted()) {
+                $creditContainer.removeData('blink-hosted-form-initialising');
+            }
+        }, 1000);
+    };
 
     $(window).on('load', function() {
 
@@ -104,10 +229,14 @@ jQuery(function ($) {
          $(this).find('input[name=remote_address]').val(order_params.remoteAddress);
          $(this).find('input[name=device_ip_address]').val(order_params.remoteAddress);
 
-         setupApplePayButtonObserver();
+        setupApplePayButtonObserver();
 
         if (paymentBy == 'credit-card') {
-            var $formCard = jQuery('form[name="blink-credit"]');
+            var $creditContainer = getCreditContainer();
+            if (!$creditContainer.length) {
+                jQuery(orderForm).unblock();
+                return;
+            }
             
             jQuery('#cc_customer_email').hide();
             jQuery('#cc_customer_postcode').hide();
@@ -119,21 +248,7 @@ jQuery(function ($) {
                     jQuery(this).hide();
                 }
             });
-            var auto = {
-                autoSetup: true,
-                autoSubmit: true,
-                stylesheets: '#hostedfield-stylesheet',
-                classes: {
-                    invalid: 'error'
-                }
-            };
-            try{
-                var hf = $formCard.hostedForm(auto);
-
-            }catch (error) {
-                // Handle any errors that occur during the execution of the try block
-                console.error("An error occurred:", error);
-            }
+            initialiseHostedFields();
             
         }
 
@@ -179,8 +294,19 @@ jQuery(function ($) {
         if(paymentBy === 'credit-card'){
 
             try {
-                // Get the hosted form instance for "blink-credit"
-                const hostedForm = window.jQuery(creditForm).hostedForm('instance');
+                if (!getCreditContainer().length) {
+                    $(orderForm).unblock();
+                    alert('There was an issue processing the payment. Please try again.');
+                    return false;
+                }
+
+                initialiseHostedFields();
+                const hostedForm = getHostedFormInstance();
+                if (!hostedForm) {
+                    $(orderForm).unblock();
+                    alert('There was an issue processing the payment. Please try again.');
+                    return false;
+                }
           
                 // Retrieve the payment details
                 const paymentDetails = await hostedForm.getPaymentDetails();
@@ -191,10 +317,24 @@ jQuery(function ($) {
                   if (paymentDetails.success) {
                     const paymentToken = paymentDetails.paymentToken;
                     console.log('Payment token:', paymentToken);
+                    if (!paymentToken) {
+                        $(orderForm).unblock();
+                        alert('There was an issue processing the payment. Please try again.');
+                        return false;
+                    }
+
                     // Set the payment token in a hidden input field (or another required field)
                     hostedForm.addPaymentToken(paymentToken);
-    
-                    $paymentData = jQuery(creditForm).serialize();
+
+                    ensureCreditCardDataField();
+                    const $paymentData = collectCreditCardData();
+
+                    if (!serializedDataHasValue($paymentData, 'paymentToken') && !serializedDataHasValue($paymentData, 'paymenttoken')) {
+                        $(orderForm).unblock();
+                        alert('There was an issue processing the payment. Please try again.');
+                        return false;
+                    }
+
                     $('#credit-card-data').val($paymentData);
     
                     // Submit the main form
@@ -271,6 +411,3 @@ jQuery(function ($) {
     
 
 });
-
-
-
