@@ -1,8 +1,8 @@
 <?php
 // phpcs:ignoreFile
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+if (! defined('ABSPATH')) {
+    exit; // Exit if accessed directly
 }
 
 if (!function_exists('blink_insert_array_at_position')) {
@@ -125,8 +125,8 @@ if (!function_exists('blink_error_payment_process')) {
     function blink_error_payment_process($error = '')
     {
         $error = $error ?: __('Error! Something went wrong.', 'blink-payment-gateway-for-woocommerce');
-        wc_add_notice( $error, 'error' );
-        
+        wc_add_notice($error, 'error');
+
         return array(
             'result'   => 'failure',
             'messages' => $error,
@@ -137,24 +137,25 @@ if (!function_exists('blink_error_payment_process')) {
 }
 
 if (!function_exists('blink_is_preauth_transaction')) {
-    function blink_is_preauth_transaction($order) {
+    function blink_is_preauth_transaction($order)
+    {
         if (!$order || $order->get_payment_method() !== 'blink') {
             return false;
         }
-        
+
         // Check if _blink_preauth meta is set
         $blink_preauth = $order->get_meta('_blink_preauth', true);
         if ('' !== $blink_preauth) {
             return 'yes' === $blink_preauth;
         }
-        
+
         // Fallback: check gateway settings if meta not set
         $gateways = WC()->payment_gateways->payment_gateways();
         $gateway = isset($gateways['blink']) ? $gateways['blink'] : null;
         if ($gateway && isset($gateway->preauthorize_payments)) {
             return $gateway->preauthorize_payments;
         }
-        
+
         return false;
     }
 }
@@ -165,15 +166,15 @@ if (!function_exists('blink_get_status')) {
         $status = strtolower(trim(urldecode((string) $status)));
         $status = preg_replace('/[\s_-]+/', ' ', $status);
         $source = strtolower(trim(urldecode((string) $source)));
-        
+
         // Check if this order was processed with preauth
         $is_preauth_mode = blink_is_preauth_transaction($order);
-        
+
         // Successful authorisation and pending states still need to be captured.
-        if ($is_preauth_mode && in_array($status, ['paid', 'approved', 'authorized', 'authorised', 'pending', 'pending submission', 'processing', 'submitted', 'awaiting capture', 'preauthorized', 'pre authorized', 'pre auth', 'preauth', 'reversed'], true)) {
+        if ($is_preauth_mode && in_array($status, ['paid', 'approved', 'authorized', 'authorised', 'pending', 'pending submission', 'processing', 'submitted', 'awaiting capture', 'preauthorized', 'pre authorized', 'pre auth', 'reversed'], true)) {
             return 'hold';
         }
-        
+
         if (in_array($status, ['tendered', 'captured', 'settled', 'success', 'successful', 'completed', 'accept', 'accepted', 'paid', 'approved', 'received', 'payment attempted'], true)) {
             return 'complete';
         } elseif (strpos($source, 'direct debit') !== false || in_array($status, ['pending submission', 'authorized', 'authorised', 'reversed'], true)) {
@@ -188,13 +189,13 @@ if (!function_exists('blink_change_status')) {
     {
         // Set _gateway_status meta field
         $wc_order->update_meta_data('_gateway_status', $status);
-        
+
         // Check if this is a preauth transaction and set _blink_preauth meta
         $is_preauth = blink_is_preauth_transaction($wc_order);
         $wc_order->update_meta_data('_blink_preauth', $is_preauth ? 'yes' : 'no');
-        
+
         $wc_order->save();
-        
+
         $wc_order->add_order_note(__('Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status);
         $mapped_status = blink_get_status($status, $source, $wc_order);
         if ($mapped_status === 'complete') {
@@ -217,36 +218,36 @@ if (!function_exists('blink_payment_complete')) {
      */
     function blink_payment_complete($order, $txn_id = '', $note = '')
     {
-		$order_id = $order->get_id();
-		$opt_key = 'blink_payment_done_' . $order_id;
-        if ( ! add_option( $opt_key, 'yes' ) ) {
+        $order_id = $order->get_id();
+        $opt_key = 'blink_payment_done_' . $order_id;
+        if (! add_option($opt_key, 'yes')) {
             return;
         }
 
-		$fresh_order = wc_get_order( $order_id );
-		if ( $fresh_order ) {
-			$order = $fresh_order;
-		}
+        $fresh_order = wc_get_order($order_id);
+        if ($fresh_order) {
+            $order = $fresh_order;
+        }
 
-        if ( $order->get_meta( '_blink_payment_complete_done', true ) === 'yes' ) {
-			delete_option( $opt_key );
+        if ($order->get_meta('_blink_payment_complete_done', true) === 'yes') {
+            delete_option($opt_key);
             return;
         }
-		$order->update_meta_data( '_blink_payment_complete_done', 'yes' );
-		$order->save();
+        $order->update_meta_data('_blink_payment_complete_done', 'yes');
+        $order->save();
 
-        if ( $order->has_status( array( 'processing', 'completed' ) ) ) {
-			delete_option( $opt_key );
+        if ($order->has_status(array('processing', 'completed'))) {
+            delete_option($opt_key);
             return;
         }
-        
-        if ( $note ) {
-            $order->add_order_note( $note );
+
+        if ($note) {
+            $order->add_order_note($note);
         }
-        $order->payment_complete( $txn_id );
-		delete_option( $opt_key );
-		
-        if ( isset( WC()->cart ) ) {
+        $order->payment_complete($txn_id);
+        delete_option($opt_key);
+
+        if (isset(WC()->cart)) {
             WC()->cart->empty_cart();
         }
     }
@@ -261,30 +262,30 @@ if (!function_exists('blink_payment_on_hold')) {
      */
     function blink_payment_on_hold($order, $reason = '')
     {
-		$order_id = $order->get_id();
-		$opt_key = 'blink_payment_done_' . $order_id;
-        if ( ! add_option( $opt_key, 'yes' ) ) {
+        $order_id = $order->get_id();
+        $opt_key = 'blink_payment_done_' . $order_id;
+        if (! add_option($opt_key, 'yes')) {
             return;
         }
-        if ( $order->get_meta( '_blink_payment_hold_done', true ) === 'yes' ) {
-			delete_option( $opt_key );
+        if ($order->get_meta('_blink_payment_hold_done', true) === 'yes') {
+            delete_option($opt_key);
             return;
         }
-		$order->update_meta_data( '_blink_payment_hold_done', 'yes' );
-		$order->save();
+        $order->update_meta_data('_blink_payment_hold_done', 'yes');
+        $order->save();
 
-        if ( $order->has_status( array( 'on-hold' ) ) ) {
-			delete_option( $opt_key );
+        if ($order->has_status(array('on-hold'))) {
+            delete_option($opt_key);
             return;
         }
-        
+
         $order->update_status('on-hold', $reason);
         if ($reason) {
             $order->add_order_note($reason);
         }
-		delete_option( $opt_key );
-		
-        if ( isset( WC()->cart ) ) {
+        delete_option($opt_key);
+
+        if (isset(WC()->cart)) {
             WC()->cart->empty_cart();
         }
     }
@@ -300,19 +301,19 @@ if (!function_exists('blink_payment_failed')) {
     function blink_payment_failed($order, $reason = '')
     {
         $order_id = $order->get_id();
-		$opt_key = 'blink_payment_done_' . $order_id;
-        if ( ! add_option( $opt_key, 'yes' ) ) {
+        $opt_key = 'blink_payment_done_' . $order_id;
+        if (! add_option($opt_key, 'yes')) {
             return;
         }
-        if ( $order->has_status( array( 'failed' ) ) ) {
-			delete_option( $opt_key );
+        if ($order->has_status(array('failed'))) {
+            delete_option($opt_key);
             return;
         }
         $order->update_status('failed', $reason);
         if ($reason) {
             $order->add_order_note($reason);
         }
-		delete_option( $opt_key );
+        delete_option($opt_key);
     }
 }
 
@@ -331,7 +332,7 @@ if (!function_exists('blink_is_in_admin_section')) {
     }
 }
 
-if ( ! function_exists( 'blink_get_3ds_challenge_url' ) ) {
+if (! function_exists('blink_get_3ds_challenge_url')) {
     /**
      * URL for the minimal 3DS challenge page.
      *
@@ -339,13 +340,14 @@ if ( ! function_exists( 'blink_get_3ds_challenge_url' ) ) {
      * @param string $nonce    Nonce (blink_3d_nonce).
      * @return string
      */
-    function blink_get_3ds_challenge_url( $order_id, $nonce ) {
+    function blink_get_3ds_challenge_url($order_id, $nonce)
+    {
         return add_query_arg(
             array(
                 'blink_3d_process' => $order_id,
                 'blink_3d_nonce'   => $nonce,
             ),
-            home_url( '/blink-3ds-challenge/' )
+            home_url('/blink-3ds-challenge/')
         );
     }
 }
@@ -381,8 +383,8 @@ if (!function_exists('blink_generate_applepay_domains')) {
     function blink_generate_applepay_domains()
     {
         // Check user permissions
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( __( 'Insufficient permissions', 'blink-payment-gateway-for-woocommerce' ) );
+        if (! current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Insufficient permissions', 'blink-payment-gateway-for-woocommerce'));
         }
 
         $configs    = include __DIR__ . '/../config.php';
@@ -429,8 +431,8 @@ if (!function_exists('blink_generate_access_token')) {
     function blink_generate_access_token()
     {
         // Check user permissions
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( __( 'Insufficient permissions', 'blink-payment-gateway-for-woocommerce' ) );
+        if (! current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Insufficient permissions', 'blink-payment-gateway-for-woocommerce'));
         }
 
         $configs    = include __DIR__ . '/../config.php';
@@ -677,7 +679,7 @@ if (!function_exists('get_client_ipv4_address')) {
 if (!function_exists('blink_is_rest_request')) {
     function blink_is_rest_request()
     {
-        if (strpos($_SERVER[ 'REQUEST_URI' ], '/blink/v1') !== false) {
+        if (strpos($_SERVER['REQUEST_URI'], '/blink/v1') !== false) {
             return true;
         }
         return false;
