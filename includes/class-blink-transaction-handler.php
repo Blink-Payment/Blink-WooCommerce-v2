@@ -227,8 +227,9 @@ class Blink_Transaction_Handler {
 				$order->set_transaction_id( $transaction_id );
 				$order->update_meta_data( 'status', $status );
 
-				$is_preauth = blink_is_preauth_transaction($order);
-				if ( $is_preauth && strtolower( $status ) !== 'captured' ) {
+				$is_preauth    = blink_is_preauth_transaction( $order );
+				$mapped_status = blink_get_status( $status, '', $order );
+				if ( $is_preauth && 'hold' === $mapped_status ) {
 					$preauth_note = __('Blink payment preauthorized (Transaction ID: ', 'blink-payment-gateway-for-woocommerce') . $transaction_id . '). ' . 
 								   __('Process order to take payment, or cancel to remove the pre-authorization. ', 'blink-payment-gateway-for-woocommerce') .
 								   __('Refunding is unavailable until payment has been captured. ', 'blink-payment-gateway-for-woocommerce');

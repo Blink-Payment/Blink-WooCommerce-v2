@@ -173,15 +173,35 @@ $tests = array(
         blink_change_status($order, 'BL-UNKNOWN', 'unexpected gateway state', 'Card');
         blink_assert_same('failed', $order->get_status(), 'Unknown pre-auth status');
     },
-    'reversed pre-auth is failed' => function () {
+    'reversed pre-auth maps to hold' => function () {
+        $order = blink_test_order(true);
+        blink_assert_same('hold', blink_get_status('reversed', '', $order), 'Reversed pre-auth status');
+    },
+    'reversed pre-auth order is on-hold' => function () {
         $order = blink_test_order(true);
         blink_change_status($order, 'BL-REVERSED', 'reversed', 'Card');
-        blink_assert_same('failed', $order->get_status(), 'Reversed pre-auth status');
+        blink_assert_same('on-hold', $order->get_status(), 'Reversed pre-auth order status');
     },
-    'reversed non-pre-auth preserves on-hold behavior' => function () {
+    'reversed non-pre-auth preserves hold mapping' => function () {
         $order = blink_test_order(false);
-        blink_change_status($order, 'BL-SALE-REVERSED', 'reversed', 'Card');
-        blink_assert_same('on-hold', $order->get_status(), 'Reversed sale status');
+        blink_assert_same('hold', blink_get_status('reversed', '', $order), 'Reversed sale status');
+    },
+    'pre auth pre-auth maps to hold' => function () {
+        $order = blink_test_order(true);
+        blink_assert_same('hold', blink_get_status('pre auth', '', $order), 'Pre auth pre-auth status');
+    },
+    'Preauth pre-auth maps to hold' => function () {
+        $order = blink_test_order(true);
+        blink_assert_same('hold', blink_get_status('Preauth', '', $order), 'Preauth pre-auth status');
+    },
+    'Preauth pre-auth order is on-hold' => function () {
+        $order = blink_test_order(true);
+        blink_change_status($order, 'BL-GOOGLE-PAY-PREAUTH', 'Preauth', 'googlepay');
+        blink_assert_same('on-hold', $order->get_status(), 'Google Pay Preauth order status');
+    },
+    'Preauth non-pre-auth remains failed' => function () {
+        $order = blink_test_order(false);
+        blink_assert_same('failed', blink_get_status('Preauth', '', $order), 'Non-pre-auth Preauth status');
     },
     'failed 3DS pre-auth is failed' => function () {
         $order = blink_test_order(true);
