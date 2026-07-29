@@ -194,6 +194,10 @@ $tests = array(
         $order = blink_test_order(true);
         blink_assert_same('hold', blink_get_status('Preauth', '', $order), 'Preauth pre-auth status');
     },
+    'preauth pre-auth maps to hold' => function () {
+        $order = blink_test_order(true);
+        blink_assert_same('hold', blink_get_status('preauth', '', $order), 'preauth pre-auth status');
+    },
     'Preauth pre-auth order is on-hold' => function () {
         $order = blink_test_order(true);
         blink_change_status($order, 'BL-GOOGLE-PAY-PREAUTH', 'Preauth', 'googlepay');

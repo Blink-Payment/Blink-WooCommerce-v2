@@ -171,7 +171,7 @@ if (!function_exists('blink_get_status')) {
         $is_preauth_mode = blink_is_preauth_transaction($order);
 
         // Successful authorisation and pending states still need to be captured.
-        if ($is_preauth_mode && in_array($status, ['paid', 'approved', 'authorized', 'authorised', 'pending', 'pending submission', 'processing', 'submitted', 'awaiting capture', 'preauthorized', 'pre authorized', 'pre auth', 'reversed'], true)) {
+        if ($is_preauth_mode && in_array($status, ['paid', 'approved', 'authorized', 'authorised', 'pending', 'pending submission', 'processing', 'submitted', 'awaiting capture', 'preauth', 'preauthorized', 'pre authorized', 'pre auth', 'reversed'], true)) {
             return 'hold';
         }
 
