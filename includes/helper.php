@@ -144,8 +144,8 @@ if (!function_exists('blink_is_preauth_transaction')) {
         
         // Check if _blink_preauth meta is set
         $blink_preauth = $order->get_meta('_blink_preauth', true);
-        if ('yes' === $blink_preauth) {
-            return true;
+        if ('' !== $blink_preauth) {
+            return 'yes' === $blink_preauth;
         }
         
         // Fallback: check gateway settings if meta not set
@@ -162,19 +162,26 @@ if (!function_exists('blink_is_preauth_transaction')) {
 if (!function_exists('blink_get_status')) {
     function blink_get_status($status = '', $source = '', $order = null)
     {
-        $status = urldecode($status);
+        $status = strtolower(trim(urldecode((string) $status)));
+        $status = preg_replace('/[\s_-]+/', ' ', $status);
+        $source = strtolower(trim(urldecode((string) $source)));
         
         // Check if this order was processed with preauth
         $is_preauth_mode = blink_is_preauth_transaction($order);
         
-        // If preauth is enabled and status is 'paid', treat as hold
-        if ($is_preauth_mode && strtolower($status) === 'paid') {
+        // Successful authorisation and pending states still need to be captured.
+        if ($is_preauth_mode && in_array($status, ['paid', 'approved', 'authorized', 'authorised', 'pending', 'pending submission', 'processing', 'submitted', 'awaiting capture', 'preauthorized', 'pre authorized', 'pre auth'], true)) {
             return 'hold';
         }
+
+        // A reversed preauthorisation can no longer be captured.
+        if ($is_preauth_mode && 'reversed' === $status) {
+            return 'failed';
+        }
         
-        if (in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid', 'approved', 'received','payment attempted', 'payment+attempted'], true)) {
+        if (in_array($status, ['tendered', 'captured', 'settled', 'success', 'successful', 'completed', 'accept', 'accepted', 'paid', 'approved', 'received', 'payment attempted'], true)) {
             return 'complete';
-        } elseif (strpos(strtolower($source), 'direct debit') !== false || strtolower($status) === 'pending submission' || strtolower($status) === 'authorized' || strtolower($status) === 'reversed') {
+        } elseif (strpos($source, 'direct debit') !== false || in_array($status, ['pending submission', 'authorized', 'authorised', 'reversed'], true)) {
             return 'hold';
         }
         return 'failed';
@@ -194,12 +201,10 @@ if (!function_exists('blink_change_status')) {
         $wc_order->save();
         
         $wc_order->add_order_note(__('Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status);
-        if (blink_get_status($status, $source, $wc_order) === 'complete') {
+        $mapped_status = blink_get_status($status, $source, $wc_order);
+        if ($mapped_status === 'complete') {
             blink_payment_complete($wc_order, $transaction_id, $note ?: __('Blink payment completed', 'blink-payment-gateway-for-woocommerce'));
-        } elseif (blink_get_status($status, $source, $wc_order) === 'hold') {
-            blink_payment_on_hold($wc_order, $note ?: __('Payment Pending (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
-        } elseif ($is_preauth && !in_array(strtolower($status), ['tendered', 'captured', 'success', 'accept', 'accepted', 'paid', 'approved', 'received', 'payment attempted', 'payment+attempted', 'reversed'])) {
-            // If preauth is enabled and status is not in standard lists, treat as hold
+        } elseif ($mapped_status === 'hold') {
             blink_payment_on_hold($wc_order, $note ?: __('Payment Pending (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
         } else {
             blink_payment_failed($wc_order, $note ?: __('Payment Failed (Transaction status - ', 'blink-payment-gateway-for-woocommerce') . $status . ')');
