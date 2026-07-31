@@ -1,5 +1,9 @@
 *** WooCommerce - Blink Changelog ***
 
+2026-07-29 - version 1.3.7
+
+* Fixed WooCommerce mapping orders for failed preauth transactions
+
 2026-06-10 - version 1.3.6
 
 * Fixed Blink card fields not reloading after checkout total changes from £0.00 back to a payable amount.
