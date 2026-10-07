@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.3.7
+ * Version: 1.4.0
  * Text Domain: blink-payment-gateway-for-woocommerce
  * Requires Plugins: woocommerce
  * License: GPLv2 or later
@@ -112,11 +112,12 @@ add_action( 'template_redirect', array( 'Blink_3D_Secure', 'serve_minimal_3ds_pa
 add_action( 'wp', [ 'Blink_Transaction_Handler', 'blink_capture_order_response' ], 999 );
 add_action( 'admin_post_blink_download_log', [ 'Blink_Logger', 'handle_download' ] );
 add_action('woocommerce_order_status_changed', array('Blink_Transaction_Handler', 'blink_handle_order_status_change'), 10, 3);
-
+add_filter( 'woocommerce_order_actions', array( 'Blink_Transaction_Handler', 'blink_add_capture_order_action' ), 10, 2 );
+add_action( 'woocommerce_order_action_blink_capture_preauthorisation', array( 'Blink_Transaction_Handler', 'blink_capture_preauthorisation_action' ) );
+//webhook
 register_activation_hook( __FILE__, function () {
 	require_once __DIR__ . '/includes/class-blink-3d-secure.php';
 	Blink_3D_Secure::register_endpoint();
 	flush_rewrite_rules();
 } );
 register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );
-

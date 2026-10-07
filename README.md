@@ -39,6 +39,11 @@ Note: Please don't use any style tag in to that text area.
 
 ```
 ```
+## Pre-authorisation
+
+The Blink WooCommerce plugin supports pre-authorisation payments, allowing a card payment to be authorised at checkout and captured later from the WooCommerce order.
+
+See the [Pre-authorisation guide](docs/preauthorisation.md) for configuration, capture, order statuses, cancellation and troubleshooting.
 
 # Custom CSS and Js
 

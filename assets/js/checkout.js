@@ -323,6 +323,7 @@ jQuery(function ($) {
                 blink_checkout_form.reset_hosted_form_state();
                 return;
             }
+            window.blinkWalletSubmit.install($form.get(0));
 
             var paymentBy = blink_checkout_form.ensure_payment_by();
             if (!paymentBy && !$paymentBox.find('input[name="switchPayment"], ' + blink_checkout_form.creditContainerSelector + ', #blinkGooglePay, #blinkApplePay').length) {
@@ -413,12 +414,15 @@ jQuery(function ($) {
             $form.find('input[name=device_ip_address]').val(blink_params.remoteAddress);
 
             setupApplePayButtonObserver();
+            setupWalletLayoutObserver();
 
         }
     };
 
     $(document).on('click', '#gpay-button-online-api-id', function () {
-        $('form[name="checkout"]').find('[id="payment_by"]').val('google-pay');
+        var form = blink_checkout_form.get_checkout_form().get(0);
+        window.blinkWalletSubmit.install(form);
+        window.blinkWalletSubmit.setActiveWallet(form, 'google');
     });
 
 
@@ -488,6 +492,7 @@ jQuery(function ($) {
                     }
                     // Set the payment token in a hidden input field (or another required field)
                     const formForToken = blink_checkout_form.get_hosted_form_instance() || activeHostedForm;
+                    window.blinkWalletSubmit.prepareCardPaymentToken(blink_checkout_form.get_checkout_form().get(0));
                     formForToken.addPaymentToken(paymentToken);
 
                     blink_checkout_form.ensure_credit_card_data();
@@ -555,39 +560,26 @@ jQuery(function ($) {
 
 // Define a function to set up the observer and check for the Apple Pay button
 function setupApplePayButtonObserver() {
-
-    function overrideApplePayButtonClicked() {
-        // Save a reference to the original onApplePayButtonClicked function
-        const originalOnApplePayButtonClicked = window.onApplePayButtonClicked;
-
-        // Override the onApplePayButtonClicked function
-        window.onApplePayButtonClicked = function (...args) {
-            // Set the value of the hidden input
-            $('form[name="checkout"]').find('[id="payment_by"]').val('apple-pay');
-
-            // Call the original function with the provided arguments
-            if (typeof originalOnApplePayButtonClicked === 'function') {
-                originalOnApplePayButtonClicked.apply(this, args);
-            }
-        };
-    }
-
-    // Function to check if the Apple Pay button script is loaded and the button is present
-    function checkApplePayButton() {
-        if (typeof window.onApplePayButtonClicked === 'function') {
-            observer.disconnect();
-
-            overrideApplePayButtonClicked();
-            // Disconnect the observer once the button is found
-        }
-    }
-
-    // Observe for changes in the document to detect when the Apple Pay button script is loaded
-    const observer = new MutationObserver(() => {
-        checkApplePayButton();
+    window.blinkWalletSubmit.observeApplePayButton(function () {
+        return document.querySelector('form.woocommerce-checkout') || document.querySelector('form[name="checkout"]');
     });
+}
 
-    // Start observing the document
-    observer.observe(document, { childList: true, subtree: true });
+// Remove WooCommerce's Apple Pay column after Blink removes its ineligible button.
+function setupWalletLayoutObserver() {
+    document.querySelectorAll('[data-blink-wallet="apple"]').forEach(function (appleWallet) {
+        if (appleWallet.dataset.blinkWalletObserved === 'true') {
+            return;
+        }
 
+        appleWallet.dataset.blinkWalletObserved = 'true';
+
+        window.blinkWalletSubmit.observeApplePayButtonRemoval(appleWallet, function () {
+            const walletRow = appleWallet.closest('[data-blink-wallet-row]');
+            appleWallet.remove();
+            if (walletRow && !walletRow.querySelector('[data-blink-wallet]')) {
+                walletRow.remove();
+            }
+        });
+    });
 }

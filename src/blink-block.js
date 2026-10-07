@@ -4,23 +4,38 @@ const { useSelect } = window.wp.data;
 const { CART_STORE_KEY } = window.wc.wcBlocksData;
 const { getSetting } = window.wc.wcSettings;
 import { decodeEntities } from '@wordpress/html-entities';
+import {
+  getWalletAvailability,
+  loadWalletScriptOnce,
+  observeApplePayButtonRemoval,
+} from './wallet-availability';
+import { CardLogos } from './card-logos';
 
-const Icon = (props) => {
-  const { settings } = props;
-  return settings.icon
-    ? <img src={settings.icon} style={{ float: 'right', marginRight: '20px', borderRadius: '0' }} />
-    : '';
+const Icon = ( props ) => {
+	const { settings } = props;
+	return settings.icon ? (
+		<img
+			src={ settings.icon }
+			alt="Blink"
+			className="blink-payment-method-icon"
+		/>
+	) : (
+		''
+	);
 };
 
-const Label = (props) => {
-  const { settings } = props;
+const Label = ( props ) => {
+	const { settings } = props;
 
-  return (
-    <span style={{ width: '100%' }}>
-      {settings.title || 'Blink'}
-      <Icon settings={settings} />
-    </span>
-  );
+	return (
+		<span className="blink-payment-method-label">
+			{ settings.title || 'Blink' }
+			<span className="blink-payment-method-icons">
+				<Icon settings={ settings } />
+				<CardLogos logos={ settings.card_logos } />
+			</span>
+		</span>
+	);
 };
 
 const Content = (props) => {
@@ -90,6 +105,7 @@ const BlinkPayment = (props) => {
   const [intentExpiryDate, setIntentExpiryDate] = useState(settings.intentExpiryDate || '');
   const [isIntentLoading, setIsIntentLoading] = useState(false);
   const [intentError, setIntentError] = useState('');
+  const [rejectedApplePayElement, setRejectedApplePayElement] = useState(null);
   const { onCheckoutValidation, onPaymentSetup, onCheckoutFail } = eventRegistration;
   const { billingAddress } = billing;
   const billingName = `${billingAddress.first_name} ${billingAddress.last_name}`;
@@ -107,6 +123,9 @@ const BlinkPayment = (props) => {
     ? (cartTotal / Math.pow(10, currencyMinorUnit)).toFixed(currencyMinorUnit)
     : null;
   const paymentRequired = !isZeroTotal(cartAmount) && !!intentId && !!intentExpiryDate;
+  const { showApplePay, showGooglePay } = getWalletAvailability(settings, elements);
+  const renderApplePay = showApplePay && rejectedApplePayElement !== elements?.apElement;
+  const renderWalletRow = renderApplePay || showGooglePay;
 
   if (settings.isHosted) {
     return null;
@@ -361,17 +380,23 @@ const BlinkPayment = (props) => {
       currentForm.find('input[name=family_name]').val(billingAddress.last_name);
       currentForm.find('input[name=account_holder_name]').val(billingName);
     }
-    currentForm.find('input[name=customer_name]').val(billingName);
-    currentForm.find('input[name=customer_email]').val(billingAddress.email);
-    currentForm.find('input[name=customer_address]').val(billingFullAddress);
-    currentForm.find('input[name=customer_postcode]').val(billingAddress.postcode);
-    currentForm.find('input[name=device_timezone]').val(timezone);
-    currentForm.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
-    currentForm.find('input[name=device_accept_language]').val(language);
-    currentForm.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' + screen_depth);
     const remoteAddress = window.blink_params?.remoteAddress || '';
-    currentForm.find('input[name=remote_address]').val(remoteAddress);
-    currentForm.find('input[name=device_ip_address]').val(remoteAddress);
+    const populateCommonValues = (form) => {
+      form.find('input[name=customer_name]').val(billingName);
+      form.find('input[name=customer_email]').val(billingAddress.email);
+      form.find('input[name=customer_address]').val(billingFullAddress);
+      form.find('input[name=customer_postcode]').val(billingAddress.postcode);
+      form.find('input[name=device_timezone]').val(timezone);
+      form.find('input[name=device_capabilities]').val('javascript' + (java ? ',java' : ''));
+      form.find('input[name=device_accept_language]').val(language);
+      form.find('input[name=device_screen_resolution]').val(screen_width + 'x' + screen_height + 'x' + screen_depth);
+      form.find('input[name=remote_address]').val(remoteAddress);
+      form.find('input[name=device_ip_address]').val(remoteAddress);
+    };
+
+    const forms = [formElement, appleFormRef.current, googleFormRef.current]
+      .filter((form, index, allForms) => form && allForms.indexOf(form) === index);
+    forms.forEach((form) => populateCommonValues(window.jQuery(form)));
   };
 
   useEffect(() => {
@@ -631,6 +656,16 @@ const BlinkPayment = (props) => {
   }, [onPaymentSetup, selectedTab, cartAmount, paymentRequired, billingAddress, elements, intentError, isIntentLoading]);
 
   useEffect(() => {
+    if (!showApplePay || !appleFormRef.current) {
+      return undefined;
+    }
+
+    return observeApplePayButtonRemoval(appleFormRef.current, () => {
+      setRejectedApplePayElement(elements?.apElement);
+    });
+  }, [elements?.apElement, showApplePay]);
+
+  useEffect(() => {
     if (!paymentRequired || !window.jQuery) {
       return;
     }
@@ -643,34 +678,29 @@ const BlinkPayment = (props) => {
       });
     };
 
-    if (settings.isSafari && settings.apple_pay_enabled) {
-      removeScriptBySrc(settings.hostUrl + '/assets/js/apple-pay-api.js');
-      const loadApplePayApi = new Promise((resolve, reject) => {
-        const script1 = document.createElement('script');
-        script1.src = settings.hostUrl + '/assets/js/apple-pay-api.js';
-        script1.async = true;
-        script1.onload = resolve;
-        script1.onerror = reject;
-        document.body.appendChild(script1);
-      });
-      const loadApplePayJs = new Promise((resolve, reject) => {
-        const script2 = document.createElement('script');
-        script2.src = 'https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js';
-        script2.async = true;
-        script2.onload = resolve;
-        script2.onerror = reject;
-        document.body.appendChild(script2);
-      });
-      if (!appleFormRef.current) {
-        return;
+    if (showApplePay) {
+      appleFormRef.current?.querySelectorAll('script[src*="apple-pay-sdk.js"]')
+        .forEach(script => script.remove());
+      const loadApplePayJs = loadWalletScriptOnce(
+        'https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js',
+        'apple-pay-sdk'
+      );
+      const loadApplePayApi = loadWalletScriptOnce(
+        settings.hostUrl + '/assets/js/apple-pay-api.js',
+        'blink-apple-pay-api'
+      );
+      Promise.all([loadApplePayApi, loadApplePayJs]).catch(() => { });
+      if (appleFormRef.current) {
+        window.jQuery(appleFormRef.current).off('submit.blinkBlocks').on('submit.blinkBlocks', function (event) {
+          event.preventDefault();
+          selectedTabRef.current = 'apple-pay';
+          setSelectedTab('apple-pay');
+          window.jQuery('.wc-block-components-checkout-place-order-button').click();
+        });
       }
-      window.jQuery(appleFormRef.current).off('submit.blinkBlocks').on('submit.blinkBlocks', function (event) {
-        event.preventDefault();
-        selectedTabRef.current = 'apple-pay';
-        setSelectedTab('apple-pay');
-        window.jQuery('.wc-block-components-checkout-place-order-button').click();
-      });
-    } else {
+    }
+
+    if (showGooglePay) {
       document.querySelectorAll('#gpay-button-online-api-id').forEach(el => el.remove());
       removeScriptBySrc(settings.hostUrl + '/assets/js/google-pay-api.js');
       const googleScriptElement = document.querySelector('#blinkGooglePay script[src="https://pay.google.com/gp/p/js/pay.js"]');
@@ -706,17 +736,16 @@ const BlinkPayment = (props) => {
           }
         })
         .catch(() => { });
-      if (!googleFormRef.current) {
-        return;
+      if (googleFormRef.current) {
+        window.jQuery(googleFormRef.current).off('submit.blinkBlocks').on('submit.blinkBlocks', function (event) {
+          event.preventDefault();
+          selectedTabRef.current = 'google-pay';
+          setSelectedTab('google-pay');
+          window.jQuery('.wc-block-components-checkout-place-order-button').click();
+        });
       }
-      window.jQuery(googleFormRef.current).off('submit.blinkBlocks').on('submit.blinkBlocks', function (event) {
-        event.preventDefault();
-        selectedTabRef.current = 'google-pay';
-        setSelectedTab('google-pay');
-        window.jQuery('.wc-block-components-checkout-place-order-button').click();
-      });
     }
-  }, [elements, paymentRequired]);
+  }, [elements, paymentRequired, showApplePay, showGooglePay]);
 
   if (isIntentLoading && cartAmount !== formattedTotal) {
     return (
@@ -760,20 +789,25 @@ const BlinkPayment = (props) => {
       <PreauthNotice settings={settings} />
       <div className="form-container">
         <>
-          {settings.isSafari && settings.apple_pay_enabled ? (
-            <form ref={appleFormRef}>
-              <div dangerouslySetInnerHTML={{ __html: elements?.apElement }} />
-              <input type="hidden" name="payment_by" id="payment_by" value="apple-pay" />
-              <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
-              <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
-            </form>
-          ) : (
-            <form ref={googleFormRef}>
-              <div dangerouslySetInnerHTML={{ __html: elements?.gpElement }} />
-              <input type="hidden" name="payment_by" id="payment_by" value="google-pay" />
-              <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
-              <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
-            </form>
+          {renderWalletRow && (
+            <div className="blink-wallet-row" data-blink-wallet-row>
+              {renderApplePay && (
+                <form ref={appleFormRef} className="blink-wallet" data-blink-wallet="apple">
+                  <div className="blink-wallet-element" dangerouslySetInnerHTML={{ __html: elements?.apElement }} />
+                  <input type="hidden" name="payment_by" id="payment_by" value="apple-pay" />
+                  <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
+                  <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
+                </form>
+              )}
+              {showGooglePay && (
+                <form ref={googleFormRef} className="blink-wallet" data-blink-wallet="google">
+                  <div className="blink-wallet-element" dangerouslySetInnerHTML={{ __html: elements?.gpElement }} />
+                  <input type="hidden" name="payment_by" id="payment_by" value="google-pay" />
+                  <input type="hidden" name="intent_id" id="intent_id" value={intentId} />
+                  <input type="hidden" name="intent_expiry_date" id="intent_expiry_date" value={intentExpiryDate} />
+                </form>
+              )}
+            </div>
           )}
         </>
         <div className='form-group mb-4'>

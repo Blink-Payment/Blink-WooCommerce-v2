@@ -114,6 +114,19 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		return $this->payment_handler->blink_handle_payment($order_id);
 	}
 
+	/**
+	 * Render the Blink icon and the merchant-selected card logos in Classic Checkout.
+	 *
+	 * WooCommerce's icon property accepts only one URL, so the fixed local card
+	 * logos are appended to its standard escaped Blink icon markup.
+	 *
+	 * @return string
+	 */
+	public function get_icon()
+	{
+		return parent::get_icon() . blink_get_card_logos_html($this->settings);
+	}
+
 	public function blink_process_admin_options()
 	{
 		$this->api_key = isset($_POST['woocommerce_blink_testmode']) && $_POST['woocommerce_blink_testmode'] === '1'
@@ -136,7 +149,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	public function blink_enqueue_scripts($hook)
 	{
 		// Only load admin scripts on relevant pages and for users with proper permissions
-		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		if (! current_user_can('manage_woocommerce')) {
 			return;
 		}
 
@@ -166,7 +179,24 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		$adminnotice->remove_notice('no-payment-type-selected');
 		$adminnotice->remove_notice('no-payment-types');
 	}
+	public function blink_print_hostedfield_styles()
+	{
+		$css_path = plugin_dir_path(__FILE__) . '../assets/css/hostedfields.css';
 
+		if (! file_exists($css_path)) {
+			return;
+		}
+
+		$css = file_get_contents($css_path);
+
+		if (false === $css || '' === trim($css)) {
+			return;
+		}
+
+		echo '<style class="hostedfield">' . "\n";
+		echo wp_strip_all_tags($css); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo "\n</style>\n";
+	}
 	public function blink_add_error_notices($payment_types = array())
 	{
 
@@ -234,9 +264,9 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	public function blink_payment_scripts()
 	{
 		// we need JavaScript to process a token only on cart/checkout pages, right?
-		$is_order_pay_endpoint = is_wc_endpoint_url( 'order-pay' );
-		$is_order_pay          = $is_order_pay_endpoint || isset( $_GET['pay_for_order'] );
-		$is_checkout_block     = function_exists( 'blink_is_checkout_block' ) && blink_is_checkout_block();
+		$is_order_pay_endpoint = is_wc_endpoint_url('order-pay');
+		$is_order_pay          = $is_order_pay_endpoint || isset($_GET['pay_for_order']);
+		$is_checkout_block     = function_exists('blink_is_checkout_block') && blink_is_checkout_block();
 
 		if (! is_cart() && ! is_checkout() && ! $is_order_pay && ! $is_checkout_block) {
 			return;
@@ -255,17 +285,13 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		}
 
 		wp_add_inline_script('jquery', '$ = jQuery.noConflict();');
-		wp_enqueue_style(
-			'hostedfield-css',
-			plugin_dir_url(__FILE__) . '../assets/css/hostedfields.css',
-			array(),
-			$this->version
-		);
+
 		wp_enqueue_script('blink_hosted_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', array('jquery'), $this->version, false);
 		wp_register_style('woocommerce_blink_payment_style', plugins_url('../assets/css/style.css', __FILE__), array(), $this->version);
+		wp_register_script('woocommerce_blink_wallet_submit', plugins_url('../assets/js/wallet-submit.js', __FILE__), array('jquery'), $this->version, true);
 		// and this is our custom JS in your plugin directory that works with token.js
 		if ($is_order_pay_endpoint) {
-			wp_register_script('woocommerce_blink_payment_order_pay', plugins_url('../assets/js/order-pay.js', __FILE__), array('jquery'), $this->version, true);
+			wp_register_script('woocommerce_blink_payment_order_pay', plugins_url('../assets/js/order-pay.js', __FILE__), array('jquery', 'woocommerce_blink_wallet_submit'), $this->version, true);
 
 			$order = wc_get_order(get_query_var('order-pay'));
 			wp_localize_script(
@@ -288,7 +314,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 			);
 			wp_enqueue_script('woocommerce_blink_payment_order_pay');
 		} elseif (is_checkout() && ! $is_checkout_block) {
-			wp_register_script('woocommerce_blink_payment_checkout', plugins_url('../assets/js/checkout.js', __FILE__), array('jquery'), $this->version, true);
+			wp_register_script('woocommerce_blink_payment_checkout', plugins_url('../assets/js/checkout.js', __FILE__), array('jquery', 'woocommerce_blink_wallet_submit'), $this->version, true);
 			wp_localize_script(
 				'woocommerce_blink_payment_checkout',
 				'blink_params',
@@ -305,8 +331,14 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		if ($custom_css) {
 			wp_add_inline_style('woocommerce_blink_payment_style', $custom_css);
 		}
+
 		do_action('blink_custom_script');
 		do_action('blink_custom_style');
+		add_action(
+			'wp_head',
+			array($this, 'blink_print_hostedfield_styles'),
+			20
+		);
 	}
 
 	public function validate_fields()
@@ -330,14 +362,16 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		return $title;
 	}
 
-	public function blink_print_custom_notice()
+	public function blink_print_custom_notice($order_id = 0)
 	{
-		$status = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : '';
-		$note   = isset($_GET['note']) ? sanitize_text_field(wp_unslash($_GET['note'])) : '';
+		$order = wc_get_order(absint($order_id));
+		if (! $order || 'blink' !== $order->get_payment_method() || ! $order->has_status('failed')) {
+			return;
+		}
 
-		if ('failed' === $status && ! get_transient('blink_custom_notice_shown')) {
-			wc_print_notice($note, 'error');
-			set_transient('blink_custom_notice_shown', true, 15);
+		$message = blink_resolve_payment_message($order->get_meta('_blink_payment_message', true));
+		if ('' !== $message) {
+			wc_print_notice($message, 'error');
 		}
 	}
 

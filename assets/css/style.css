@@ -75,6 +75,65 @@
 	border-radius: 0;
   }
 
+.blink-payment-method-label,
+.blink-payment-method-icons,
+.blink-card-logos {
+	display: inline-flex;
+	align-items: center;
+}
+
+.blink-payment-method-label {
+	justify-content: space-between;
+	gap: 10px;
+	width: 100%;
+}
+
+.blink-payment-method-icons {
+	flex-shrink: 0;
+	gap: 8px;
+}
+
+.blink-card-logos {
+	gap: 4px;
+}
+
+.blink-card-logo {
+	display: block;
+	width: auto;
+	height: 24px;
+	max-height: 24px;
+	border-radius: 0;
+}
+
+.payment_method_blink img.blink-card-logo {
+	height: 24px;
+	max-height: 24px;
+}
+
+.blink-payment-method-icon {
+	display: block;
+	width: auto;
+	max-height: 30px;
+	border-radius: 0;
+}
+
+@media (max-width: 480px) {
+
+	.wc_payment_method.payment_method_blink > label[for="payment_method_blink"] {
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.blink-payment-method-label {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.blink-payment-method-icons {
+		flex-wrap: wrap;
+	}
+}
+
 .payment_method_blink .d-flex-center {
 	display: -webkit-box;
 	display: -webkit-flex;
@@ -311,12 +370,69 @@ input:focus,
 	display: none;
 }
 
-.payment_method_blink .form-container .gpay-card-info-container {
+.payment_method_blink .blink-wallet [id="container"] > .gpay-card-info-container {
+	display: block;
+	box-sizing: border-box;
+	width: 100% !important;
+	max-width: 100% !important;
+	margin: 0;
+}
+
+.payment_method_blink .blink-wallet[data-blink-wallet="google"] .gpay-button {
+	display: block;
+	box-sizing: border-box;
+	width: 100% !important;
+	max-width: 100% !important;
+}
+
+.payment_method_blink .blink-wallet [id="apple-pay-btn"] {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 100%;
+	--apple-pay-button-width: 100%;
+}
+
+.payment_method_blink .blink-wallet-row {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
 	width: 100%;
 }
 
-.payment_method_blink .form-container #apple-pay-btn {
+.payment_method_blink .blink-wallet {
+	box-sizing: border-box;
 	width: 100%;
+	max-width: 100%;
+	margin: 0 !important;
+	padding: 0;
+	float: none;
+	position: static;
+}
+
+/*
+ * Blocks adds .blink-wallet-element around Blink's markup; Classic inserts
+ * it directly. Google Pay appends its button to #container, which is a sibling
+ * of #blinkGooglePay rather than a child of it.
+ */
+.payment_method_blink .blink-wallet-element,
+.payment_method_blink .blink-wallet [id="blinkApplePay"],
+.payment_method_blink .blink-wallet [id="blinkGooglePay"],
+.payment_method_blink .blink-wallet [id="container"] {
+	display: block;
+	box-sizing: border-box;
+	width: 100% !important;
+	max-width: 100% !important;
+	margin: 0 !important;
+	padding: 0;
+	float: none !important;
+	position: static !important;
+}
+
+/* Blink's wallet field groups contain only hidden inputs. */
+.payment_method_blink .blink-wallet .fieldgroup-container {
+	margin: 0 !important;
+	padding: 0;
 }
 
 .payment_method_blink .switch-wrapper {

@@ -80,6 +80,29 @@ class Blink_Settings_Handler {
 				'type'        => 'textarea',
 				'description' => __( 'Do not include style tag', 'blink-payment-gateway-for-woocommerce' ),
 			),
+			'card_logos'      => array(
+				'title'       => __( 'Accepted card logos', 'blink-payment-gateway-for-woocommerce' ),
+				'type'        => 'title',
+				'description' => __( 'Choose the card-brand logos displayed alongside Blink at checkout.', 'blink-payment-gateway-for-woocommerce' ),
+			),
+			'card_logo_visa' => array(
+				'title'   => '',
+				'label'   => __( 'Visa', 'blink-payment-gateway-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'default' => 'no',
+			),
+			'card_logo_mastercard' => array(
+				'title'   => '',
+				'label'   => __( 'Mastercard', 'blink-payment-gateway-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'default' => 'no',
+			),
+			'card_logo_american_express' => array(
+				'title'   => '',
+				'label'   => __( 'American Express', 'blink-payment-gateway-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'default' => 'no',
+			),
 		);
 
 		// Payment methods

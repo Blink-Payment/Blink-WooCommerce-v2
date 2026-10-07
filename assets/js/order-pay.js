@@ -208,6 +208,7 @@ jQuery(function ($) {
         document.querySelectorAll('#gpay-button-online-api-id').forEach(el => el.remove());
         
         var paymentBy = $(this).find('input[name=payment_by]').val();
+        window.blinkWalletSubmit.install(document.querySelector(orderForm));
 
         var screen_width = (window && window.screen ? window.screen.width : '0');
         var screen_height = (window && window.screen ? window.screen.height : '0');
@@ -230,6 +231,7 @@ jQuery(function ($) {
          $(this).find('input[name=device_ip_address]').val(order_params.remoteAddress);
 
         setupApplePayButtonObserver();
+        setupWalletLayoutObserver();
 
         if (paymentBy == 'credit-card') {
             var $creditContainer = getCreditContainer();
@@ -324,6 +326,7 @@ jQuery(function ($) {
                     }
 
                     // Set the payment token in a hidden input field (or another required field)
+                    window.blinkWalletSubmit.prepareCardPaymentToken(document.querySelector(orderForm));
                     hostedForm.addPaymentToken(paymentToken);
 
                     ensureCreditCardDataField();
@@ -367,46 +370,35 @@ jQuery(function ($) {
     };
     
     jQuery(document).on('click', '#gpay-button-online-api-id', function() {
-        jQuery(orderForm).find('[id="payment_by"]').val('google-pay');
+        const form = document.querySelector(orderForm);
+        window.blinkWalletSubmit.install(form);
+        window.blinkWalletSubmit.setActiveWallet(form, 'google');
     });
     
         // Define a function to set up the observer and check for the Apple Pay button
     function setupApplePayButtonObserver() {
-    
-        function overrideApplePayButtonClicked() {
-            // Save a reference to the original onApplePayButtonClicked function
-            const originalOnApplePayButtonClicked = window.onApplePayButtonClicked;
-    
-            // Override the onApplePayButtonClicked function
-            window.onApplePayButtonClicked = function(...args) {
-                // Set the value of the hidden input
-                jQuery(orderForm).find('[id="payment_by"]').val('apple-pay');
-    
-                // Call the original function with the provided arguments
-                if (typeof originalOnApplePayButtonClicked === 'function') {
-                    originalOnApplePayButtonClicked.apply(this, args);
-                }
-            };
-        }
-    
-        // Function to check if the Apple Pay button script is loaded and the button is present
-        function checkApplePayButton() {
-            if (typeof window.onApplePayButtonClicked === 'function') {
-                            observer.disconnect();
-    
-                overrideApplePayButtonClicked();
-                // Disconnect the observer once the button is found
-            }
-        }
-    
-        // Observe for changes in the document to detect when the Apple Pay button script is loaded
-        const observer = new MutationObserver(() => {
-            checkApplePayButton();
+        window.blinkWalletSubmit.observeApplePayButton(function () {
+            return document.querySelector(orderForm);
         });
-    
-        // Start observing the document
-        observer.observe(document, { childList: true, subtree: true });
-    
+    }
+
+    // Remove WooCommerce's Apple Pay column after Blink removes its ineligible button.
+    function setupWalletLayoutObserver() {
+        document.querySelectorAll('[data-blink-wallet="apple"]').forEach(function(appleWallet) {
+            if (appleWallet.dataset.blinkWalletObserved === 'true') {
+                return;
+            }
+
+            appleWallet.dataset.blinkWalletObserved = 'true';
+
+            window.blinkWalletSubmit.observeApplePayButtonRemoval(appleWallet, function() {
+                const walletRow = appleWallet.closest('[data-blink-wallet-row]');
+                appleWallet.remove();
+                if (walletRow && !walletRow.querySelector('[data-blink-wallet]')) {
+                    walletRow.remove();
+                }
+            });
+        });
     }
     
 
