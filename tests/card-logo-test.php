@@ -6,6 +6,14 @@ function __( $text, $domain = null ) {
 	return $text;
 }
 
+function esc_html__( $text, $domain = null ) {
+	return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
+function esc_html( $text ) {
+	return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
 function get_option( $key, $default = false ) {
 	return $default;
 }
