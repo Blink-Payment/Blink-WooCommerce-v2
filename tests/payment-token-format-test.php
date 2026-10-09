@@ -47,10 +47,6 @@ function is_wc_endpoint_url( $endpoint ) {
 	return 'order-pay' === $endpoint && $test_is_order_pay;
 }
 
-function blink_get_payment_information( $order_id ) {
-	return wp_json_encode( array( 'order_id' => $order_id ) );
-}
-
 function blink_error_payment_process( $message ) {
 	return array(
 		'result' => 'failure',
@@ -104,6 +100,7 @@ class Blink_Logger {
 	}
 }
 
+require_once dirname( __DIR__ ) . '/includes/helper.php';
 require_once dirname( __DIR__ ) . '/includes/class-blink-payment-handler.php';
 
 class Blink_Payment_Token_Test_Order {
@@ -170,7 +167,7 @@ class Blink_Payment_Token_Test_Utils {
 
 class Blink_Payment_Token_Test_Gateway {
 	public $host_url             = 'https://gateway.example.com';
-	public $paymentMethods       = array( 'credit-card', 'direct-debit' );
+	public $paymentMethods       = array( 'credit-card', 'direct-debit', 'open-banking' );
 	public $preauthorize_payments = false;
 	public $utils;
 
@@ -228,6 +225,11 @@ function blink_payment_token_run_request( $request, $is_order_pay = false ) {
 
 	blink_payment_token_assert_same( 'success', $result['result'], 'Expected checkout to succeed.' );
 	blink_payment_token_assert_same( 1, count( $test_http_requests ), 'Expected one API request.' );
+	blink_payment_token_assert_same(
+		'{"order_info":{"order_id":17037}}',
+		$test_http_requests[0]['args']['body']['merchant_data'],
+		'Every Direct request must send only the nested order ID, without customer data.'
+	);
 
 	return $test_http_requests[0];
 }
@@ -246,6 +248,11 @@ $apple_payment_json = wp_json_encode( $apple_payment_data );
 $test_orders[17037] = new Blink_Payment_Token_Test_Order( 17037 );
 
 $tests = array(
+	'Open Banking sends minimal merchant_data and retains customer request fields' => function () {
+		$request = blink_payment_token_run_request( blink_payment_token_request( 'open-banking' ) );
+		blink_payment_token_assert_same( 'https://gateway.example.com/pay/v1/openbankings', $request['url'], 'Expected the Open Banking endpoint.' );
+		blink_payment_token_assert_same( 'customer@example.com', $request['args']['body']['user_email'], 'Customer email outside merchant_data must be retained.' );
+	},
 	'Apple Pay keeps paymentData JSON text in the outgoing API body' => function () use ( $apple_payment_json ) {
 		$request = blink_payment_token_run_request(
 			blink_payment_token_request( 'apple-pay', addslashes( $apple_payment_json ) )

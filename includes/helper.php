@@ -231,10 +231,12 @@ if (!function_exists('blink_get_payment_information')) {
     function blink_get_payment_information($order_id)
     {
         $order = wc_get_order($order_id);
+        // Blink can echo merchant_data in browser return URLs. Keep only the order identifier.
         return wp_json_encode(
             array(
-                'payer_info' => blink_get_customer_data($order),
-                'order_info' => blink_get_order_data($order),
+                'order_info' => array(
+                    'order_id' => $order->get_id(),
+                ),
             )
         );
     }

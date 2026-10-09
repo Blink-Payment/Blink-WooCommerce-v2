@@ -1,6 +1,6 @@
 *** WooCommerce - Blink Changelog ***
 
-2026-10-07 - version 1.4.0 
+2026-10-12 - version 1.4.0 
 
 * Apple Pay available on checkout for Window devices.
 * Decline reasons show on customer checkout.
@@ -8,6 +8,7 @@
 * Card scheme logos optionally shown at checkout.
 * Cleaner font for card fields.
 * Improved UI of admin settings.
+* Removed unnecessary information from merchant_data.
 
 2026-07-29 - version 1.3.7
 

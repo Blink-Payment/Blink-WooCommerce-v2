@@ -92,6 +92,7 @@ Preauthorized funds are typically held for a limited time (usually 7-30 days dep
 * Card scheme logos optionally shown at checkout.
 * Cleaner font for card fields.
 * Improved UI of admin settings.
+* Removed unnecessary information from merchant_data.
 
 
 = 1.3.7 =
