@@ -1,6 +1,6 @@
 *** WooCommerce - Blink Changelog ***
 
-2026-10-12 - version 1.4.0 
+2026-10-15 - version 1.4.0 
 
 * Apple Pay available on checkout for Window devices.
 * Decline reasons show on customer checkout.

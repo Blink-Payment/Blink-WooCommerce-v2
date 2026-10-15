@@ -299,9 +299,9 @@ class Blink_Transaction_Handler {
 			Blink_Logger::log( 'Rerun webhook ignored: rerun handler unavailable', array( 'order_id' => $order->get_id() ) );
 			return true;
 		}
+		$webhook_reference = ! empty( $request['reference'] ) && is_scalar( $request['reference'] ) ? sanitize_text_field( (string) $request['reference'] ) : '';
 		if ( 'yes' === $order->get_meta( '_blink_rerun_outcome_unknown', true ) ) {
 			$expected_reference = (string) $order->get_meta( '_blink_rerun_reference', true );
-			$webhook_reference = ! empty( $request['reference'] ) && is_scalar( $request['reference'] ) ? sanitize_text_field( (string) $request['reference'] ) : '';
 			if ( '' === $expected_reference || $expected_reference !== $webhook_reference ) {
 				Blink_Logger::log( 'Unknown rerun outcome remains blocked: webhook correlation unavailable', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id ) );
 				return true;
@@ -338,7 +338,7 @@ class Blink_Transaction_Handler {
 			$order->delete_meta_data( '_blink_rerun_outcome_unknown' );
 			$order->update_meta_data( '_gateway_status', $status );
 			$order->save();
-			$rerun_handler->record_rerun_failure( $order, $message, $transaction_id );
+			$rerun_handler->record_rerun_failure( $order, $message, $transaction_id, $webhook_reference );
 			// Only the optimistic legacy On hold -> Processing flow may be
 			// restored while its capture request is still active. A delayed
 			// webhook must never reopen a later merchant-selected status.
@@ -705,6 +705,16 @@ class Blink_Transaction_Handler {
 			}
 			// The merchant already changed the order to Processing. Restore the
 			// accurate payment state; this transition does not match the capture hook.
+			// A concurrent request may already have captured it, in which case
+			// this request was rejected under the lock and Processing is correct.
+			$already_captured = '' !== (string) $order->get_meta( 'blink_rerun_id', true );
+			if ( $already_captured ) {
+				Blink_Logger::log(
+					'Legacy pre-authorisation capture skipped; order already captured',
+					array( 'order_id' => $order_id, 'error' => isset( $result['error'] ) ? $result['error'] : '' )
+				);
+				return;
+			}
 			if ( $order->has_status( 'processing' ) ) {
 				$order->update_status( 'on-hold' );
 			}
@@ -751,7 +761,7 @@ class Blink_Transaction_Handler {
 			return;
 		}
 
-		$result = $gateway->rerun_handler->process_rerun( $order );
+		$result = $gateway->rerun_handler->process_rerun( $order, true );
 		$fresh_order = wc_get_order( $order->get_id() );
 		if ( $fresh_order ) {
 			$order = $fresh_order;

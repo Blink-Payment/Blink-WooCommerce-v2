@@ -18,22 +18,25 @@ class Blink_Rerun_Handler {
 	/**
 	 * Capture a pre-authorised order using Blink's rerun endpoint.
 	 *
-	 * @param WC_Order $order The order to capture.
+	 * @param WC_Order $order           The order to capture.
+	 * @param bool     $require_on_hold Whether this is an explicit admin action.
 	 * @return array Result of the capture operation.
 	 */
-	public function process_rerun( $order ) {
-		$order_id = $order->get_id();
+	public function process_rerun( $order, $require_on_hold = false ) {
+		$order_id     = $order->get_id();
+		$not_eligible = array(
+			'success' => false,
+			'error'   => __( 'This pre-authorisation is not eligible for capture', 'blink-payment-gateway-for-woocommerce' ),
+		);
 		Blink_Logger::log( 'Processing rerun for order', array( 'order_id' => $order_id ) );
 
-		if ( ! $this->is_eligible_for_rerun( $order ) ) {
-			return array(
-				'success' => false,
-				'error'   => __( 'This pre-authorisation is not eligible for capture', 'blink-payment-gateway-for-woocommerce' ),
-			);
+		// Cheap early rejection on the caller's snapshot; the authoritative
+		// check runs on a reloaded order once the lock is held.
+		if ( ! $this->is_eligible_for_rerun( $order, $require_on_hold ) ) {
+			return $not_eligible;
 		}
 
-		$transaction_id = $order->get_meta( 'blink_res', true );
-		$marker         = time() . ':' . wp_generate_uuid4();
+		$marker = time() . ':' . wp_generate_uuid4();
 		if ( ! $this->acquire_rerun_lock( $order, $marker ) ) {
 			return array(
 				'success' => false,
@@ -41,11 +44,26 @@ class Blink_Rerun_Handler {
 			);
 		}
 		try {
+			// The caller's order may be a stale snapshot taken before another
+			// request captured it and released the lock. Reload persisted state.
+			$fresh_order = wc_get_order( $order_id );
+			if ( $fresh_order ) {
+				$order = $fresh_order;
+			}
+			// The lock option holds this request's own marker, so skip the
+			// in-progress test that would otherwise reject it.
+			if ( ! $this->is_eligible_for_rerun( $order, $require_on_hold, true ) ) {
+				return $not_eligible;
+			}
+
+			$transaction_id = $order->get_meta( 'blink_res', true );
 			$order->update_meta_data( self::IN_PROGRESS_META, $marker );
 			// A new attempt gets its own merchant-facing failure result. These fields
 			// are then shared by its synchronous response and asynchronous webhook.
 			$order->update_meta_data( '_blink_last_failed_rerun_id', '' );
 			$order->update_meta_data( '_blink_last_failed_rerun_message', '' );
+			$order->update_meta_data( '_blink_last_failed_rerun_status', '' );
+			$order->update_meta_data( '_blink_last_failed_rerun_reference', '' );
 			$order->save();
 
 			$token = $this->gateway->utils->blink_set_tokens();
@@ -102,6 +120,12 @@ class Blink_Rerun_Handler {
 			if ( is_wp_error( $response ) ) {
 				$error_message = $response->get_error_message();
 				Blink_Logger::log( 'process_rerun() POST reruns', array( 'error' => $error_message ) );
+				// A final decline webhook may have landed while the request was
+				// waiting; it is authoritative over the transport failure.
+				$attempt_failure = $this->get_current_attempt_failure( $order );
+				if ( null !== $attempt_failure ) {
+					return array( 'success' => false, 'error' => $attempt_failure );
+				}
 				$this->record_rerun_unknown( $order, $error_message );
 				return array( 'success' => false, 'error' => $error_message );
 			}
@@ -130,6 +154,10 @@ class Blink_Rerun_Handler {
 				|| ( $http_code < 200 || $http_code >= 300 ) && ! $explicit_failure
 				|| ( ! $confirmed_success && ! $explicit_failure );
 			if ( $ambiguous_response ) {
+				$attempt_failure = $this->get_current_attempt_failure( $order );
+				if ( null !== $attempt_failure ) {
+					return array( 'success' => false, 'error' => $attempt_failure );
+				}
 				$error_message = __( 'Blink capture outcome is unknown; awaiting webhook confirmation', 'blink-payment-gateway-for-woocommerce' );
 				$this->record_rerun_unknown( $order, $error_message );
 				return array( 'success' => false, 'error' => $error_message );
@@ -268,9 +296,10 @@ class Blink_Rerun_Handler {
 	 * @param WC_Order $order          Order whose capture failed.
 	 * @param string   $message        Safe failure reason.
 	 * @param string   $transaction_id Optional failed rerun transaction ID.
+	 * @param string   $reference      Optional rerun reference the failure belongs to.
 	 * @return void
 	 */
-	public function record_rerun_failure( $order, $message, $transaction_id = '' ) {
+	public function record_rerun_failure( $order, $message, $transaction_id = '', $reference = '' ) {
 		$message        = sanitize_text_field( is_scalar( $message ) ? (string) $message : '' );
 		$message        = '' !== $message ? $message : __( 'Unknown error occurred', 'blink-payment-gateway-for-woocommerce' );
 		$transaction_id = sanitize_text_field( is_scalar( $transaction_id ) ? (string) $transaction_id : '' );
@@ -282,6 +311,7 @@ class Blink_Rerun_Handler {
 		$order->update_meta_data( '_blink_last_failed_rerun_id', $transaction_id );
 		$order->update_meta_data( '_blink_last_failed_rerun_message', $message );
 		$order->update_meta_data( '_blink_last_failed_rerun_status', 'failed' );
+		$order->update_meta_data( '_blink_last_failed_rerun_reference', sanitize_text_field( is_scalar( $reference ) ? (string) $reference : '' ) );
 		$order->save();
 
 		if ( ! $is_duplicate ) {
@@ -293,6 +323,29 @@ class Blink_Rerun_Handler {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Return the failure recorded for the current capture attempt, if any.
+	 *
+	 * A recorded failure only overrides an ambiguous synchronous response when
+	 * its rerun reference matches this attempt's reference. Without that
+	 * correlation a late decline from an older attempt could be mistaken for
+	 * this one and re-enable capture while this attempt's outcome is unknown.
+	 *
+	 * @param WC_Order $order Order reloaded after the capture request.
+	 * @return string|null Failure message, or null when no current failure exists.
+	 */
+	private function get_current_attempt_failure( $order ) {
+		if ( 'failed' !== (string) $order->get_meta( '_blink_last_failed_rerun_status', true ) ) {
+			return null;
+		}
+		$failed_reference = (string) $order->get_meta( '_blink_last_failed_rerun_reference', true );
+		if ( '' === $failed_reference || $failed_reference !== (string) $order->get_meta( '_blink_rerun_reference', true ) ) {
+			return null;
+		}
+		$message = (string) $order->get_meta( '_blink_last_failed_rerun_message', true );
+		return '' !== $message ? $message : __( 'Capture failed', 'blink-payment-gateway-for-woocommerce' );
 	}
 
 	public function record_rerun_unknown( $order, $message ) {
@@ -307,9 +360,10 @@ class Blink_Rerun_Handler {
 	 *
 	 * @param WC_Order $order           Order to check.
 	 * @param bool     $require_on_hold Whether this is an explicit admin action.
+	 * @param bool     $ignore_lock     Whether the caller already holds the capture lock.
 	 * @return bool
 	 */
-	public function is_eligible_for_rerun( $order, $require_on_hold = false ) {
+	public function is_eligible_for_rerun( $order, $require_on_hold = false, $ignore_lock = false ) {
 		if ( ! is_object( $order ) || 'blink' !== $order->get_payment_method() ) {
 			return false;
 		}
@@ -319,7 +373,7 @@ class Blink_Rerun_Handler {
 		if ( 'yes' === $order->get_meta( '_blink_rerun_outcome_unknown', true ) ) {
 			return false;
 		}
-		if ( ! empty( $order->get_meta( 'blink_rerun_id', true ) ) || $this->is_rerun_in_progress( $order ) ) {
+		if ( ! empty( $order->get_meta( 'blink_rerun_id', true ) ) || ( ! $ignore_lock && $this->is_rerun_in_progress( $order ) ) ) {
 			return false;
 		}
 		if ( $require_on_hold && ! $order->has_status( 'on-hold' ) ) {

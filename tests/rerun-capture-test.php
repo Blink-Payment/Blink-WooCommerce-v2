@@ -10,6 +10,7 @@ $test_current_user_can   = true;
 $test_woocommerce        = null;
 $test_options            = array();
 $test_filters            = array();
+$test_order_loads        = array();
 
 function __( $text, $domain = null ) {
 	return $text;
@@ -111,7 +112,12 @@ function wp_remote_retrieve_response_code( $response ) {
 }
 
 function wc_get_order( $order_id ) {
-	global $test_orders;
+	global $test_orders, $test_order_loads;
+	// Queued snapshots are returned first, to simulate a request that loaded
+	// the order before another request persisted a change.
+	if ( ! empty( $test_order_loads[ $order_id ] ) ) {
+		return array_shift( $test_order_loads[ $order_id ] );
+	}
 	return isset( $test_orders[ $order_id ] ) ? $test_orders[ $order_id ] : null;
 }
 
@@ -273,8 +279,9 @@ class Blink_Rerun_Test_Utils {
 }
 
 function blink_rerun_test_reset( $response = null ) {
-	global $test_orders, $test_remote_post_calls, $test_remote_response, $test_logs, $test_current_user_can, $test_woocommerce, $test_options, $test_filters;
+	global $test_orders, $test_remote_post_calls, $test_remote_response, $test_logs, $test_current_user_can, $test_woocommerce, $test_options, $test_filters, $test_order_loads;
 	$test_orders            = array();
+	$test_order_loads       = array();
 	$test_remote_post_calls = array();
 	$test_logs              = array();
 	$test_current_user_can  = true;
@@ -710,6 +717,140 @@ $tests = array(
 		$actions = Blink_Transaction_Handler::blink_add_capture_order_action( array(), $order );
 		blink_rerun_assert_same( 'Capture Blink pre-authorisation', $actions['blink_capture_preauthorisation'], 'Stale marker action' );
 		blink_rerun_assert_same( '', $order->get_meta( '_blink_rerun_in_progress', true ), 'Stale marker cleared' );
+	},
+	'decline webhook during request wins over a subsequent transport timeout' => function () {
+		global $test_remote_post_calls, $test_remote_response, $test_woocommerce;
+		blink_rerun_test_reset();
+		$order = blink_rerun_test_order( 170 );
+		$test_remote_response = function () use ( $order, &$test_woocommerce ) {
+			$handler = new Blink_Transaction_Handler( $test_woocommerce->payment_gateways->payment_gateways()['blink'] );
+			$handler->blink_handle_rerun_webhook(
+				$order,
+				array( 'event_type' => 'rerun_transaction', 'status' => 'Declined', 'message' => 'CARD DECLINED', 'reference' => $order->get_meta( '_blink_rerun_reference', true ) ),
+				'DECLINED-170'
+			);
+			return new WP_Error( 'Timeout' );
+		};
+		$rerun_handler = $test_woocommerce->payment_gateways->payment_gateways()['blink']->rerun_handler;
+		$result        = $rerun_handler->process_rerun( $order );
+		blink_rerun_assert_same( false, $result['success'], 'Timeout decline result' );
+		blink_rerun_assert_same( 'CARD DECLINED', $result['error'], 'Timeout decline reported' );
+		blink_rerun_assert_same( '', $order->get_meta( '_blink_rerun_outcome_unknown', true ), 'Timeout decline not unknown' );
+		blink_rerun_assert_same( 0, blink_rerun_note_count( $order, 'outcome is unknown' ), 'Timeout decline unknown note' );
+		blink_rerun_assert_same( 1, count( $test_remote_post_calls ), 'Timeout decline request count' );
+		$actions = Blink_Transaction_Handler::blink_add_capture_order_action( array(), $order );
+		blink_rerun_assert_same( 'Capture Blink pre-authorisation', $actions['blink_capture_preauthorisation'] ?? null, 'Timeout decline capture action available' );
+	},
+	'decline webhook during request wins over a subsequent 503' => function () {
+		global $test_remote_post_calls, $test_remote_response, $test_woocommerce;
+		blink_rerun_test_reset();
+		$order = blink_rerun_test_order( 171 );
+		$test_remote_response = function () use ( $order, &$test_woocommerce ) {
+			$handler = new Blink_Transaction_Handler( $test_woocommerce->payment_gateways->payment_gateways()['blink'] );
+			$handler->blink_handle_rerun_webhook(
+				$order,
+				array( 'event_type' => 'rerun_transaction', 'status' => 'Declined', 'message' => 'CARD DECLINED', 'reference' => $order->get_meta( '_blink_rerun_reference', true ) ),
+				'DECLINED-171'
+			);
+			return array( 'response' => array( 'code' => 503 ), 'body' => 'Service Unavailable' );
+		};
+		$rerun_handler = $test_woocommerce->payment_gateways->payment_gateways()['blink']->rerun_handler;
+		$result        = $rerun_handler->process_rerun( $order );
+		blink_rerun_assert_same( false, $result['success'], '503 decline result' );
+		blink_rerun_assert_same( 'CARD DECLINED', $result['error'], '503 decline reported' );
+		blink_rerun_assert_same( '', $order->get_meta( '_blink_rerun_outcome_unknown', true ), '503 decline not unknown' );
+		blink_rerun_assert_same( 0, blink_rerun_note_count( $order, 'outcome is unknown' ), '503 decline unknown note' );
+		blink_rerun_assert_same( 1, count( $test_remote_post_calls ), '503 decline request count' );
+		$actions = Blink_Transaction_Handler::blink_add_capture_order_action( array(), $order );
+		blink_rerun_assert_same( 'Capture Blink pre-authorisation', $actions['blink_capture_preauthorisation'] ?? null, '503 decline capture action available' );
+	},
+	'stale order snapshots send exactly one capture request' => function () {
+		global $test_remote_post_calls, $test_woocommerce;
+		blink_rerun_test_reset();
+		$persisted  = blink_rerun_test_order( 172 );
+		$snapshot_a = clone $persisted;
+		$snapshot_b = clone $persisted;
+		$rerun_handler = $test_woocommerce->payment_gateways->payment_gateways()['blink']->rerun_handler;
+		$result_a = $rerun_handler->process_rerun( $snapshot_a );
+		$result_b = $rerun_handler->process_rerun( $snapshot_b );
+		blink_rerun_assert_same( true, $result_a['success'], 'First snapshot captured' );
+		blink_rerun_assert_same( false, $result_b['success'], 'Second snapshot rejected' );
+		blink_rerun_assert_same( 'This pre-authorisation is not eligible for capture', $result_b['error'], 'Second snapshot not eligible' );
+		blink_rerun_assert_same( 1, count( $test_remote_post_calls ), 'Stale snapshot request count' );
+		blink_rerun_assert_same( '', get_option( 'blink_rerun_lock_172', '' ), 'Stale snapshot lock released' );
+	},
+	'stale failure from an earlier attempt does not mask an unknown outcome' => function () {
+		global $test_remote_response, $test_woocommerce;
+		blink_rerun_test_reset( new WP_Error( 'Timeout' ) );
+		$order = blink_rerun_test_order( 173 );
+		$order->update_meta_data( '_blink_last_failed_rerun_id', 'OLD-173' );
+		$order->update_meta_data( '_blink_last_failed_rerun_message', 'OLD DECLINE' );
+		$order->update_meta_data( '_blink_last_failed_rerun_status', 'failed' );
+		$rerun_handler = $test_woocommerce->payment_gateways->payment_gateways()['blink']->rerun_handler;
+		$result        = $rerun_handler->process_rerun( $order );
+		blink_rerun_assert_same( 'Timeout', $result['error'], 'Earlier failure not reported' );
+		blink_rerun_assert_same( 'yes', $order->get_meta( '_blink_rerun_outcome_unknown', true ), 'Earlier failure leaves outcome unknown' );
+	},
+	'decline webhook for an older attempt reference does not mask an unknown outcome' => function () {
+		global $test_remote_response, $test_woocommerce;
+		blink_rerun_test_reset();
+		$order = blink_rerun_test_order( 174 );
+		$test_remote_response = function () use ( $order, &$test_woocommerce ) {
+			$handler = new Blink_Transaction_Handler( $test_woocommerce->payment_gateways->payment_gateways()['blink'] );
+			$handler->blink_handle_rerun_webhook(
+				$order,
+				array( 'event_type' => 'rerun_transaction', 'status' => 'Declined', 'message' => 'OLD DECLINE', 'reference' => 'WC-174-R-older-attempt' ),
+				'OLD-174'
+			);
+			return new WP_Error( 'Timeout' );
+		};
+		$rerun_handler = $test_woocommerce->payment_gateways->payment_gateways()['blink']->rerun_handler;
+		$result        = $rerun_handler->process_rerun( $order );
+		blink_rerun_assert_same( 'Timeout', $result['error'], 'Older attempt decline not reported' );
+		blink_rerun_assert_same( 'yes', $order->get_meta( '_blink_rerun_outcome_unknown', true ), 'Older attempt decline leaves outcome unknown' );
+	},
+	'decline webhook without a reference does not mask an unknown outcome' => function () {
+		global $test_remote_response, $test_woocommerce;
+		blink_rerun_test_reset();
+		$order = blink_rerun_test_order( 176 );
+		$test_remote_response = function () use ( $order, &$test_woocommerce ) {
+			$handler = new Blink_Transaction_Handler( $test_woocommerce->payment_gateways->payment_gateways()['blink'] );
+			$handler->blink_handle_rerun_webhook(
+				$order,
+				array( 'event_type' => 'rerun_transaction', 'status' => 'Declined', 'message' => 'UNCORRELATED DECLINE' ),
+				'UNCORRELATED-176'
+			);
+			return new WP_Error( 'Timeout' );
+		};
+		$rerun_handler = $test_woocommerce->payment_gateways->payment_gateways()['blink']->rerun_handler;
+		$result        = $rerun_handler->process_rerun( $order );
+		blink_rerun_assert_same( 'Timeout', $result['error'], 'Uncorrelated decline not reported' );
+		blink_rerun_assert_same( 'yes', $order->get_meta( '_blink_rerun_outcome_unknown', true ), 'Uncorrelated decline leaves outcome unknown' );
+		blink_rerun_assert_same( array(), Blink_Transaction_Handler::blink_add_capture_order_action( array(), $order ), 'Uncorrelated decline keeps capture blocked' );
+	},
+	'legacy capture losing to a completed capture keeps the order processing' => function () {
+		global $test_remote_post_calls, $test_order_loads;
+		blink_rerun_test_reset();
+		// Another request has already captured and released the lock.
+		$persisted = blink_rerun_test_order( 177, 'blink', 'processing', true, 'CAPTURE-177' );
+		$persisted->update_meta_data( '_blink_payment_complete_done', 'yes' );
+		// This request loaded the order before that capture was persisted.
+		$test_order_loads[177] = array( new Blink_Rerun_Test_Order( 177, 'blink', 'processing', true ) );
+		Blink_Transaction_Handler::blink_handle_order_status_change( 177, 'on-hold', 'processing' );
+		blink_rerun_assert_same( 0, count( $test_remote_post_calls ), 'Losing legacy request count' );
+		blink_rerun_assert_same( 'processing', $persisted->get_status(), 'Captured order stays processing' );
+		blink_rerun_assert_same( array( 'processing' ), $persisted->status_history, 'Captured order never restored to on-hold' );
+	},
+	'admin capture re-checks on-hold status under the lock' => function () {
+		global $test_remote_post_calls, $test_woocommerce;
+		blink_rerun_test_reset();
+		$persisted = blink_rerun_test_order( 175 );
+		$snapshot  = clone $persisted;
+		$persisted->update_status( 'cancelled' );
+		$rerun_handler = $test_woocommerce->payment_gateways->payment_gateways()['blink']->rerun_handler;
+		$result        = $rerun_handler->process_rerun( $snapshot, true );
+		blink_rerun_assert_same( false, $result['success'], 'Cancelled order not captured' );
+		blink_rerun_assert_same( 0, count( $test_remote_post_calls ), 'Cancelled order request count' );
 	},
 );
 
