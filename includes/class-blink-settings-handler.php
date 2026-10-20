@@ -40,7 +40,7 @@ class Blink_Settings_Handler {
 				'title'       => __( 'Checkout title', 'blink-payment-gateway-for-woocommerce' ),
 				'type'        => 'text',
 				'description' => __( 'This controls the title which the customer sees during checkout.', 'blink-payment-gateway-for-woocommerce' ),
-				'default'     => __( 'Blink v2', 'blink-payment-gateway-for-woocommerce' ),
+				'default'     => __( 'Blink Payment', 'blink-payment-gateway-for-woocommerce' ),
 				'desc_tip'    => true,
 			),
 			'description'     => array(
