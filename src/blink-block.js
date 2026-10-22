@@ -682,7 +682,7 @@ const BlinkPayment = (props) => {
       appleFormRef.current?.querySelectorAll('script[src*="apple-pay-sdk.js"]')
         .forEach(script => script.remove());
       const loadApplePayJs = loadWalletScriptOnce(
-        'https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js',
+        'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js',
         'apple-pay-sdk'
       );
       const loadApplePayApi = loadWalletScriptOnce(
