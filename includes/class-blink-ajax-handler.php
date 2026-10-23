@@ -38,7 +38,7 @@ class Blink_Ajax_Handler {
 		if ( ! $order ) {
 			wp_send_json_error( __( 'Invalid order ID.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
-		$transaction_id = $order->get_meta( 'blink_res', true );
+		$transaction_id = blink_get_charge_transaction_id( $order );
 
 		if ( ! $transaction_id ) {
 			wp_send_json_error( __( 'Transaction ID not found.', 'blink-payment-gateway-for-woocommerce' ) );

@@ -3,9 +3,9 @@ Contributors: BlinkPayment
 Tags: woocommerce payment gateway, credit card, open banking, apple pay, google pay
 Requires at least: 5.8
 Requires Plugins: woocommerce
-Tested up to: 6.6
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.7
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,18 @@ Preauthorized funds are typically held for a limited time (usually 7-30 days dep
 3. Apple Pay and Google Pay buttons on the checkout page.
 
 == Changelog ==
+
+= 1.4.0 =
+* Apple Pay available on checkout for Windows devices.
+* Decline reasons show on customer checkout.
+* Additional capture option for Preauthorised orders.
+* Card scheme logos optionally shown at checkout.
+* Cleaner font for card fields.
+* Improved UI of admin settings.
+* Removed unnecessary information from merchant_data.
+* Declared compatibility with WooCommerce High-Performance Order Storage (HPOS).
+* Default checkout title changed to "Blink Payment" (existing saved titles are unchanged).
+
 
 = 1.3.7 =
 * Fixed WooCommerce mapping orders for failed preauth transactions

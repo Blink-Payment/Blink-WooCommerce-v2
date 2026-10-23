@@ -305,21 +305,32 @@ class Blink_Payment_Handler {
 			return blink_error_payment_process( __( 'Missing intent or token', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
-		// Decode payment tokens if present
+		$payment_by = isset( $request['payment_by'] ) ? sanitize_text_field( wp_unslash( $request['payment_by'] ) ) : '';
+
+		// Apple Pay expects paymentData as JSON text. Keep the existing decoded
+		// representation for Google Pay and card tokens.
 		if ( ! empty( $request['paymenttoken'] ) ) {
-			$token_array = json_decode( $request['paymenttoken'], true );
-			if ( ! empty( $token_array ) ) {
-				$request['paymenttoken'] = $token_array;
+			if ( 'apple-pay' === $payment_by ) {
+				$request['paymenttoken'] = wp_unslash( $request['paymenttoken'] );
+			} else {
+				$token_array = json_decode( $request['paymenttoken'], true );
+				if ( ! empty( $token_array ) ) {
+					$request['paymenttoken'] = $token_array;
+				}
 			}
 		}
 		if ( ! empty( $request['paymentToken'] ) ) {
-			$token_array = json_decode( wp_unslash( $request['paymentToken'] ), true );
-			if ( ! empty( $token_array ) ) {
-				$request['paymentToken'] = $token_array;
+			$payment_token = wp_unslash( $request['paymentToken'] );
+			if ( 'apple-pay' === $payment_by ) {
+				$request['paymentToken'] = $payment_token;
+			} else {
+				$token_array = json_decode( $payment_token, true );
+				if ( ! empty( $token_array ) ) {
+					$request['paymentToken'] = $token_array;
+				}
 			}
 		}
 
-		$payment_by = isset( $request['payment_by'] ) ? sanitize_text_field( wp_unslash( $request['payment_by'] ) ) : '';
 		$supported_methods = array();
 		if ( ! empty( $this->gateway->paymentMethods ) && is_array( $this->gateway->paymentMethods ) ) {
 			$supported_methods = $this->gateway->paymentMethods;

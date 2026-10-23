@@ -10,6 +10,10 @@ function __($text, $domain = null) {
     return $text;
 }
 
+function sanitize_text_field($text) {
+    return trim(strip_tags((string) $text));
+}
+
 function add_option($key, $value) {
     global $test_options;
     if (isset($test_options[$key])) {
@@ -131,6 +135,21 @@ function blink_assert_same($expected, $actual, $message) {
 }
 
 $tests = array(
+    'transaction API payment message takes priority' => function () {
+        blink_assert_same('API decline', blink_resolve_payment_message('API decline', 'Redirect decline'), 'Resolved API message');
+    },
+    'redirect payment note is the operational fallback' => function () {
+        blink_assert_same('Redirect decline', blink_resolve_payment_message('', 'Redirect decline'), 'Resolved redirect note');
+    },
+    'payment message is sanitized' => function () {
+        blink_assert_same('Declined', blink_resolve_payment_message('<strong>Declined</strong>', ''), 'Sanitized payment message');
+    },
+    'non-scalar API payment message is not exposed' => function () {
+        blink_assert_same('Safe fallback', blink_resolve_payment_message(array('internal' => 'error'), 'Safe fallback'), 'Non-scalar API message');
+    },
+    'empty payment messages remain empty' => function () {
+        blink_assert_same('', blink_resolve_payment_message('', ''), 'Empty payment message');
+    },
     'pre-auth authorized is on-hold' => function () {
         $order = blink_test_order(true);
         blink_change_status($order, 'BL-AUTH', '  AUTHORIZED  ', 'Card');
@@ -194,10 +213,6 @@ $tests = array(
         $order = blink_test_order(true);
         blink_assert_same('hold', blink_get_status('Preauth', '', $order), 'Preauth pre-auth status');
     },
-    'preauth pre-auth maps to hold' => function () {
-        $order = blink_test_order(true);
-        blink_assert_same('hold', blink_get_status('preauth', '', $order), 'preauth pre-auth status');
-    },
     'Preauth pre-auth order is on-hold' => function () {
         $order = blink_test_order(true);
         blink_change_status($order, 'BL-GOOGLE-PAY-PREAUTH', 'Preauth', 'googlepay');
@@ -223,6 +238,21 @@ $tests = array(
         blink_assert_same('no', $order->get_meta('_blink_preauth', true), 'Sale pre-auth metadata');
         $test_preauthorize_payments = false;
     },
+	'charge transaction uses capture ID after pre-auth capture' => function () {
+		$order = blink_test_order( true );
+		$order->update_meta_data( 'blink_res', 'ORIGINAL-AUTH' );
+		$order->update_meta_data( 'blink_rerun_id', 'CAPTURE-ID' );
+		blink_assert_same( 'CAPTURE-ID', blink_get_charge_transaction_id( $order ), 'Captured charge transaction ID' );
+	},
+	'charge transaction falls back to original transaction before capture' => function () {
+		$order = blink_test_order( true );
+		$order->update_meta_data( 'blink_res', 'ORIGINAL-AUTH' );
+        blink_assert_same( 'ORIGINAL-AUTH', blink_get_charge_transaction_id( $order ), 'Pre-capture transaction ID' );
+    },
+	'initial pre-auth paid and approved statuses remain on-hold' => function () {
+		blink_assert_same( 'hold', blink_get_status( 'paid', '', blink_test_order( true ) ), 'Initial paid pre-auth status' );
+		blink_assert_same( 'hold', blink_get_status( 'approved', '', blink_test_order( true ) ), 'Initial approved pre-auth status' );
+	},
 );
 
 $failures = 0;

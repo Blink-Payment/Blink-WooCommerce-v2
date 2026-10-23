@@ -149,7 +149,7 @@ class Blink_Payment_Fields_Handler {
 				</div>';
 			}
 			
-			$showGP = true;
+			$wallet_availability = blink_get_wallet_availability( $this->gateway->apple_pay_enabled, $element );
 			$count  = 0;
 			foreach ( $available_methods as $method ) {
 				$key = $this->blink_get_element_key( $method );
@@ -162,14 +162,19 @@ class Blink_Payment_Fields_Handler {
 			?>
 			<div class="form-container">
 				<?php
-				if ( blink_is_safari() ) {
-					if ( ! empty( $element['apElement'] ) && ! empty( $this->gateway->apple_pay_enabled ) ) {
-						$showGP = false;
+				if ( $wallet_availability['showWalletRow'] ) {
+					echo '<div class="blink-wallet-row" data-blink-wallet-row>';
+					if ( $wallet_availability['showApplePay'] ) {
+						echo '<div class="blink-wallet" data-blink-wallet="apple">';
 						echo wp_kses( $element['apElement'], $this->blink_get_payment_box_allowed_html() );
+						echo '</div>';
 					}
-				}
-				if ( $showGP && ! empty( $element['gpElement'] ) ) {
-					echo wp_kses( $element['gpElement'], $this->blink_get_payment_box_allowed_html() );
+					if ( $wallet_availability['showGooglePay'] ) {
+						echo '<div class="blink-wallet" data-blink-wallet="google">';
+						echo wp_kses( $element['gpElement'], $this->blink_get_payment_box_allowed_html() );
+						echo '</div>';
+					}
+					echo '</div>';
 				}
 				?>
 				<div class="batch-upload-wrap pb-3">

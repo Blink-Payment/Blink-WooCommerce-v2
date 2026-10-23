@@ -109,3 +109,550 @@
 .blink-preauth-notice p {
 	margin: 0;
 }
+
+/* Blink gateway settings. Keep all layout rules inside the gateway wrapper. */
+/* stylelint-disable no-descending-specificity */
+.blink-settings {
+	max-width: 1180px;
+}
+
+.blink-settings .wc-settings-sub-title.blink-settings-section {
+	margin: 28px 0 0;
+	padding: 18px 20px 0;
+	border: 1px solid #c3c4c7;
+	border-bottom: 0;
+	background: #fff;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.blink-settings .blink-settings-caption {
+	padding: 0;
+	caption-side: top;
+	text-align: left;
+}
+
+.blink-settings .blink-settings-caption > div {
+	margin-top: 0;
+	padding: 22px 22px 18px;
+	border: 0;
+	background: #fff;
+	box-shadow: none;
+}
+
+.blink-settings .blink-settings-caption h3,
+.blink-settings .blink-settings-caption p {
+	margin: 0;
+}
+
+.blink-settings .blink-settings-caption .wc-settings-sub-title {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.blink-settings .blink-settings-caption p {
+	margin-top: 5px;
+	color: #646970;
+}
+
+.blink-settings .blink-settings-caption .wc-settings-sub-title + p {
+	padding: 0;
+	border: 0;
+	background: transparent;
+}
+
+.blink-settings .form-table:has(.blink-settings-caption) {
+	margin-top: 28px;
+	border-top: 1px solid #c3c4c7;
+}
+
+.blink-settings .wc-settings-sub-title.blink-settings-section + p {
+	box-sizing: border-box;
+	max-width: none;
+	margin: 0;
+	padding: 6px 20px 18px;
+	border: 1px solid #c3c4c7;
+	border-top: 0;
+	border-bottom: 0;
+	background: #fff;
+	color: #646970;
+}
+
+.blink-settings .wc-settings-sub-title.blink-settings-subsection {
+	margin: 18px 0 0;
+	padding: 14px 20px 0;
+	border: 1px solid #dcdcde;
+	border-bottom: 0;
+	background: #f6f7f7;
+	font-size: 14px;
+}
+
+.blink-settings .wc-settings-sub-title.blink-settings-subsection + p {
+	box-sizing: border-box;
+	max-width: none;
+	margin: 0;
+	padding: 4px 20px 14px;
+	border: 1px solid #dcdcde;
+	border-top: 0;
+	border-bottom: 0;
+	background: #f6f7f7;
+	color: #646970;
+}
+
+.blink-settings .form-table {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 8px 22px 18px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.blink-settings .blink-settings-subsection + p + .form-table {
+	border-color: #dcdcde;
+	background: #f6f7f7;
+}
+
+.blink-settings .blink-settings-subheading th {
+	width: auto;
+	padding: 18px 0 8px;
+	border-top: 1px solid #dcdcde;
+}
+
+.blink-settings .blink-settings-subheading h4,
+.blink-settings .blink-settings-subheading p {
+	margin: 0;
+}
+
+.blink-settings .blink-settings-subheading h4 {
+	font-size: 14px;
+}
+
+.blink-settings .blink-settings-subheading p {
+	margin-top: 4px;
+	color: #646970;
+	font-weight: 400;
+}
+
+.blink-settings .form-table th {
+	width: 190px;
+	padding: 14px 18px 14px 0;
+}
+
+.blink-settings .form-table td {
+	padding: 12px 0;
+}
+
+/* Keep field content aligned with the padded section headings. */
+.blink-settings .form-table:not(:has(.blink-settings-choice-row)) > tbody > tr > th {
+	padding-left: 22px;
+}
+
+.blink-settings .form-table:not(:has(.blink-settings-choice-row)) > tbody > tr > td {
+	padding-right: 22px;
+}
+
+.blink-settings .form-table th.titledesc > label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.blink-settings .form-table th.titledesc .woocommerce-help-tip {
+	margin: 0;
+}
+
+.blink-settings .form-table input[type="text"],
+.blink-settings .form-table input[type="password"],
+.blink-settings .form-table select,
+.blink-settings .form-table textarea {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 560px;
+}
+
+.blink-settings .form-table textarea {
+	min-height: 96px;
+}
+
+.blink-settings [data-direct-description] ~ .description {
+	margin-top: 8px;
+}
+
+.blink-settings .form-table:has(.blink-settings-choice-row) {
+	margin-top: 0;
+	padding-top: 4px;
+	padding-bottom: 14px;
+}
+
+.blink-settings .blink-settings-section--choices + p {
+	padding-bottom: 4px;
+}
+
+.blink-settings .blink-settings-choice-columns {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 24px;
+	margin-top: 28px;
+}
+
+.blink-settings .blink-settings-choice-section {
+	min-width: 0;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.blink-settings .blink-settings-choice-section .blink-settings-choice-heading {
+	margin: 0;
+	padding: 20px 22px 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.blink-settings .blink-settings-choice-section > p {
+	margin: 0;
+	padding: 5px 22px 12px;
+	border: 0;
+	background: transparent;
+	color: #646970;
+}
+
+.blink-settings .blink-settings-choice-section .form-table {
+	padding: 4px 22px 18px;
+	border: 0;
+	box-shadow: none;
+}
+
+.blink-settings .blink-settings-choice-section .form-table:has(.blink-settings-choice-row) tbody {
+	display: flex;
+	flex-wrap: wrap;
+	align-content: flex-start;
+	row-gap: 10px;
+	column-gap: 16px;
+}
+
+.blink-settings .blink-settings-choice-group-row,
+.blink-settings .blink-settings-choice-group-row > td {
+	display: block;
+	padding: 0;
+	border: 0;
+}
+
+.blink-settings .blink-settings-choice-group {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 16px;
+	margin: 0;
+	padding: 0;
+}
+
+.blink-settings .blink-settings-choice-group > fieldset {
+	flex: 0 0 auto;
+	margin: 0;
+	padding: 0;
+}
+
+.blink-settings .blink-settings-choice-section .blink-settings-choice-row {
+	display: flex;
+	flex: 0 0 auto;
+	margin: 0;
+	width: auto;
+	max-width: 100%;
+	border: 0;
+}
+
+.blink-settings .blink-settings-choice-section .blink-settings-choice-row td {
+	width: auto;
+	border: 0;
+}
+
+.blink-settings .blink-settings-choice-section .blink-settings-choice {
+	display: inline-flex;
+	width: auto;
+	max-width: 100%;
+	min-width: 132px;
+	padding: 8px 12px;
+}
+
+.blink-settings .form-table:has(.blink-api-test-field) tbody {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	column-gap: 32px;
+}
+
+.blink-settings .form-table:has(.blink-api-test-field) tr {
+	display: grid;
+	grid-template-columns: 150px minmax(0, 1fr);
+	align-items: center;
+}
+
+.blink-settings .form-table:has(.blink-api-test-field) .blink-settings-mode-row,
+.blink-settings .form-table:has(.blink-api-test-field) .blink-settings-subheading {
+	grid-column: 1 / -1;
+}
+
+.blink-settings .form-table:has(.blink-api-test-field) .blink-settings-subheading {
+	display: block;
+}
+
+.blink-settings .form-table:has(.blink-api-test-field) .blink-settings-subheading th {
+	padding-top: 16px;
+	padding-left: 22px;
+}
+
+.blink-settings .blink-settings-mode-row th,
+.blink-settings .blink-settings-mode-row td {
+	vertical-align: middle;
+}
+
+.blink-settings .blink-settings-mode-row td fieldset {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.blink-settings .blink-settings-mode-row td fieldset > label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.blink-settings .blink-settings-section--payment-options + p {
+	padding-bottom: 8px;
+}
+
+.blink-settings .blink-settings-section--payment-options + p + .form-table {
+	padding-top: 4px;
+	padding-bottom: 12px;
+}
+
+.blink-settings .blink-settings-advanced {
+	margin-top: 28px;
+	border: 1px solid #dcdcde;
+	background: #f6f7f7;
+	box-shadow: none;
+}
+
+.blink-settings .blink-settings-advanced summary {
+	box-sizing: border-box;
+	padding: 18px 22px;
+	cursor: pointer;
+	list-style-position: inside;
+}
+
+.blink-settings .blink-settings-advanced summary:focus {
+	outline: 2px solid #2271b1;
+	outline-offset: -2px;
+}
+
+.blink-settings .blink-settings-advanced-title,
+.blink-settings .blink-settings-advanced-description {
+	display: inline;
+}
+
+.blink-settings .blink-settings-advanced-title {
+	margin-right: 8px;
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.blink-settings .blink-settings-advanced-description {
+	color: #646970;
+}
+
+.blink-settings .blink-settings-advanced > .form-table {
+	margin: 0;
+	border: 0;
+	border-top: 1px solid #dcdcde;
+	box-shadow: none;
+}
+
+.blink-settings .form-table:has(.blink-settings-choice-row) tbody {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.blink-settings .blink-settings-choice-row,
+.blink-settings .blink-settings-choice-row td {
+	display: block;
+	padding: 0;
+}
+
+.blink-settings .blink-settings-choice {
+	display: flex;
+	box-sizing: border-box;
+	min-height: 44px;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+	background: #f6f7f7;
+}
+
+.blink-settings .blink-settings-choice:hover {
+	border-color: #8c8f94;
+	background: #fff;
+}
+
+.blink-settings .blink-settings-mode-status,
+.blink-settings .blink-settings-status {
+	display: inline-block;
+	margin-left: 10px;
+	padding: 3px 8px;
+	border-radius: 12px;
+	background: #f0f0f1;
+	color: #50575e;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.blink-settings .blink-settings-state-control {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.blink-settings .blink-settings-mode-status.is-test {
+	background: #fcf0d5;
+	color: #6e4b00;
+}
+
+.blink-settings .blink-settings-mode-status.is-live,
+.blink-settings .blink-settings-status.is-enabled {
+	background: #edfaef;
+	color: #176b2c;
+}
+
+.blink-settings .blink-settings-status.is-disabled {
+	background: #f0f0f1;
+	color: #646970;
+}
+
+.blink-settings .blink-apple-pay-card {
+	box-sizing: border-box;
+	margin-top: 28px;
+	padding: 18px 20px 8px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.blink-settings .blink-apple-pay-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.blink-settings .blink-apple-pay-header h3,
+.blink-settings .blink-apple-pay-header .blink-settings-status {
+	margin: 0;
+}
+
+.blink-settings .blink-apple-pay-instructions > p {
+	margin: 8px 0 0;
+	color: #646970;
+}
+
+.blink-settings .blink-apple-pay-instructions ol {
+	margin: 12px 0 0 22px;
+}
+
+.blink-settings .blink-apple-pay-instructions li {
+	margin: 0 0 14px;
+	padding-left: 4px;
+}
+
+.blink-settings .blink-apple-pay-instructions code {
+	overflow-wrap: anywhere;
+}
+
+.blink-settings .blink-settings-section--advanced {
+	color: #50575e;
+}
+
+.blink-settings .blink-settings-section--advanced,
+.blink-settings .blink-settings-section--advanced + p,
+.blink-settings .blink-settings-section--advanced + p + .form-table {
+	border-color: #dcdcde;
+	background: #f6f7f7;
+	box-shadow: none;
+}
+
+@media screen and (max-width: 782px) {
+
+	.blink-settings {
+		max-width: 100%;
+	}
+
+	.blink-settings .wc-settings-sub-title.blink-settings-section,
+	.blink-settings .wc-settings-sub-title.blink-settings-subsection,
+	.blink-settings .wc-settings-sub-title.blink-settings-section + p,
+	.blink-settings .wc-settings-sub-title.blink-settings-subsection + p,
+	.blink-settings .form-table {
+		padding-right: 14px;
+		padding-left: 14px;
+	}
+
+	.blink-settings .blink-settings-caption > div,
+	.blink-settings .blink-apple-pay-card {
+		padding-right: 14px;
+		padding-left: 14px;
+	}
+
+	.blink-settings .form-table th,
+	.blink-settings .form-table td {
+		display: block;
+		box-sizing: border-box;
+		width: 100%;
+		padding: 10px 0 4px;
+	}
+
+	.blink-settings .blink-settings-subheading th {
+		display: table-cell;
+		width: auto;
+		padding: 18px 0 8px;
+	}
+
+	.blink-settings .form-table td {
+		padding: 4px 0 10px;
+	}
+
+	.blink-settings .form-table:has(.blink-settings-choice-row) tbody {
+		grid-template-columns: 1fr;
+	}
+
+	.blink-settings .blink-settings-mode-status {
+		display: table;
+		margin: 8px 0 0;
+	}
+}
+
+@media screen and (max-width: 1000px) {
+
+	.blink-settings .blink-settings-choice-columns {
+		grid-template-columns: 1fr;
+	}
+
+	.blink-settings .form-table:has(.blink-api-test-field) tbody {
+		grid-template-columns: 1fr;
+	}
+
+	.blink-settings .form-table:has(.blink-api-test-field) tr {
+		grid-template-columns: 1fr;
+	}
+
+	.blink-settings .form-table:has(.blink-api-test-field) .blink-settings-subheading,
+	.blink-settings .form-table:has(.blink-api-test-field) .blink-settings-mode-row {
+		grid-column: auto;
+	}
+}
+/* stylelint-enable no-descending-specificity */

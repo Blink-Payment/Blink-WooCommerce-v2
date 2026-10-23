@@ -109,9 +109,295 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		$this->fields_handler->blink_render_payment_fields();
 	}
 
+	/**
+	 * Output the Blink gateway settings inside a settings-specific wrapper.
+	 *
+	 * The wrapper keeps presentation changes scoped to this gateway while the
+	 * underlying fields continue to use WC_Settings_API rendering and saving.
+	 */
+	public function admin_options()
+	{
+		echo '<div class="blink-settings">';
+		parent::admin_options();
+		echo '</div>';
+	}
+
+	/**
+	 * Close the native Advanced disclosure after WooCommerce has generated its
+	 * fields, before the outer settings table is closed.
+	 *
+	 * @param array $form_fields Form fields.
+	 * @param bool  $echo        Whether to echo the markup.
+	 * @return string
+	 */
+	public function generate_settings_html($form_fields = array(), $echo = true)
+	{
+		$fields = empty($form_fields) ? $this->get_form_fields() : $form_fields;
+		$html   = parent::generate_settings_html($fields, false);
+		$html   = preg_replace_callback(
+			'~(?:(<tr[^>]*class="[^"]*blink-settings-choice-row[^"]*"[^>]*>.*?</tr>)[\r\n\t ]*)+~s',
+			function ( $matches ) {
+				preg_match_all( '~<tr[^>]*class="[^"]*blink-settings-choice-row[^"]*"[^>]*>.*?</tr>~s', $matches[0], $rows );
+				$controls = '';
+				foreach ( $rows[0] as $row ) {
+					if ( preg_match( '~<td[^>]*>(.*?)</td>~s', $row, $cell ) ) {
+						$controls .= $cell[1];
+					}
+				}
+				return '<tr class="blink-settings-choice-group-row"><td colspan="2"><fieldset class="blink-settings-choice-group">' . $controls . '</fieldset></td></tr>';
+			},
+			$html
+		);
+
+		if (isset($fields['advanced']['blink_advanced_start'])) {
+			$html .= '</table></details>';
+		}
+
+		if ($echo) {
+			echo $html; // WPCS: XSS ok.
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Render Blink section variants using valid table and section markup.
+	 *
+	 * @param string $key  Field key.
+	 * @param array  $data Field configuration.
+	 * @return string
+	 */
+	public function generate_title_html($key, $data)
+	{
+		if (empty($data['blink_first_section']) && empty($data['blink_subheading']) && empty($data['blink_apple_pay']) && empty($data['blink_after_standalone']) && empty($data['blink_choice_section']) && empty($data['blink_advanced_start'])) {
+			return parent::generate_title_html($key, $data);
+		}
+
+		$field_key = $this->get_field_key($key);
+		$data      = wp_parse_args(
+			$data,
+			array(
+				'title'       => '',
+				'class'       => '',
+				'description' => '',
+			)
+		);
+		$choice_section = isset($data['blink_choice_section']) ? $data['blink_choice_section'] : '';
+
+		ob_start();
+		if (! empty($data['blink_first_section'])) {
+			?>
+			<caption class="blink-settings-caption">
+				<div>
+					<h3 class="wc-settings-sub-title blink-settings-choice-heading" id="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></h3>
+					<?php if (! empty($data['description'])) : ?>
+						<p><?php echo wp_kses_post($data['description']); ?></p>
+					<?php endif; ?>
+				</div>
+			</caption>
+			<?php
+		} elseif (! empty($data['blink_subheading'])) {
+			?>
+			<tr class="blink-settings-subheading">
+				<th colspan="2" scope="colgroup">
+					<h4 id="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></h4>
+					<?php if (! empty($data['description'])) : ?>
+						<p><?php echo wp_kses_post($data['description']); ?></p>
+					<?php endif; ?>
+				</th>
+			</tr>
+			<?php
+		} elseif ('start' === $choice_section) {
+			?>
+			</table>
+			<div class="blink-settings-choice-columns">
+				<section class="blink-settings-choice-section blink-settings-choice-section--<?php echo esc_attr($data['blink_choice_kind']); ?>" aria-labelledby="<?php echo esc_attr($field_key); ?>">
+					<h3 class="wc-settings-sub-title blink-settings-choice-heading" id="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></h3>
+					<?php if (! empty($data['description'])) : ?>
+						<p><?php echo wp_kses_post($data['description']); ?></p>
+					<?php endif; ?>
+					<table class="form-table">
+			<?php
+		} elseif ('middle' === $choice_section) {
+			?>
+					</table>
+				</section>
+				<section class="blink-settings-choice-section blink-settings-choice-section--<?php echo esc_attr($data['blink_choice_kind']); ?>" aria-labelledby="<?php echo esc_attr($field_key); ?>">
+					<h3 class="wc-settings-sub-title blink-settings-choice-heading" id="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></h3>
+					<?php if (! empty($data['description'])) : ?>
+						<p><?php echo wp_kses_post($data['description']); ?></p>
+					<?php endif; ?>
+					<table class="form-table">
+			<?php
+		} elseif (! empty($data['blink_apple_pay'])) {
+			$status_key        = $data['blink_status_key'];
+			$status_field_key  = $this->get_field_key($status_key);
+			$status_attributes = array(
+				'custom_attributes' => $data['blink_status_attributes'],
+			);
+			$is_enabled        = ! empty($data['blink_registered']) && 'yes' === $this->get_option($status_key);
+			?>
+			</table>
+			<?php if (! empty($data['blink_choices_wrapper_open'])) : ?>
+			</section>
+			</div>
+			<?php endif; ?>
+			<section class="blink-apple-pay-card" aria-labelledby="<?php echo esc_attr($field_key); ?>">
+				<div class="blink-apple-pay-header">
+					<h3 class="wc-settings-sub-title" id="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></h3>
+					<span class="blink-settings-status <?php echo $is_enabled ? 'is-enabled' : 'is-disabled'; ?>" data-blink-apple-pay-status data-enabled-label="<?php echo esc_attr(__('Enabled', 'blink-payment-gateway-for-woocommerce')); ?>" data-disabled-label="<?php echo esc_attr(__('Not enabled', 'blink-payment-gateway-for-woocommerce')); ?>" aria-live="polite">
+						<?php echo esc_html($is_enabled ? __('Enabled', 'blink-payment-gateway-for-woocommerce') : __('Not enabled', 'blink-payment-gateway-for-woocommerce')); ?>
+					</span>
+				</div>
+				<p>
+					<label for="<?php echo esc_attr($status_field_key); ?>">
+						<input type="checkbox" name="<?php echo esc_attr($status_field_key); ?>" id="<?php echo esc_attr($status_field_key); ?>" value="1" <?php checked($this->get_option($status_key), 'yes'); ?> <?php echo $this->get_custom_attribute_html($status_attributes); // WPCS: XSS ok. ?> />
+						<?php echo esc_html__('Enable Apple Pay at checkout', 'blink-payment-gateway-for-woocommerce'); ?>
+					</label>
+				</p>
+				<?php echo wp_kses_post($data['description']); ?>
+			</section>
+			<?php
+		} elseif (! empty($data['blink_advanced_start'])) {
+			?>
+			</table>
+			<details class="blink-settings-advanced">
+				<summary>
+					<span class="blink-settings-advanced-title"><?php echo wp_kses_post($data['title']); ?></span>
+					<span class="blink-settings-advanced-description"><?php echo wp_kses_post($data['description']); ?></span>
+				</summary>
+				<table class="form-table">
+			<?php
+		} else {
+			?>
+			<h3 class="wc-settings-sub-title <?php echo esc_attr($data['class']); ?>" id="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></h3>
+			<?php if (! empty($data['description'])) : ?>
+				<p><?php echo wp_kses_post($data['description']); ?></p>
+			<?php endif; ?>
+			<table class="form-table">
+			<?php
+		}
+
+		return ob_get_clean();
+	}
+
+	/**
+	 * Add mode-specific help to the standard Integration Type select.
+	 *
+	 * @param string $key  Field key.
+	 * @param array  $data Field configuration.
+	 * @return string
+	 */
+	public function generate_select_html($key, $data)
+	{
+		if (empty($data['blink_descriptions'])) {
+			return parent::generate_select_html($key, $data);
+		}
+
+		$value                       = $this->get_option($key);
+		$descriptions                = $data['blink_descriptions'];
+		$data['description']         = isset($descriptions[$value]) ? $descriptions[$value] : $descriptions['direct'];
+		$data['custom_attributes']   = isset($data['custom_attributes']) ? $data['custom_attributes'] : array();
+		$data['custom_attributes']['data-direct-description'] = $descriptions['direct'];
+		$data['custom_attributes']['data-hosted-description'] = $descriptions['hosted'];
+
+		return parent::generate_select_html($key, $data);
+	}
+
+	/**
+	 * Render Blink checkbox variants without changing their WC field type.
+	 *
+	 * Keeping these fields as checkboxes preserves WooCommerce's standard
+	 * yes/no validation and the existing option keys.
+	 *
+	 * @param string $key  Field key.
+	 * @param array  $data Field configuration.
+	 * @return string
+	 */
+	public function generate_checkbox_html($key, $data)
+	{
+		if (! empty($data['blink_status'])) {
+			return '';
+		}
+
+		if (empty($data['blink_group']) && empty($data['blink_mode_status'])) {
+			return parent::generate_checkbox_html($key, $data);
+		}
+
+		$field_key = $this->get_field_key($key);
+		$defaults  = array(
+			'title'             => '',
+			'label'             => '',
+			'disabled'          => false,
+			'class'             => '',
+			'css'               => '',
+			'desc_tip'          => false,
+			'description'       => '',
+			'custom_attributes' => array(),
+		);
+		$data = wp_parse_args($data, $defaults);
+
+		if (! $data['label']) {
+			$data['label'] = $data['title'];
+		}
+
+		ob_start();
+		if (! empty($data['blink_group'])) {
+			?>
+			<tr valign="top" class="blink-settings-choice-row" data-blink-settings-group="<?php echo esc_attr($data['blink_group']); ?>">
+				<th scope="row" class="screen-reader-text"><label for="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['label']); ?></label></th>
+				<td class="forminp">
+					<fieldset>
+						<legend class="screen-reader-text"><span><?php echo wp_kses_post($data['label']); ?></span></legend>
+						<label class="blink-settings-choice" for="<?php echo esc_attr($field_key); ?>">
+							<input <?php disabled($data['disabled'], true); ?> class="<?php echo esc_attr($data['class']); ?>" type="checkbox" name="<?php echo esc_attr($field_key); ?>" id="<?php echo esc_attr($field_key); ?>" style="<?php echo esc_attr($data['css']); ?>" value="1" <?php checked($this->get_option($key), 'yes'); ?> <?php echo $this->get_custom_attribute_html($data); // WPCS: XSS ok. ?> />
+							<span><?php echo wp_kses_post($data['label']); ?></span>
+						</label>
+						<?php echo $this->get_description_html($data); // WPCS: XSS ok. ?>
+					</fieldset>
+				</td>
+			</tr>
+			<?php
+		} else {
+			$is_test_mode = 'yes' === $this->get_option($key);
+			?>
+			<tr valign="top" class="blink-settings-mode-row">
+				<th scope="row" class="titledesc">
+					<label for="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?> <?php echo $this->get_tooltip_html($data); // WPCS: XSS ok. ?></label>
+				</th>
+				<td class="forminp">
+					<fieldset>
+						<legend class="screen-reader-text"><span><?php echo wp_kses_post($data['title']); ?></span></legend>
+						<label for="<?php echo esc_attr($field_key); ?>">
+							<input <?php disabled($data['disabled'], true); ?> class="<?php echo esc_attr($data['class']); ?>" type="checkbox" name="<?php echo esc_attr($field_key); ?>" id="<?php echo esc_attr($field_key); ?>" style="<?php echo esc_attr($data['css']); ?>" value="1" <?php checked($this->get_option($key), 'yes'); ?> <?php echo $this->get_custom_attribute_html($data); // WPCS: XSS ok. ?> /> <?php echo wp_kses_post($data['label']); ?>
+						</label>
+						<span class="blink-settings-mode-status <?php echo $is_test_mode ? 'is-test' : 'is-live'; ?>" data-blink-test-mode-status data-test-label="<?php echo esc_attr(__('Using test credentials', 'blink-payment-gateway-for-woocommerce')); ?>" data-live-label="<?php echo esc_attr(__('Using live credentials', 'blink-payment-gateway-for-woocommerce')); ?>" aria-live="polite"><?php echo esc_html($is_test_mode ? __('Using test credentials', 'blink-payment-gateway-for-woocommerce') : __('Using live credentials', 'blink-payment-gateway-for-woocommerce')); ?></span>
+						<?php echo $this->get_description_html($data); // WPCS: XSS ok. ?>
+					</fieldset>
+				</td>
+			</tr>
+			<?php
+		}
+
+		return ob_get_clean();
+	}
+
 	public function process_payment($order_id)
 	{
 		return $this->payment_handler->blink_handle_payment($order_id);
+	}
+
+	/**
+	 * Render the Blink icon and the merchant-selected card logos in Classic Checkout.
+	 *
+	 * WooCommerce's icon property accepts only one URL, so the fixed local card
+	 * logos are appended to its standard escaped Blink icon markup.
+	 *
+	 * @return string
+	 */
+	public function get_icon()
+	{
+		return parent::get_icon() . blink_get_card_logos_html($this->settings);
 	}
 
 	public function blink_process_admin_options()
@@ -136,12 +422,15 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	public function blink_enqueue_scripts($hook)
 	{
 		// Only load admin scripts on relevant pages and for users with proper permissions
-		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+		if (! current_user_can('manage_woocommerce')) {
 			return;
 		}
 
 		wp_enqueue_script('woocommerce_blink_payment_admin_scripts', plugins_url('/../assets/js/admin-scripts.js', __FILE__), array('jquery'), $this->version, true);
 		wp_enqueue_style('woocommerce_blink_payment_admin_css', plugins_url('/../assets/css/admin.css', __FILE__), array(), $this->version);
+		if (blink_is_in_admin_section()) {
+			wp_enqueue_script('woocommerce_blink_payment_admin_settings', plugins_url('/../assets/js/admin-settings.js', __FILE__), array('jquery'), $this->version, true);
+		}
 
 		wp_localize_script(
 			'woocommerce_blink_payment_admin_scripts',
@@ -166,7 +455,24 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		$adminnotice->remove_notice('no-payment-type-selected');
 		$adminnotice->remove_notice('no-payment-types');
 	}
+	public function blink_print_hostedfield_styles()
+	{
+		$css_path = plugin_dir_path(__FILE__) . '../assets/css/hostedfields.css';
 
+		if (! file_exists($css_path)) {
+			return;
+		}
+
+		$css = file_get_contents($css_path);
+
+		if (false === $css || '' === trim($css)) {
+			return;
+		}
+
+		echo '<style class="hostedfield">' . "\n";
+		echo wp_strip_all_tags($css); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo "\n</style>\n";
+	}
 	public function blink_add_error_notices($payment_types = array())
 	{
 
@@ -234,9 +540,9 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 	public function blink_payment_scripts()
 	{
 		// we need JavaScript to process a token only on cart/checkout pages, right?
-		$is_order_pay_endpoint = is_wc_endpoint_url( 'order-pay' );
-		$is_order_pay          = $is_order_pay_endpoint || isset( $_GET['pay_for_order'] );
-		$is_checkout_block     = function_exists( 'blink_is_checkout_block' ) && blink_is_checkout_block();
+		$is_order_pay_endpoint = is_wc_endpoint_url('order-pay');
+		$is_order_pay          = $is_order_pay_endpoint || isset($_GET['pay_for_order']);
+		$is_checkout_block     = function_exists('blink_is_checkout_block') && blink_is_checkout_block();
 
 		if (! is_cart() && ! is_checkout() && ! $is_order_pay && ! $is_checkout_block) {
 			return;
@@ -255,17 +561,13 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		}
 
 		wp_add_inline_script('jquery', '$ = jQuery.noConflict();');
-		wp_enqueue_style(
-			'hostedfield-css',
-			plugin_dir_url(__FILE__) . '../assets/css/hostedfields.css',
-			array(),
-			$this->version
-		);
+
 		wp_enqueue_script('blink_hosted_js', 'https://gateway2.blinkpayment.co.uk/sdk/web/v1/js/hostedfields.min.js', array('jquery'), $this->version, false);
 		wp_register_style('woocommerce_blink_payment_style', plugins_url('../assets/css/style.css', __FILE__), array(), $this->version);
+		wp_register_script('woocommerce_blink_wallet_submit', plugins_url('../assets/js/wallet-submit.js', __FILE__), array('jquery'), $this->version, true);
 		// and this is our custom JS in your plugin directory that works with token.js
 		if ($is_order_pay_endpoint) {
-			wp_register_script('woocommerce_blink_payment_order_pay', plugins_url('../assets/js/order-pay.js', __FILE__), array('jquery'), $this->version, true);
+			wp_register_script('woocommerce_blink_payment_order_pay', plugins_url('../assets/js/order-pay.js', __FILE__), array('jquery', 'woocommerce_blink_wallet_submit'), $this->version, true);
 
 			$order = wc_get_order(get_query_var('order-pay'));
 			wp_localize_script(
@@ -288,7 +590,7 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 			);
 			wp_enqueue_script('woocommerce_blink_payment_order_pay');
 		} elseif (is_checkout() && ! $is_checkout_block) {
-			wp_register_script('woocommerce_blink_payment_checkout', plugins_url('../assets/js/checkout.js', __FILE__), array('jquery'), $this->version, true);
+			wp_register_script('woocommerce_blink_payment_checkout', plugins_url('../assets/js/checkout.js', __FILE__), array('jquery', 'woocommerce_blink_wallet_submit'), $this->version, true);
 			wp_localize_script(
 				'woocommerce_blink_payment_checkout',
 				'blink_params',
@@ -305,8 +607,14 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		if ($custom_css) {
 			wp_add_inline_style('woocommerce_blink_payment_style', $custom_css);
 		}
+
 		do_action('blink_custom_script');
 		do_action('blink_custom_style');
+		add_action(
+			'wp_head',
+			array($this, 'blink_print_hostedfield_styles'),
+			20
+		);
 	}
 
 	public function validate_fields()
@@ -330,14 +638,16 @@ class Blink_Payment_Gateway extends WC_Payment_Gateway
 		return $title;
 	}
 
-	public function blink_print_custom_notice()
+	public function blink_print_custom_notice($order_id = 0)
 	{
-		$status = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : '';
-		$note   = isset($_GET['note']) ? sanitize_text_field(wp_unslash($_GET['note'])) : '';
+		$order = wc_get_order(absint($order_id));
+		if (! $order || 'blink' !== $order->get_payment_method() || ! $order->has_status('failed')) {
+			return;
+		}
 
-		if ('failed' === $status && ! get_transient('blink_custom_notice_shown')) {
-			wc_print_notice($note, 'error');
-			set_transient('blink_custom_notice_shown', true, 15);
+		$message = blink_resolve_payment_message($order->get_meta('_blink_payment_message', true));
+		if ('' !== $message) {
+			wc_print_notice($message, 'error');
 		}
 	}
 
