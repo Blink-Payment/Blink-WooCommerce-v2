@@ -5,7 +5,7 @@
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.4.0
+ * Version: 1.4.1
  * Text Domain: blink-payment-gateway-for-woocommerce
  * Requires Plugins: woocommerce
  * License: GPLv2 or later
@@ -115,8 +115,13 @@ add_action( 'template_redirect', array( 'Blink_3D_Secure', 'serve_minimal_3ds_pa
 
 // Only add transaction handler if the class exists.
 add_action( 'wp', [ 'Blink_Transaction_Handler', 'blink_capture_order_response' ], 999 );
+// A Hosted return Blink has not confirmed as paid: Classic title, Blocks heading, and the confirmation text.
+add_filter( 'woocommerce_endpoint_order-received_title', [ 'Blink_Transaction_Handler', 'blink_hosted_return_title' ], 100 );
+add_filter( 'woocommerce_thankyou_order_received_title', [ 'Blink_Transaction_Handler', 'blink_hosted_return_title' ], 100 );
+add_filter( 'woocommerce_thankyou_order_received_text', [ 'Blink_Transaction_Handler', 'blink_hosted_return_text' ], 100, 2 );
 add_action( 'admin_post_blink_download_log', [ 'Blink_Logger', 'handle_download' ] );
 add_action('woocommerce_order_status_changed', array('Blink_Transaction_Handler', 'blink_handle_order_status_change'), 10, 3);
+add_action( 'blink_recheck_webhook', array( 'Blink_Transaction_Handler', 'blink_recheck_webhook' ) );
 add_filter( 'woocommerce_order_actions', array( 'Blink_Transaction_Handler', 'blink_add_capture_order_action' ), 10, 2 );
 add_action( 'woocommerce_order_action_blink_capture_preauthorisation', array( 'Blink_Transaction_Handler', 'blink_capture_preauthorisation_action' ) );
 //webhook

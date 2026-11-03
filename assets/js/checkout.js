@@ -343,16 +343,7 @@ jQuery(function ($) {
                 blink_checkout_form.recoveryAttempts = 0;
                 blink_checkout_form.ensure_credit_card_data();
 
-                $('#cc_customer_email').hide();
-                $('#cc_customer_postcode').hide();
-                $('#cc_customer_address').hide();
-                $(".blink-form__label.field-label").each(function () {
-                    // Check if the label contains the text "Email"
-                    if ($(this).text().trim() === "Email" || $(this).text().trim() === "Address") {
-                        // Hide the label
-                        $(this).hide();
-                    }
-                });
+                window.blinkCardFormFields.concealBillingFields($creditContainer);
                 blink_checkout_form.initialise_hosted_fields($creditContainer);
 
             }
