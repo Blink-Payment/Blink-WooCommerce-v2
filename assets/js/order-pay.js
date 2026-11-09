@@ -239,17 +239,8 @@ jQuery(function ($) {
                 jQuery(orderForm).unblock();
                 return;
             }
-            
-            jQuery('#cc_customer_email').hide();
-            jQuery('#cc_customer_postcode').hide();
-            jQuery('#cc_customer_address').hide();
-            jQuery(".blink-form__label.field-label").each(function(){
-                // Check if the label contains the text "Email"
-                if (jQuery(this).text().trim() === "Email" || jQuery(this).text().trim() === "Address") {
-                    // Hide the label
-                    jQuery(this).hide();
-                }
-            });
+
+            window.blinkCardFormFields.concealBillingFields($creditContainer);
             initialiseHostedFields();
             
         }

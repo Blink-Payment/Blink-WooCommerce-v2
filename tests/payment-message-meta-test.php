@@ -14,10 +14,6 @@ function sanitize_text_field( $text ) {
 	return trim( strip_tags( (string) $text ) );
 }
 
-function sanitize_email( $email ) {
-	return (string) $email;
-}
-
 function wp_unslash( $value ) {
 	return $value;
 }
@@ -57,14 +53,6 @@ function delete_transient( $key ) {
 	return true;
 }
 
-function wc_get_checkout_url() {
-	return 'https://example.com/checkout';
-}
-
-function trailingslashit( $value ) {
-	return rtrim( $value, '/' ) . '/';
-}
-
 function wp_remote_get( $url, $args ) {
 	global $test_api_data;
 	return array(
@@ -74,8 +62,8 @@ function wp_remote_get( $url, $args ) {
 	);
 }
 
-function wp_remote_retrieve_headers( $response ) {
-	return $response['headers'];
+function is_wp_error( $value ) {
+	return false;
 }
 
 function wp_remote_retrieve_response_code( $response ) {
@@ -98,9 +86,6 @@ function WC() {
 }
 
 class Blink_Logger {
-	public static function set_context( $context ) {
-	}
-
 	public static function log( $message, $context = null ) {
 	}
 
@@ -128,7 +113,7 @@ class Blink_Payment_Message_Test_Gateway {
 }
 
 class Blink_Payment_Message_Test_Utils {
-	public function blink_set_tokens( $intent_id ) {
+	public function blink_generate_access_token() {
 		return array( 'access_token' => 'test-token' );
 	}
 
@@ -184,6 +169,10 @@ class Blink_Payment_Message_Test_Order {
 		return 'wc_order_test_key_' . $this->id;
 	}
 
+	public function get_total() {
+		return '18.00';
+	}
+
 	public function needs_payment() {
 		return in_array( $this->status, array( 'pending', 'failed' ), true );
 	}
@@ -228,19 +217,6 @@ class Blink_Payment_Message_Test_Order {
 	}
 }
 
-class Blink_Payment_Message_Test_Handler extends Blink_Transaction_Handler {
-	private $transaction_result;
-
-	public function __construct( $gateway, $transaction_result ) {
-		parent::__construct( $gateway );
-		$this->transaction_result = $transaction_result;
-	}
-
-	public function blink_validate_transaction( $order, $transaction ) {
-		return $this->transaction_result;
-	}
-}
-
 function blink_payment_message_test_order( $id, $status, $message ) {
 	global $test_orders;
 	$order              = new Blink_Payment_Message_Test_Order( $id, $status, $message );
@@ -248,14 +224,22 @@ function blink_payment_message_test_order( $id, $status, $message ) {
 	return $order;
 }
 
-function blink_payment_message_process( $order, $status, $message ) {
-	$result = array(
-		'transaction_id' => 'validated-' . $order->get_id(),
+// Blink's transaction API returns the order's own transaction with this status and message.
+function blink_payment_message_api_data( $order, $status, $message ) {
+	global $test_api_data;
+	$test_api_data = array(
+		'transaction_id' => $order->get_meta( 'blink_res', true ),
 		'status'         => $status,
+		'amount'         => 18,
 		'payment_source' => 'credit card',
 		'message'        => $message,
+		'merchant_data'  => array( 'order_info' => array( 'order_id' => $order->get_id() ) ),
 	);
-	$handler = new Blink_Payment_Message_Test_Handler( new Blink_Payment_Message_Test_Gateway(), $result );
+}
+
+function blink_payment_message_process( $order, $status, $message ) {
+	blink_payment_message_api_data( $order, $status, $message );
+	$handler = new Blink_Transaction_Handler( new Blink_Payment_Message_Test_Gateway() );
 	$handler->blink_check_response_for_order( $order->get_id() );
 }
 
@@ -290,14 +274,8 @@ $tests = array(
 		blink_payment_message_assert_same( '', $order->get_meta( '_blink_payment_message', true ), 'Removed stale decline message' );
 	},
 	'already successful order cleans stale message without transaction validation' => function () {
-		$order  = blink_payment_message_test_order( 5, 'processing', 'Old decline' );
-		$result = array(
-			'transaction_id' => 'unused',
-			'status'         => 'captured',
-			'payment_source' => 'credit card',
-			'message'        => 'unused',
-		);
-		$handler = new Blink_Payment_Message_Test_Handler( new Blink_Payment_Message_Test_Gateway(), $result );
+		$order   = blink_payment_message_test_order( 5, 'processing', 'Old decline' );
+		$handler = new Blink_Transaction_Handler( new Blink_Payment_Message_Test_Gateway() );
 		$handler->blink_check_response_for_order( $order->get_id() );
 		blink_payment_message_assert_same( '', $order->get_meta( '_blink_payment_message', true ), 'Removed stale successful-order message' );
 	},
@@ -308,21 +286,25 @@ $tests = array(
 		$test_api_data = array(
 			'transaction_id' => 'return-transaction',
 			'status'         => 'failed',
+			'amount'         => 18,
 			'payment_source' => 'credit card',
 			'message'        => 'First-load decline',
+			'merchant_data'  => array( 'order_info' => array( 'order_id' => $order->get_id() ) ),
 		);
 		$wp = (object) array( 'query_vars' => array( 'order-received' => $order->get_id() ) );
 		WC()->payment_gateways->set_gateway( $gateway );
-		$_REQUEST['transaction_id'] = 'return-transaction';
+		$_GET     = array( 'key' => $order->get_order_key(), 'transaction_id' => 'return-transaction' );
+		$_REQUEST = $_GET;
 
 		Blink_Transaction_Handler::blink_capture_order_response();
 
 		blink_payment_message_assert_same( 'return-transaction', $order->get_meta( 'blink_res', true ), 'Captured return transaction ID' );
 		blink_payment_message_assert_same( 'failed', $order->get_status(), 'Validated first-load status' );
 		blink_payment_message_assert_same( 'First-load decline', $order->get_meta( '_blink_payment_message', true ), 'Persisted first-load decline' );
-		unset( $_REQUEST['transaction_id'] );
+		$_GET     = array();
+		$_REQUEST = array();
 	},
-	'authenticated Hosted decline is persisted during wp without a transaction ID' => function () {
+	'authenticated Hosted decline keeps the order Pending and is shown, not stored, during wp' => function () {
 		global $wp;
 		$order   = blink_payment_message_test_order( 7, 'pending', '' );
 		$order->delete_meta_data( 'blink_res' );
@@ -338,9 +320,12 @@ $tests = array(
 
 		Blink_Transaction_Handler::blink_capture_order_response();
 
-		blink_payment_message_assert_same( 'failed', $order->get_status(), 'Hosted first-load status' );
+		// Blink keeps a declined Paylink payable, so the order stays Pending (AB#17324).
+		blink_payment_message_assert_same( 'pending', $order->get_status(), 'Hosted first-load status' );
 		blink_payment_message_assert_same( '', $order->get_meta( 'blink_res', true ), 'Hosted transaction ID remains empty' );
-		blink_payment_message_assert_same( 'Payment was declined. Please try again.', $order->get_meta( '_blink_payment_message', true ), 'Hosted generic decline' );
+		blink_payment_message_assert_same( '', $order->get_meta( '_blink_payment_message', true ), 'Hosted decline message is not stored' );
+		blink_payment_message_assert_same( 'declined', Blink_Transaction_Handler::$hosted_return_notice['type'], 'Hosted generic decline is shown' );
+		Blink_Transaction_Handler::$hosted_return_notice = null;
 		$_GET     = array();
 		$_REQUEST = array();
 	},

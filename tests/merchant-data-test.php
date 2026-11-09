@@ -28,8 +28,16 @@ function wc_get_orders( $args ) {
 }
 
 function wp_remote_get( $url, $args ) {
+	global $test_status;
 	merchant_data_assert( 'https://gateway.example.com/pay/v1/transactions/TXN-12345', $url, 'Webhook must validate the transaction.' );
-	return array( 'body' => '{"data":{"transaction_id":"TXN-12345"}}', 'response' => array( 'code' => 200 ) );
+	// The order status comes from Blink's record of the transaction, not the webhook.
+	$transaction = array(
+		'transaction_id' => 'TXN-12345',
+		'status'         => $test_status,
+		'amount'         => 16,
+		'merchant_data'  => '{"order_info":{"order_id":12345}}',
+	);
+	return array( 'body' => json_encode( array( 'data' => $transaction ) ), 'response' => array( 'code' => 200 ) );
 }
 
 function is_wp_error( $response ) {
@@ -73,6 +81,8 @@ class Merchant_Data_Order {
 	public $transaction_id = '';
 
 	public function get_id() { return 12345; }
+	public function get_total() { return '16.00'; }
+	public function has_status( $status ) { return false; }
 	public function get_payment_method() { return 'blink'; }
 	public function get_transaction_id() { return $this->transaction_id; }
 	public function set_transaction_id( $id ) { $this->transaction_id = $id; }

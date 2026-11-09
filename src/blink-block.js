@@ -10,6 +10,10 @@ import {
   observeApplePayButtonRemoval,
 } from './wallet-availability';
 import { CardLogos } from './card-logos';
+// Shared with the classic checkout and pay-for-order scripts.
+import cardFormFields from '../assets/js/card-form-fields';
+
+const { concealBillingFields } = cardFormFields;
 
 const Icon = ( props ) => {
 	const { settings } = props;
@@ -365,11 +369,7 @@ const BlinkPayment = (props) => {
 
     const currentForm = window.jQuery(formElement);
     if (selectedTabRef.current === 'credit-card') {
-      currentForm.find('input[name=customer_email]').hide();
-      currentForm.find('label.blink-form__label:contains("Email")').hide();
-      currentForm.find('input[name=customer_postcode]').hide();
-      currentForm.find('input[name=customer_address]').hide();
-      currentForm.find('label.blink-form__label:contains("Address")').hide();
+      concealBillingFields(formElement);
       if (paymentRequired && elements?.ccElement) {
         initializeHostedForm();
       }

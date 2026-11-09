@@ -24,14 +24,19 @@
 	--border-radius: 6px;
 }
 
-* {
+/*
+ * Reset inside the Blink payment form only, so the theme's own spacing is left
+ * alone. :where() keeps the reset at zero specificity, as the old global *
+ * reset was, so it never wins over a rule that sets a margin on purpose.
+ */
+:where(.payment_method_blink) * {
 	margin: 0;
 	padding: 0;
 }
 
-*,
-:after,
-:before {
+:where(.payment_method_blink) *,
+:where(.payment_method_blink) *::before,
+:where(.payment_method_blink) *::after {
 	box-sizing: border-box;
 }
 
@@ -226,43 +231,25 @@
 	width: 24px;
 }
 
-.payment_method_blink input:not([type="radio"]) {
+/*
+ * One box style for every card form field: the hosted fields (Card Number,
+ * Expiry, CVV), whose text is drawn inside an iframe, and the plain inputs such
+ * as Name on Card. The font matches the one hostedfields.css sets inside the
+ * iframes. 16px text at every screen size stops iOS zooming in on tap.
+ */
+.payment_method_blink .hostedfield-wrapper,
+.payment_method_blink input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]):not(.hostedfield-input) {
 	position: relative;
-	display: block;
-	width: 100%;
-	height: 48px;
-	padding: 0.375rem 0.75rem;
-	font-size: var(--input-font-size);
-	font-weight: 400;
-	line-height: 1.5;
-	color: var(--input-text-color);
-	font-family: var(--font-family);
-	background-color: var(--color-white);
-	background-clip: padding-box;
-
-	border: none;
-	border-radius: var(--border-radius);
-	box-shadow: 0 0 0 1px var(--input-outline-color-3),
-	0 2px 4px 0 rgba(var(--outline-color), 0.07),
-	0 1px 1.5px 0 rgba(var(--outline-color), 0.05);
-	transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-}
-
-.hostedfield-wrapper {
-	display: -webkit-box;
-	display: -webkit-flex;
-	display: -ms-flexbox;
 	display: flex;
-	position: relative;
-	display: block;
+	align-items: center;
 	width: 100%;
 	height: 48px;
-	padding: 0.375rem 0.75rem;
-	font-size: var(--input-font-size);
+	padding: 0 12px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+	font-size: 16px;
 	font-weight: 400;
 	line-height: 1.5;
 	color: var(--input-text-color);
-	font-family: var(--font-family);
 	background-color: var(--color-white);
 	background-clip: padding-box;
 	border: none;
@@ -273,7 +260,18 @@
 	transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
-.hostedfield-wrapper>div {
+/*
+ * WooCommerce's classic payment list gives every input in it a right margin
+ * (.woocommerce-checkout #payment ul.payment_methods li input), meant for the
+ * payment method radios. That rule has an ID, so it beats the class-only rule
+ * above and left Name on Card 1em narrower than the hosted fields on classic
+ * checkout and the pay-for-order page. The ID here puts this rule ahead of it.
+ */
+#payment .payment_method_blink input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]):not(.hostedfield-input) {
+	margin: 0;
+}
+
+.payment_method_blink .hostedfield-wrapper>div {
 	display: -webkit-box;
 	display: -webkit-flex;
 	display: -ms-flexbox;
@@ -284,11 +282,12 @@
 	width: 100%;
 }
 
-.hostedfield-wrapper:hover,
-input:hover,
-.hostedfield-wrapper:focus,
-input:focus,
-.input:focus-visible {
+/* Focus is inside the iframe for hosted fields; the SDK marks the wrapper with hf-focus. */
+.payment_method_blink .hostedfield-wrapper:hover,
+.payment_method_blink .hostedfield-wrapper.hf-focus,
+.payment_method_blink .hostedfield-wrapper:focus-within,
+.payment_method_blink input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]):not(.hostedfield-input):hover,
+.payment_method_blink input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]):not(.hostedfield-input):focus {
 	border: none;
 	outline: 0;
 	box-shadow: rgba(var(--input-outline-color-2), 0.36) 0px 0px 0px 4px,
@@ -337,6 +336,20 @@ input:focus,
 	margin: 0 auto;
 }
 
+/*
+ * Classic checkout and the pay-for-order page wrap each payment method in
+ * WooCommerce's grey payment_box with an arrow. Blink's form brings its own
+ * white card, so drop the box around it for Blink only.
+ */
+.woocommerce-checkout #payment div.payment_box.payment_method_blink {
+	background: transparent;
+	padding: 0;
+}
+
+.woocommerce-checkout #payment div.payment_box.payment_method_blink::before {
+	display: none;
+}
+
 .payment_method_blink .switches-container {
 	position: relative;
 	display: flex;
@@ -370,19 +383,34 @@ input:focus,
 	display: none;
 }
 
-.payment_method_blink .blink-wallet [id="container"] > .gpay-card-info-container {
+/*
+ * Google Pay puts its button in a plain <div> inside #container and sizes it
+ * with its own stylesheet, so these rules need !important. The button is
+ * .gpay-button, or .gpay-card-info-container (inside
+ * .gpay-card-info-container-fill) when it shows the shopper's card. Only the
+ * button and its wrappers are sized; the card art, placeholder and progress bar
+ * inside the card version are left to Google.
+ */
+.payment_method_blink .blink-wallet[data-blink-wallet="google"] [id="container"] > div,
+.payment_method_blink .blink-wallet[data-blink-wallet="google"] .gpay-card-info-container-fill {
 	display: block;
 	box-sizing: border-box;
 	width: 100% !important;
+	min-width: 0 !important;
 	max-width: 100% !important;
 	margin: 0;
 }
 
-.payment_method_blink .blink-wallet[data-blink-wallet="google"] .gpay-button {
+.payment_method_blink .blink-wallet[data-blink-wallet="google"] button,
+.payment_method_blink .blink-wallet[data-blink-wallet="google"] .gpay-button,
+.payment_method_blink .blink-wallet[data-blink-wallet="google"] .gpay-card-info-container {
 	display: block;
 	box-sizing: border-box;
 	width: 100% !important;
+	min-width: 0 !important;
 	max-width: 100% !important;
+	height: 44px !important;
+	margin: 0;
 }
 
 .payment_method_blink .blink-wallet [id="apple-pay-btn"] {
@@ -391,6 +419,7 @@ input:focus,
 	width: 100%;
 	max-width: 100%;
 	--apple-pay-button-width: 100%;
+	--apple-pay-button-height: 44px;
 }
 
 .payment_method_blink .blink-wallet-row {
@@ -503,24 +532,12 @@ input:focus,
 	padding: 30px 15px;
 	}
 
-	.hostedfield-wrapper,
-	input {
-	height: 36px;
-	font-size: 14px;
-	}
-
 	.payment_method_blink .cards_icons {
 	gap: 0;
 	}
 
 	.payment_method_blink .cards_icons img {
 	width: 20px;
-	}
-
-	.btn {
-	line-height: 1;
-	height: 45px;
-	font-size: 16px;
 	}
 
 	.payment_method_blink .switches-container {
@@ -577,10 +594,6 @@ input:focus,
 @media (max-width: 575px) {
 	.payment_method_blink .switches-container {
 	height: 40px;
-	}
-
-	.payment_method_blink input {
-		height: 38px;
 	}
 }
 

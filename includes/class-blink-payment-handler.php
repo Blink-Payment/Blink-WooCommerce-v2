@@ -402,6 +402,9 @@ class Blink_Payment_Handler {
 	public function blink_handle_hosted_payment( $order, $request ) {
 		Blink_Logger::log( 'handle_hosted_payment called', array( 'order_id' => $order->get_id() ) );
 		$order_id = $order->get_id();
+		// Before any call to Blink, while the loaded order is still current: run
+		// later, a status change from a webhook in the meantime could be overwritten.
+		$this->blink_start_hosted_attempt( $order );
 
 
 		// Prepare paylink API data
@@ -434,6 +437,30 @@ class Blink_Payment_Handler {
 			'notification_url'   => WC()->api_request_url( 'blink_gateway' ),
 		);
 
+		// A Hosted order keeps one Paylink across attempts: Blink keeps a declined
+		// Paylink payable, so the customer goes back to it rather than to a new one.
+		$check = $this->gateway->transaction_handler->blink_check_hosted_paylinks( $order );
+		if ( 'unavailable' === $check['result'] ) {
+			// An earlier Paylink may already be paid, so a new one could take a second payment.
+			return blink_error_payment_process( __( 'We could not reach the payment provider. Please try again in a moment.', 'blink-payment-gateway-for-woocommerce' ) );
+		}
+		if ( 'paid' === $check['result'] ) {
+			return array(
+				'result'   => 'success',
+				'redirect' => $this->gateway->blink_get_return_url( $order ),
+			);
+		}
+		if ( 'mismatch' === $check['result'] ) {
+			return blink_error_payment_process( __( 'We received a payment that does not match this order. Please contact us rather than paying again.', 'blink-payment-gateway-for-woocommerce' ) );
+		}
+		if ( null !== $check['payable'] && $this->blink_paylink_fits_attempt( $check['payable'], $paylink_data ) ) {
+			Blink_Logger::log( 'handle_hosted_payment reusing Paylink', array( 'order_id' => $order_id, 'paylink_id' => $check['payable']['id'] ) );
+			return array(
+				'result'   => 'success',
+				'redirect' => $check['payable']['paylink_url'],
+			);
+		}
+
 		$url = $this->gateway->host_url . '/paylink/v1/paylinks';
 		Blink_Logger::log( 'handle_hosted_payment() POST paylinks', $paylink_data );
 		$response = wp_remote_post(
@@ -457,6 +484,11 @@ class Blink_Payment_Handler {
 
 		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( isset( $api_body['paylink_url'] ) ) {
+			// Webhooks are verified against the Paylinks this order created.
+			if ( ! empty( $api_body['id'] ) && is_scalar( $api_body['id'] ) ) {
+				$order->add_meta_data( '_blink_paylink_id', sanitize_text_field( (string) $api_body['id'] ) );
+				$order->save();
+			}
 			Blink_Logger::log( 'handle_hosted_payment success', array( 'redirect' => $api_body['paylink_url'] ) );
 			return array(
 				'result'   => 'success',
@@ -467,5 +499,39 @@ class Blink_Payment_Handler {
 			Blink_Logger::log( 'handle_hosted_payment error', array( 'error' => $error ) );
 			return blink_error_payment_process( $error );
 		}
+	}
+
+	/**
+	 * Whether a still-payable Paylink can be reused for this attempt: it must take
+	 * the amount, currency and transaction type a new Paylink would be created with.
+	 *
+	 * @param array $paylink      The Paylink as Blink returns it.
+	 * @param array $paylink_data What a new Paylink would be created with.
+	 * @return bool
+	 */
+	private function blink_paylink_fits_attempt( $paylink, $paylink_data ) {
+		$amount   = isset( $paylink['amount'] ) && is_numeric( $paylink['amount'] ) ? (int) round( (float) $paylink['amount'] * 100 ) : null;
+		$currency = isset( $paylink['currency'] ) && is_scalar( $paylink['currency'] ) ? strtoupper( (string) $paylink['currency'] ) : '';
+		$type     = isset( $paylink['transaction_type'] ) && is_scalar( $paylink['transaction_type'] ) ? strtolower( (string) $paylink['transaction_type'] ) : '';
+		return ! empty( $paylink['paylink_url'] ) && is_string( $paylink['paylink_url'] )
+			&& (int) round( (float) $paylink_data['amount'] * 100 ) === $amount
+			&& strtoupper( (string) $paylink_data['currency'] ) === $currency
+			&& strtolower( $paylink_data['transaction_type'] ) === $type;
+	}
+
+	/**
+	 * Start a Hosted attempt: an order Failed by an earlier decline (before declines
+	 * stopped failing Hosted orders) returns to Pending, and the previous attempt's
+	 * decline state is cleared.
+	 *
+	 * @param WC_Order $order WooCommerce order.
+	 */
+	private function blink_start_hosted_attempt( $order ) {
+		if ( $order->has_status( 'failed' ) ) {
+			$order->update_status( 'pending', __( 'Blink: new payment attempt started.', 'blink-payment-gateway-for-woocommerce' ) );
+		}
+		$order->delete_meta_data( '_blink_payment_message' );
+		$order->delete_meta_data( '_blink_res_expired' );
+		$order->save();
 	}
 }

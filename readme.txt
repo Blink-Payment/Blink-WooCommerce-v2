@@ -5,7 +5,7 @@ Requires at least: 5.8
 Requires Plugins: woocommerce
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,14 @@ Preauthorized funds are typically held for a limited time (usually 7-30 days dep
 3. Apple Pay and Google Pay buttons on the checkout page.
 
 == Changelog ==
+
+= 1.4.1 =
+* Improved webhook verification.
+* Improved payment return verification.
+* Hosted payment retries reuse the order's open Paylink, and a returning customer is told when a payment is still being confirmed.
+* A declined Hosted payment no longer fails the order: it stays pending so the customer can pay again on the same Paylink.
+* The card form no longer shows the email, address or postcode fields when the store's theme styles form fields.
+* Card form fields line up on classic checkout and the pay-for-order page, with matching sizes and fonts on mobile, and the plugin's styles no longer change the rest of the checkout page.
 
 = 1.4.0 =
 * Apple Pay available on checkout for Windows devices.
