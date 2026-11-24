@@ -1,11 +1,11 @@
 === Blink Payment Gateway for WooCommerce ===
-Contributors: BlinkPayment
+Contributors: blinkpayment
 Tags: woocommerce payment gateway, credit card, open banking, apple pay, google pay
-Requires at least: 5.8
+Requires at least: 6.5
 Requires Plugins: woocommerce
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,27 +25,34 @@ The Blink Payment Gateway plugin allows WooCommerce store owners to accept payme
 - **Rerun API integration** - Automatically capture preauthorized funds when orders are processed.
 - Fully compatible with the latest version of WooCommerce.
 
-**External Services:**
-This plugin connects to the Blink Payment API to process transactions. The following external services are used:
-- Blink Payment API: Used to process payments, refunds, and cancellations.
-  - Data sent: Transaction details, customer information, and order details.
-  - Terms of Service: [https://www.blinkpayment.co.uk/terms/terms-of-service](https://www.blinkpayment.co.uk/terms/terms-of-service)
-  - Privacy Policy: [https://www.blinkpayment.co.uk/terms/privacy-policy](https://www.blinkpayment.co.uk/terms/privacy-policy)
-- Google Pay API: Used to enable Google Pay functionality.
-  - Data sent: Payment details.
-  - Terms of Service: [https://pay.google.com/about/terms/](https://pay.google.com/about/terms/)
-  - Privacy Policy: [https://policies.google.com/privacy](https://policies.google.com/privacy)
-- Apple Pay API: Used to enable Apple Pay functionality.
-  - Data sent: Payment details.
-  - Terms of Service: [https://developer.apple.com/apple-pay/](https://developer.apple.com/apple-pay/)
-  - Privacy Policy: [https://www.apple.com/legal/privacy/](https://www.apple.com/legal/privacy/)
+The plugin sends payment data to Blink and loads payment scripts from Blink, Apple and Google. See External services below for what is sent and when.
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/blink-payment` directory, or install the plugin through the WordPress plugins screen directly.
-2. Activate the plugin through the 'Plugins' screen in WordPress.
-3. Go to WooCommerce > Settings > Payments and enable the "Blink Payment Gateway."
-4. Configure the API keys and other settings in the Blink Payment Gateway settings page.
+= Requirements =
+
+* WordPress 6.5 or later
+* WooCommerce 7.6 or later
+* PHP 7.4 or later
+* A Blink account and its API keys
+
+= Install from the plugin directory =
+
+1. In WordPress admin, go to Plugins > Add New Plugin and search for "Blink Payment Gateway for WooCommerce".
+2. Click Install Now, then Activate.
+3. Go to WooCommerce > Settings > Payments and enable Blink.
+4. Enter your Blink API keys and choose your payment methods.
+
+To install by hand instead, upload the plugin zip at Plugins > Add New Plugin > Upload Plugin, or copy the `blink-payment-gateway-for-woocommerce` folder to `/wp-content/plugins/`. Then follow steps 2 to 4.
+
+= Moving from the GitHub version =
+
+If you installed Blink from GitHub, its folder is usually `Blink-WooCommerce-v2-master`. Remove it before you install from the directory:
+
+1. Go to Plugins. Deactivate the Blink Payment Gateway for WooCommerce plugin, then delete it.
+2. Install and activate the plugin from the directory, as above.
+
+Your Blink settings, API keys and orders are kept. Don't run the GitHub version and this one at the same time: checkout stops working.
 
 == Frequently Asked Questions ==
 
@@ -77,6 +84,9 @@ No, preauth is only available with credit card payments. When preauth is enabled
 = What happens if I don't capture a preauth payment? =
 Preauthorized funds are typically held for a limited time (usually 7-30 days depending on your payment processor). If not captured within this period, the authorization will expire and the funds will be released back to the customer.
 
+= Where is the source code for the block checkout script? =
+The block checkout script, `dist/blink-block.js`, is built from the files in the plugin's `src/` folder. To build it yourself, run `npm install` and then `npm run build` in the plugin folder.
+
 == Screenshots ==
 
 1. Blink Payment Gateway settings page.
@@ -84,6 +94,22 @@ Preauthorized funds are typically held for a limited time (usually 7-30 days dep
 3. Apple Pay and Google Pay buttons on the checkout page.
 
 == Changelog ==
+
+= 1.4.2 =
+* Debug logs now go to WooCommerce › Status › Logs and no longer contain customer details. Log files from older versions are deleted, as they could be read over the web.
+* Improved security of block checkout payment field loading, Apple Pay setup and webhook handling.
+* Block checkout card fields now reload after the order total changes, for example when a coupon is applied. Before, the shopper had to reload the page to pay by card.
+* Block checkout card fields now load on sites installed in a subfolder or using plain permalinks.
+* The pay-for-order page no longer shows a critical error for an order that doesn't exist.
+* On the classic checkout and the pay-for-order page, Blink no longer takes over the Place order button when the shopper picks another payment method. Before, gateways that open their own popup from that button, such as Klarna, failed with an error.
+* On the pay-for-order page, choosing another payment method no longer leaves the form greyed out with a Pay for order button that can't be clicked.
+* WooCommerce's Refund button shows again on orders paid through other gateways. Versions up to 1.3.7 tagged those orders as Blink ones, which hid it. On Blink orders, the button now also shows when Blink can't be reached to check the payment.
+* The plugin no longer changes the timeout of other plugins' and WordPress's HTTP requests. Its own requests to Blink wait up to 30 seconds, so a slow cancel or refund is less likely to fail.
+* If Blink doesn't answer a Cancel Order request, the plugin checks the payment with Blink and cancels the order if Blink has cancelled it, instead of noting that the cancel failed.
+* Cancel and refund errors from Blink show Blink's reason, without PHP warnings.
+* The block checkout script can be cached by browsers.
+* Now requires WordPress 6.5 or later and WooCommerce 7.6 or later. The installation steps cover moving from the GitHub version.
+* For developers: the plugin's functions, classes, hooks, options and REST route now start with blink_pg_ (REST: blink-payment-gateway/v1). The old hook names still work but are deprecated; use blink_pg_get_return_url, blink_pg_hostedfield_css, blink_pg_custom_script, blink_pg_custom_style and blink_pg_hosted_return_recheck_delay instead.
 
 = 1.4.1 =
 * Improved webhook verification.
@@ -160,27 +186,49 @@ Upgrade to this version to enable preauthorization payments, manual capture func
 = 1.1.0 =
 Upgrade to this version to enable Apple Pay and Google Pay support and improve compatibility with WooCommerce Blocks.
 
-== External Services ==
+== External services ==
 
-This plugin connects to the following external services:
+The plugin needs these services to take payments. They are only contacted once the gateway is enabled and its API keys are saved.
 
-1. **Blink Payment API**:
-   - Purpose: To process payments, refunds, and cancellations.
-   - Data sent: Transaction details, customer information, and order details.
-   - Terms of Service: [https://www.blinkpayment.co.uk/terms/terms-of-service](https://www.blinkpayment.co.uk/terms/terms-of-service)
-   - Privacy Policy: [https://www.blinkpayment.co.uk/terms/privacy-policy](https://www.blinkpayment.co.uk/terms/privacy-policy)
+= Blink Payment API (secure.blinkpayment.co.uk) =
 
-2. **Google Pay API**:
-   - Purpose: To enable Google Pay functionality.
-   - Data sent: Payment details.
-   - Terms of Service: [https://pay.google.com/about/terms/](https://pay.google.com/about/terms/)
-   - Privacy Policy: [https://policies.google.com/privacy](https://policies.google.com/privacy)
+Blink processes the payments. The plugin's server talks to Blink:
 
-3. **Apple Pay API**:
-   - Purpose: To enable Apple Pay functionality.
-   - Data sent: Payment details.
-   - Terms of Service: [https://developer.apple.com/apple-pay/](https://developer.apple.com/apple-pay/)
-   - Privacy Policy: [https://www.apple.com/legal/privacy/](https://www.apple.com/legal/privacy/)
+* When a shopper opens the checkout or pay-for-order page, and when the cart total changes: the order or cart total, currency and order ID, to create a payment intent.
+* When a shopper places an order: their billing name, email, address and postcode, their IP address, their browser's user agent, language, time zone and screen size (Blink uses these for 3D Secure), and the order ID and total. A card payment sends a one-time card token, not the card number. A direct debit sends the account holder's name, account number and sort code. An open banking payment sends the name, email and address.
+* When a shopper uses Hosted checkout: the order total, billing name, email, address and postcode, to create a Blink payment page. The shopper is sent to that page, on Blink, to pay.
+* When an admin refunds, cancels or captures a payment, or opens an order paid with Blink: the Blink transaction ID and, for a refund or capture, the amount.
+* When Blink sends a payment notification, and when a shopper returns from paying: the transaction ID, to confirm the payment with Blink.
+* Each time it needs an access token: the store's Blink API key and secret, the site name, and the WordPress, WooCommerce and plugin versions.
+* When an admin enables Apple Pay: the site's domain name, to register it with Apple through Blink.
+
+On the checkout and pay-for-order pages, the shopper's browser also loads Blink's Apple Pay and Google Pay scripts from this domain when those methods are offered.
+
+During 3D Secure, Blink may send the shopper to their card issuer's authentication page. During an open banking payment, they are sent to their bank.
+
+* Terms and conditions: https://www.blinkpayment.co.uk/terms-conditions/
+* Privacy policy: https://www.blinkpayment.co.uk/privacy-policy/
+
+= Blink hosted card fields (gateway2.blinkpayment.co.uk) =
+
+On the cart, checkout and pay-for-order pages, the shopper's browser loads Blink's card fields script from this domain. The card number, expiry date and security code are typed into fields hosted by Blink, so they go from the shopper's browser straight to Blink and never reach the store's server. For PCI DSS compliance, this script has to come from Blink and can't be included in the plugin.
+
+* Terms and conditions: https://www.blinkpayment.co.uk/terms-conditions/
+* Privacy policy: https://www.blinkpayment.co.uk/privacy-policy/
+
+= Apple Pay (applepay.cdn-apple.com) =
+
+Only when Apple Pay is enabled in the plugin's settings. The shopper's browser loads Apple's Apple Pay script on the checkout and pay-for-order pages, and a shopper who pays with Apple Pay shares their payment details with Apple as part of that payment.
+
+* Terms and conditions: https://developer.apple.com/terms/apple-pay-web/
+* Privacy policy: https://www.apple.com/legal/privacy/data/en/apple-pay/
+
+= Google Pay (pay.google.com) =
+
+Only when Google Pay is offered at checkout. The shopper's browser loads Google's Google Pay script on the checkout and pay-for-order pages, and a shopper who pays with Google Pay shares their payment details with Google as part of that payment.
+
+* Terms of service: https://payments.developers.google.com/terms/sellertos
+* Privacy policy: https://policies.google.com/privacy
 
 == Notes ==
 

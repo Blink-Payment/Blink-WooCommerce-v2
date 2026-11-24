@@ -1,6 +1,12 @@
 <?php
+/**
+ * Static configuration for the Blink gateway: title, description, host URL and version.
+ *
+ * @package Blink_Payment_Gateway_For_WooCommerce
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+	exit; // Exit if accessed directly.
 }
 
 return array(
@@ -8,5 +14,5 @@ return array(
 	'method_description' =>
 	'Pay securely via Credit / Debit Card / Direct Debit / Open banking with Blink',
 	'host_url'           => 'https://secure.blinkpayment.co.uk',
-	'version'            => '1.4.1',
+	'version'            => '1.4.2',
 );

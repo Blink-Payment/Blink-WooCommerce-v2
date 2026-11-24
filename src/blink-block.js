@@ -10,6 +10,7 @@ import {
   observeApplePayButtonRemoval,
 } from './wallet-availability';
 import { CardLogos } from './card-logos';
+import { amountsMatch, createIntentRequestTracker } from './intent-request';
 // Shared with the classic checkout and pay-for-order scripts.
 import cardFormFields from '../assets/js/card-form-fields';
 
@@ -103,6 +104,10 @@ const BlinkPayment = (props) => {
   const hostedFormIntentRef = useRef('');
   const intentFailureAmountRef = useRef('');
   const intentLoadingAmountRef = useRef('');
+  const intentRequestsRef = useRef(null);
+  if (!intentRequestsRef.current) {
+    intentRequestsRef.current = createIntentRequestTracker();
+  }
   const [elements, setElements] = useState(settings.elements || {});
   const [cartAmount, setCartAmount] = useState(settings.cartAmount || '');
   const [intentId, setIntentId] = useState(settings.intentId || '');
@@ -141,6 +146,7 @@ const BlinkPayment = (props) => {
     }
 
     if (isZeroTotal(formattedTotal)) {
+      intentRequestsRef.current.invalidate();
       resetBlinkPaymentState(formattedTotal);
       return;
     }
@@ -157,11 +163,11 @@ const BlinkPayment = (props) => {
     if (isIntentLoading && intentLoadingAmountRef.current === formattedTotal) {
       return;
     }
-    if (cartAmount === formattedTotal && intentId && intentExpiryDate && hasRenderableElements) {
+    if (amountsMatch(cartAmount, formattedTotal) && intentId && intentExpiryDate && hasRenderableElements) {
       return;
     }
 
-    let isCurrentRequest = true;
+    const requestId = intentRequestsRef.current.start();
     setIsIntentLoading(true);
     intentLoadingAmountRef.current = formattedTotal;
 
@@ -170,14 +176,13 @@ const BlinkPayment = (props) => {
       destroyHostedForm();
 
       try {
-        const intentRes = await fetch('/wp-json/blink/v1/set-intent', {
+        const intentRes = await fetch(settings.setIntentUrl || '/wp-json/blink-payment-gateway/v1/set-intent', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cartAmount: formattedTotal }),
+          headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': settings.restNonce || '' },
         });
         const intentData = await intentRes.json();
 
-        if (!isCurrentRequest) {
+        if (!intentRequestsRef.current.isCurrent(requestId)) {
           return;
         }
 
@@ -192,7 +197,9 @@ const BlinkPayment = (props) => {
 
         destroyHostedForm();
         setElements(intentData.intent.element);
-        setCartAmount(intentData.amount || formattedTotal);
+        // Keep the total this intent was asked for, in the block's own format,
+        // so the check above matches it and no further request is sent.
+        setCartAmount(formattedTotal);
         setIntentId(intentData.intent.id);
         setIntentExpiryDate(intentData.intent.expiry_date);
         setIntentError('');
@@ -200,7 +207,7 @@ const BlinkPayment = (props) => {
         intentFailureAmountRef.current = '';
         intentLoadingAmountRef.current = '';
       } catch (e) {
-        if (!isCurrentRequest) {
+        if (!intentRequestsRef.current.isCurrent(requestId)) {
           return;
         }
 
@@ -210,10 +217,6 @@ const BlinkPayment = (props) => {
         intentLoadingAmountRef.current = '';
       }
     })();
-
-    return () => {
-      isCurrentRequest = false;
-    };
   }, [formattedTotal, cartAmount, intentId, intentExpiryDate, elements, intentError, isIntentLoading]);
 
   if (settings.isHosted) {
@@ -303,6 +306,14 @@ const BlinkPayment = (props) => {
     try {
       const hostedForm = hostedFormTarget.hostedForm('instance');
       if (hostedForm && typeof hostedForm.destroy === 'function') {
+        // destroy() un-hides each original input, which fires the SDK's own
+        // style watcher for a field whose iframe has just been removed. A field
+        // that is not ready ignores it instead of posting to a missing iframe.
+        (hostedForm.fields || []).forEach((field) => {
+          if (field && field._state) {
+            field._state.isReady = false;
+          }
+        });
         hostedForm.destroy();
       }
     } catch (error) { }
@@ -747,7 +758,7 @@ const BlinkPayment = (props) => {
     }
   }, [elements, paymentRequired, showApplePay, showGooglePay]);
 
-  if (isIntentLoading && cartAmount !== formattedTotal) {
+  if (isIntentLoading && !amountsMatch(cartAmount, formattedTotal)) {
     return (
       <div className="blink-gutenberg payment_method_blink">
         <div className="blink-intent-loading" style={{ padding: '12px 0' }}>

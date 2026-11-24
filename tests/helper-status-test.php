@@ -136,95 +136,95 @@ function blink_assert_same($expected, $actual, $message) {
 
 $tests = array(
     'transaction API payment message takes priority' => function () {
-        blink_assert_same('API decline', blink_resolve_payment_message('API decline', 'Redirect decline'), 'Resolved API message');
+        blink_assert_same('API decline', blink_pg_resolve_payment_message('API decline', 'Redirect decline'), 'Resolved API message');
     },
     'redirect payment note is the operational fallback' => function () {
-        blink_assert_same('Redirect decline', blink_resolve_payment_message('', 'Redirect decline'), 'Resolved redirect note');
+        blink_assert_same('Redirect decline', blink_pg_resolve_payment_message('', 'Redirect decline'), 'Resolved redirect note');
     },
     'payment message is sanitized' => function () {
-        blink_assert_same('Declined', blink_resolve_payment_message('<strong>Declined</strong>', ''), 'Sanitized payment message');
+        blink_assert_same('Declined', blink_pg_resolve_payment_message('<strong>Declined</strong>', ''), 'Sanitized payment message');
     },
     'non-scalar API payment message is not exposed' => function () {
-        blink_assert_same('Safe fallback', blink_resolve_payment_message(array('internal' => 'error'), 'Safe fallback'), 'Non-scalar API message');
+        blink_assert_same('Safe fallback', blink_pg_resolve_payment_message(array('internal' => 'error'), 'Safe fallback'), 'Non-scalar API message');
     },
     'empty payment messages remain empty' => function () {
-        blink_assert_same('', blink_resolve_payment_message('', ''), 'Empty payment message');
+        blink_assert_same('', blink_pg_resolve_payment_message('', ''), 'Empty payment message');
     },
     'pre-auth authorized is on-hold' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-AUTH', '  AUTHORIZED  ', 'Card');
+        blink_pg_change_status($order, 'BL-AUTH', '  AUTHORIZED  ', 'Card');
         blink_assert_same('on-hold', $order->get_status(), 'Authorized pre-auth status');
     },
     'gateway Pre-Auth status is on-hold' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-PRE-AUTH', 'Pre-Auth', 'Card');
+        blink_pg_change_status($order, 'BL-PRE-AUTH', 'Pre-Auth', 'Card');
         blink_assert_same('on-hold', $order->get_status(), 'Pre-Auth gateway status');
     },
     'pre-auth declined is failed' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-DECLINED', 'declined', 'Card');
+        blink_pg_change_status($order, 'BL-DECLINED', 'declined', 'Card');
         blink_assert_same('failed', $order->get_status(), 'Declined pre-auth status');
     },
     'pre-auth failed is failed' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-FAILED', 'failed', 'Card');
+        blink_pg_change_status($order, 'BL-FAILED', 'failed', 'Card');
         blink_assert_same('failed', $order->get_status(), 'Failed pre-auth status');
     },
     'pre-auth expired is failed' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-EXPIRED', 'expired', 'Card');
+        blink_pg_change_status($order, 'BL-EXPIRED', 'expired', 'Card');
         blink_assert_same('failed', $order->get_status(), 'Expired pre-auth status');
     },
     'pre-auth captured uses paid lifecycle' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-CAPTURED', 'captured', 'Card');
+        blink_pg_change_status($order, 'BL-CAPTURED', 'captured', 'Card');
         blink_assert_same('processing', $order->get_status(), 'Captured pre-auth status');
         blink_assert_same(1, $order->payment_complete_calls, 'Captured payment_complete call count');
         blink_assert_same('BL-CAPTURED', $order->transaction_id, 'Captured transaction ID');
     },
     'non-pre-auth declined is failed' => function () {
         $order = blink_test_order(false);
-        blink_change_status($order, 'BL-SALE-DECLINED', 'declined', 'Card');
+        blink_pg_change_status($order, 'BL-SALE-DECLINED', 'declined', 'Card');
         blink_assert_same('failed', $order->get_status(), 'Declined sale status');
     },
     'unknown pre-auth status is failed' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-UNKNOWN', 'unexpected gateway state', 'Card');
+        blink_pg_change_status($order, 'BL-UNKNOWN', 'unexpected gateway state', 'Card');
         blink_assert_same('failed', $order->get_status(), 'Unknown pre-auth status');
     },
     'reversed pre-auth maps to hold' => function () {
         $order = blink_test_order(true);
-        blink_assert_same('hold', blink_get_status('reversed', '', $order), 'Reversed pre-auth status');
+        blink_assert_same('hold', blink_pg_get_status('reversed', '', $order), 'Reversed pre-auth status');
     },
     'reversed pre-auth order is on-hold' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-REVERSED', 'reversed', 'Card');
+        blink_pg_change_status($order, 'BL-REVERSED', 'reversed', 'Card');
         blink_assert_same('on-hold', $order->get_status(), 'Reversed pre-auth order status');
     },
     'reversed non-pre-auth preserves hold mapping' => function () {
         $order = blink_test_order(false);
-        blink_assert_same('hold', blink_get_status('reversed', '', $order), 'Reversed sale status');
+        blink_assert_same('hold', blink_pg_get_status('reversed', '', $order), 'Reversed sale status');
     },
     'pre auth pre-auth maps to hold' => function () {
         $order = blink_test_order(true);
-        blink_assert_same('hold', blink_get_status('pre auth', '', $order), 'Pre auth pre-auth status');
+        blink_assert_same('hold', blink_pg_get_status('pre auth', '', $order), 'Pre auth pre-auth status');
     },
     'Preauth pre-auth maps to hold' => function () {
         $order = blink_test_order(true);
-        blink_assert_same('hold', blink_get_status('Preauth', '', $order), 'Preauth pre-auth status');
+        blink_assert_same('hold', blink_pg_get_status('Preauth', '', $order), 'Preauth pre-auth status');
     },
     'Preauth pre-auth order is on-hold' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-GOOGLE-PAY-PREAUTH', 'Preauth', 'googlepay');
+        blink_pg_change_status($order, 'BL-GOOGLE-PAY-PREAUTH', 'Preauth', 'googlepay');
         blink_assert_same('on-hold', $order->get_status(), 'Google Pay Preauth order status');
     },
     'Preauth non-pre-auth remains failed' => function () {
         $order = blink_test_order(false);
-        blink_assert_same('failed', blink_get_status('Preauth', '', $order), 'Non-pre-auth Preauth status');
+        blink_assert_same('failed', blink_pg_get_status('Preauth', '', $order), 'Non-pre-auth Preauth status');
     },
     'failed 3DS pre-auth is failed' => function () {
         $order = blink_test_order(true);
-        blink_change_status($order, 'BL-3DS-FAILED', 'Failed_3DS', 'Card');
+        blink_pg_change_status($order, 'BL-3DS-FAILED', 'Failed_3DS', 'Card');
         blink_assert_same('failed', $order->get_status(), 'Failed 3DS pre-auth status');
     },
     'explicit sale metadata overrides enabled global pre-auth' => function () {
@@ -232,7 +232,7 @@ $tests = array(
         $test_preauthorize_payments = true;
 
         $order = blink_test_order(false);
-        blink_change_status($order, 'BL-SALE-APPROVED', 'approved', 'Card');
+        blink_pg_change_status($order, 'BL-SALE-APPROVED', 'approved', 'Card');
 
         blink_assert_same('processing', $order->get_status(), 'Approved sale status');
         blink_assert_same('no', $order->get_meta('_blink_preauth', true), 'Sale pre-auth metadata');
@@ -242,16 +242,16 @@ $tests = array(
 		$order = blink_test_order( true );
 		$order->update_meta_data( 'blink_res', 'ORIGINAL-AUTH' );
 		$order->update_meta_data( 'blink_rerun_id', 'CAPTURE-ID' );
-		blink_assert_same( 'CAPTURE-ID', blink_get_charge_transaction_id( $order ), 'Captured charge transaction ID' );
+		blink_assert_same( 'CAPTURE-ID', blink_pg_get_charge_transaction_id( $order ), 'Captured charge transaction ID' );
 	},
 	'charge transaction falls back to original transaction before capture' => function () {
 		$order = blink_test_order( true );
 		$order->update_meta_data( 'blink_res', 'ORIGINAL-AUTH' );
-        blink_assert_same( 'ORIGINAL-AUTH', blink_get_charge_transaction_id( $order ), 'Pre-capture transaction ID' );
+        blink_assert_same( 'ORIGINAL-AUTH', blink_pg_get_charge_transaction_id( $order ), 'Pre-capture transaction ID' );
     },
 	'initial pre-auth paid and approved statuses remain on-hold' => function () {
-		blink_assert_same( 'hold', blink_get_status( 'paid', '', blink_test_order( true ) ), 'Initial paid pre-auth status' );
-		blink_assert_same( 'hold', blink_get_status( 'approved', '', blink_test_order( true ) ), 'Initial approved pre-auth status' );
+		blink_assert_same( 'hold', blink_pg_get_status( 'paid', '', blink_test_order( true ) ), 'Initial paid pre-auth status' );
+		blink_assert_same( 'hold', blink_pg_get_status( 'approved', '', blink_test_order( true ) ), 'Initial approved pre-auth status' );
 	},
 );
 

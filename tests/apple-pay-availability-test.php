@@ -2,17 +2,19 @@
 
 define( 'ABSPATH', __DIR__ . '/' );
 
+function wp_parse_url( $url ) { return parse_url( $url ); }
+
 require_once dirname( __DIR__ ) . '/includes/helper.php';
 
 function blink_assert_apple_pay_availability( $expected, $enabled, $elements, $message ) {
-	$actual = blink_should_render_apple_pay( $enabled, $elements );
+	$actual = blink_pg_should_render_apple_pay( $enabled, $elements );
 	if ( $expected !== $actual ) {
 		throw new RuntimeException( $message );
 	}
 }
 
 function blink_assert_wallet_availability( $expected, $enabled, $elements, $message ) {
-	$actual = blink_get_wallet_availability( $enabled, $elements );
+	$actual = blink_pg_get_wallet_availability( $enabled, $elements );
 	if ( $expected !== $actual ) {
 		throw new RuntimeException( $message );
 	}
@@ -77,6 +79,20 @@ $tests = array(
 			array(),
 			'Expected no wallet row.'
 		);
+	},
+	'Apple Pay domain registration accepts the https origin the settings page sends' => function () {
+		foreach ( array( 'https://shop.example.com', 'https://shop.example.com/' ) as $domain ) {
+			if ( ! blink_pg_is_valid_applepay_domain( $domain ) ) {
+				throw new RuntimeException( 'Expected ' . $domain . ' to be accepted.' );
+			}
+		}
+	},
+	'Apple Pay domain registration rejects anything but a bare https origin' => function () {
+		foreach ( array( '', 'shop.example.com', 'http://shop.example.com', 'https://shop.example.com/path', 'https://shop.example.com:8443', 'https://shop.example.com?x=1', 'https://localhost', 'https://user@shop.example.com' ) as $domain ) {
+			if ( blink_pg_is_valid_applepay_domain( $domain ) ) {
+				throw new RuntimeException( 'Expected ' . var_export( $domain, true ) . ' to be rejected.' );
+			}
+		}
 	},
 );
 

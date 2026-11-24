@@ -1,34 +1,35 @@
 {
   "name": "plugin-woocommerce",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "woocommerce checkout block support for Blink Payment Gateway",
   "scripts": {
     "build": "wp-scripts build",
     "check-engines": "wp-scripts check-engines",
-    "check-licenses": "wp-scripts check-licenses",
+    "check-licenses": "wp-scripts check-licenses --prod",
     "format": "wp-scripts format",
     "lint:css": "wp-scripts lint-style",
     "lint:js": "wp-scripts lint-js",
     "lint:md:docs": "wp-scripts lint-md-docs",
     "lint:pkg-json": "wp-scripts lint-pkg-json",
     "packages-update": "wp-scripts packages-update",
-    "plugin-zip": "wp-scripts plugin-zip",
     "start": "wp-scripts start",
     "test:e2e": "wp-scripts test-e2e",
     "test:unit": "wp-scripts test-unit-js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/blink3sixty/plugin-woocommerce.git"
+    "url": "git+https://github.com/Blink-Payment/Blink-WooCommerce-v2.git"
   },
   "author": "Blink",
-  "license": "ISC",
+  "license": "GPL-2.0-or-later",
   "bugs": {
-    "url": "https://github.com/blink3sixty/plugin-woocommerce/issues"
+    "url": "https://github.com/Blink-Payment/Blink-WooCommerce-v2/issues"
   },
-  "homepage": "https://github.com/blink3sixty/plugin-woocommerce#readme",
+  "homepage": "https://github.com/Blink-Payment/Blink-WooCommerce-v2#readme",
   "dependencies": {
-    "@wordpress/html-entities": "^4.9.0",
+    "@wordpress/html-entities": "^4.9.0"
+  },
+  "devDependencies": {
     "@wordpress/scripts": "^30.14.0"
   }
 }

@@ -22,6 +22,11 @@ function plugins_url( $path, $file = '' ) {
 	return 'https://shop.example/wp-content/plugins/plugin-woocommerce/includes/' . ltrim( $path, '/' );
 }
 
+if ( ! function_exists( 'admin_url' ) ) {
+	function admin_url( $path = '' ) { return 'https://shop.example.com/wp-admin/' . $path; }
+}
+function wp_nonce_url( $url, $action ) { return $url . '&_wpnonce=test-nonce'; }
+
 function plugin_dir_url( $file ) {
 	return 'https://shop.example/wp-content/plugins/plugin-woocommerce/includes/';
 }
@@ -43,10 +48,10 @@ function absint( $value ) {
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-settings-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-settings-handler.php';
 
 function blink_assert_card_logos( $expected_ids, $settings, $message ) {
-	$actual_ids = array_column( blink_get_card_logos( $settings ), 'id' );
+	$actual_ids = array_column( blink_pg_get_card_logos( $settings ), 'id' );
 	if ( $expected_ids !== $actual_ids ) {
 		throw new RuntimeException( $message . ': got ' . var_export( $actual_ids, true ) );
 	}
@@ -54,7 +59,7 @@ function blink_assert_card_logos( $expected_ids, $settings, $message ) {
 
 $tests = array(
 	'gateway settings use independently persisted checkboxes defaulting off' => function () {
-		$fields = ( new Blink_Settings_Handler( '', '' ) )->blink_get_form_fields();
+		$fields = ( new Blink_PG_Settings_Handler( '', '' ) )->blink_get_form_fields();
 		foreach ( array( 'card_logo_visa', 'card_logo_mastercard', 'card_logo_american_express' ) as $key ) {
 			if ( ! isset( $fields[ $key ] ) || 'checkbox' !== $fields[ $key ]['type'] || 'no' !== $fields[ $key ]['default'] ) {
 				throw new RuntimeException( $key . ' is not a standard checkbox defaulting to no' );
@@ -99,7 +104,7 @@ $tests = array(
 			'All-brand selection'
 		);
 
-		$logos = blink_get_card_logos( $settings );
+		$logos = blink_pg_get_card_logos( $settings );
 		if (
 			array( 'Visa', 'Mastercard', 'American Express' ) !== array_column( $logos, 'label' ) ||
 			array( 36, 36, 37 ) !== array_column( $logos, 'width' ) ||
@@ -125,7 +130,7 @@ $tests = array(
 		);
 	},
 	'classic output uses local assets and accessible labels' => function () {
-		$html = blink_get_card_logos_html(
+		$html = blink_pg_get_card_logos_html(
 			array(
 				'card_logo_visa'             => 'yes',
 				'card_logo_american_express' => 'yes',
@@ -142,8 +147,8 @@ $tests = array(
 		}
 	},
 	'direct and hosted modes do not affect selection' => function () {
-		$direct = blink_get_card_logos( array( 'integration_type' => 'direct', 'card_logo_mastercard' => 'yes' ) );
-		$hosted = blink_get_card_logos( array( 'integration_type' => 'hosted', 'card_logo_mastercard' => 'yes' ) );
+		$direct = blink_pg_get_card_logos( array( 'integration_type' => 'direct', 'card_logo_mastercard' => 'yes' ) );
+		$hosted = blink_pg_get_card_logos( array( 'integration_type' => 'hosted', 'card_logo_mastercard' => 'yes' ) );
 		if ( $direct !== $hosted ) {
 			throw new RuntimeException( 'Integration type changed the logo data' );
 		}

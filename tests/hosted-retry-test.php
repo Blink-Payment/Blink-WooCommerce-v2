@@ -34,11 +34,12 @@ function wc_add_notice( $message, $type = 'success' ) {
 	global $hr_notices;
 	$hr_notices[] = array( $type, $message );
 }
-function blink_get_full_address( $order = null ) { return '1 Test Street'; }
+function blink_pg_get_full_address( $order = null ) { return '1 Test Street'; }
 
 // The return page re-checks a Paylink after a short wait; tests don't wait.
+function apply_filters_deprecated( $hook, $args ) { return $args[0]; }
 function apply_filters( $hook, $value ) {
-	return 'blink_hosted_return_recheck_delay' === $hook ? 0 : $value;
+	return 'blink_pg_hosted_return_recheck_delay' === $hook ? 0 : $value;
 }
 
 class WP_Error {
@@ -100,29 +101,29 @@ function WC() {
 }
 
 // Order status changes are recorded rather than run through WooCommerce.
-function blink_is_preauth_transaction( $order ) {
+function blink_pg_is_preauth_transaction( $order ) {
 	return $order && 'yes' === $order->get_meta( '_blink_preauth', true );
 }
 
-function blink_payment_complete( $order, $txn_id = '', $note = '', $allow_processing = false ) {
+function blink_pg_payment_complete( $order, $txn_id = '', $note = '', $allow_processing = false ) {
 	global $hr_status_log;
 	$hr_status_log[] = array( 'complete', $order->get_id(), $txn_id );
 	$order->status = 'processing';
 }
 
-function blink_payment_on_hold( $order, $reason = '' ) {
+function blink_pg_payment_on_hold( $order, $reason = '' ) {
 	global $hr_status_log;
 	$hr_status_log[] = array( 'hold', $order->get_id() );
 	$order->status = 'on-hold';
 }
 
-function blink_payment_failed( $order, $reason = '' ) {
+function blink_pg_payment_failed( $order, $reason = '' ) {
 	global $hr_status_log;
 	$hr_status_log[] = array( 'failed', $order->get_id() );
 	$order->status = 'failed';
 }
 
-class Blink_Logger {
+class Blink_PG_Logger {
 	public static $entries = array();
 	public static function log( $message, $context = null ) { self::$entries[] = array( $message, $context ); }
 	public static function http_response_context( $response ) { return array(); }
@@ -183,8 +184,8 @@ class HR_Order {
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-transaction-handler.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-payment-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-transaction-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-payment-handler.php';
 
 class HR_Utils {
 	public function blink_generate_access_token() {
@@ -200,15 +201,15 @@ class HR_Utils {
 
 class HR_Gateway {
 	public $host_url              = 'https://gateway.example.com';
-	public $paymentMethods        = array( 'credit-card' );
+	public $payment_methods        = array( 'credit-card' );
 	public $preauthorize_payments = false;
 	public $utils;
 	public $transaction_handler;
 	public $payment_handler;
 	public function __construct() {
 		$this->utils               = new HR_Utils();
-		$this->transaction_handler = new Blink_Transaction_Handler( $this );
-		$this->payment_handler     = new Blink_Payment_Handler( $this );
+		$this->transaction_handler = new Blink_PG_Transaction_Handler( $this );
+		$this->payment_handler     = new Blink_PG_Payment_Handler( $this );
 	}
 	public function blink_is_hosted() { return true; }
 	public function blink_get_return_url( $order = null ) { return $order->get_checkout_order_received_url(); }
@@ -247,8 +248,8 @@ function hr_reset() {
 	$_GET          = array();
 	$_REQUEST      = array();
 	$_POST         = array();
-	Blink_Logger::$entries = array();
-	Blink_Transaction_Handler::$hosted_return_notice = null;
+	Blink_PG_Logger::$entries = array();
+	Blink_PG_Transaction_Handler::$hosted_return_notice = null;
 }
 
 function hr_order( $id, $props = array() ) {
@@ -291,8 +292,8 @@ function hr_visit( $order, $query ) {
 	$wp       = (object) array( 'query_vars' => array( 'order-received' => $order->get_id() ) );
 	$_GET     = $query;
 	$_REQUEST = $query;
-	Blink_Transaction_Handler::$hosted_return_notice = null;
-	Blink_Transaction_Handler::blink_capture_order_response();
+	Blink_PG_Transaction_Handler::$hosted_return_notice = null;
+	Blink_PG_Transaction_Handler::blink_capture_order_response();
 	if ( isset( $query['key'] ) && $query['key'] === $order->get_order_key() ) {
 		$hr_gateway->transaction_handler->blink_check_response_for_order( $order->get_id() );
 	}
@@ -307,8 +308,8 @@ function hr_return( $order, $status, $extra = array() ) {
 // What the page shows: the Blocks and Classic title and text, with a null order as Blocks passes.
 function hr_page() {
 	return array(
-		'title' => Blink_Transaction_Handler::blink_hosted_return_title( 'Order received' ),
-		'text'  => Blink_Transaction_Handler::blink_hosted_return_text( 'Thank you. Your order has been received.', null ),
+		'title' => Blink_PG_Transaction_Handler::blink_hosted_return_title( 'Order received' ),
+		'text'  => Blink_PG_Transaction_Handler::blink_hosted_return_text( 'Thank you. Your order has been received.', null ),
 	);
 }
 
@@ -461,8 +462,8 @@ $tests['9. the page filters work without an order, as Blocks calls them'] = func
 	$order->add_meta_data( '_blink_paylink_id', '7012' );
 	hr_paylink( '7012', array( 'status' => 'Payment Attempted' ) );
 	hr_return( $order, 'Declined' );
-	hr_assert( 'Payment declined', Blink_Transaction_Handler::blink_hosted_return_title( 'Order failed', null ), 'The title filter ignores a null order.' );
-	hr_assert_contains( 'Payment was declined', Blink_Transaction_Handler::blink_hosted_return_text( 'Your order cannot be processed', null ), 'The text filter ignores a null order.' );
+	hr_assert( 'Payment declined', Blink_PG_Transaction_Handler::blink_hosted_return_title( 'Order failed', null ), 'The title filter ignores a null order.' );
+	hr_assert_contains( 'Payment was declined', Blink_PG_Transaction_Handler::blink_hosted_return_text( 'Your order cannot be processed', null ), 'The text filter ignores a null order.' );
 };
 
 $tests['10. decline URL on a Paylink Blink reports Paid completes the order'] = function () {

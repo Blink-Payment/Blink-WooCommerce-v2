@@ -14,6 +14,10 @@ function wp_json_encode( $value ) {
 	return json_encode( $value );
 }
 
+function wp_unslash( $value ) {
+	return is_array( $value ) ? array_map( 'wp_unslash', $value ) : stripslashes( (string) $value );
+}
+
 function sanitize_text_field( $value ) {
 	return trim( strip_tags( (string) $value ) );
 }
@@ -56,15 +60,15 @@ function wp_remote_retrieve_body( $response ) {
 // without its terminal exit(). Status mapping has its own helper-status tests.
 class Merchant_Data_Status_Dispatch extends RuntimeException {}
 
-function blink_is_preauth_transaction( $order ) {
+function blink_pg_is_preauth_transaction( $order ) {
 	return false;
 }
 
-function blink_get_status( $status, $unused = '', $order = null ) {
+function blink_pg_get_status( $status, $unused = '', $order = null ) {
 	return $status;
 }
 
-function blink_change_status( $order, $transaction_id, $status, $unused = '', $note = '' ) {
+function blink_pg_change_status( $order, $transaction_id, $status, $unused = '', $note = '' ) {
 	global $test_order, $test_status;
 	merchant_data_assert( $test_order, $order, 'Webhook must dispatch to the identified order.' );
 	merchant_data_assert( 'TXN-12345', $transaction_id, 'Transaction ID must be preserved.' );
@@ -72,7 +76,7 @@ function blink_change_status( $order, $transaction_id, $status, $unused = '', $n
 	throw new Merchant_Data_Status_Dispatch();
 }
 
-class Blink_Logger {
+class Blink_PG_Logger {
 	public static function log( $message, $context = null ) {}
 }
 
@@ -95,7 +99,7 @@ class Merchant_Data_Order {
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-transaction-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-transaction-handler.php';
 
 function merchant_data_assert( $expected, $actual, $message ) {
 	if ( $expected !== $actual ) {
@@ -104,7 +108,7 @@ function merchant_data_assert( $expected, $actual, $message ) {
 }
 
 $test_order = new Merchant_Data_Order();
-$minimal = blink_get_payment_information( '12345' );
+$minimal = blink_pg_get_payment_information( '12345' );
 merchant_data_assert( '{"order_info":{"order_id":12345}}', $minimal, 'Exact JSON must contain only the numeric order ID.' );
 echo "PASS: exact JSON structure without reading customer fields\n";
 
@@ -136,7 +140,7 @@ $gateway = (object) array(
 		public function blink_generate_access_token() { return array( 'access_token' => 'test-token' ); }
 	},
 );
-$handler = new Blink_Transaction_Handler( $gateway );
+$handler = new Blink_PG_Transaction_Handler( $gateway );
 $_SERVER['REQUEST_METHOD'] = 'POST';
 
 foreach ( array( 'minimal' => $minimal, 'historical' => wp_json_encode( $historical ), 'hosted reference' => '' ) as $name => $payload ) {
@@ -156,7 +160,9 @@ foreach ( array( 'minimal' => $minimal, 'historical' => wp_json_encode( $histori
 		} catch ( Merchant_Data_Status_Dispatch $dispatched ) {
 			merchant_data_assert( 'TXN-12345', $test_order->get_transaction_id(), 'Webhook must store the transaction on the right order.' );
 			merchant_data_assert( $test_status, $test_order->meta['status'], 'Webhook must store the payment outcome.' );
-			merchant_data_assert( $payload ? json_decode( $payload, true ) : null, $test_order->meta['_debug']['merchant_data'], 'Historical payload parsing must remain unchanged.' );
+			// Historical payloads still identify the order, but only the order ID is kept.
+			$stored = isset( $test_order->meta['_debug']['merchant_data'] ) ? $test_order->meta['_debug']['merchant_data'] : null;
+			merchant_data_assert( $payload ? array( 'order_info' => array( 'order_id' => 12345 ) ) : null, $stored, 'Only the merchant_data order ID may be stored.' );
 			echo "PASS: {$name} webhook identifies order for {$test_status}\n";
 		}
 	}

@@ -418,6 +418,12 @@ jQuery(function ($) {
 
 
     $('form[name="checkout"]').on('click', '#place_order', async function (e) {
+        // Leave the click alone for other gateways. Some, like Klarna, open their
+        // own popup from it and give up if the checkout is already submitting.
+        if (blink_checkout_form.get_checkout_form().find('input[name="payment_method"]:checked').val() !== 'blink') {
+            return;
+        }
+
         e.preventDefault();
 
         var activeTab = blink_checkout_form.ensure_payment_by();

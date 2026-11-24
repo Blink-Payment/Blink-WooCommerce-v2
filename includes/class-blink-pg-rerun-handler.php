@@ -1,16 +1,35 @@
 <?php
+/**
+ * Capture of pre-authorised orders through Blink's rerun endpoint.
+ *
+ * @package Blink_Payment_Gateway_For_WooCommerce
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-class Blink_Rerun_Handler {
+/**
+ * Captures pre-authorised orders and records the outcome on the order.
+ */
+class Blink_PG_Rerun_Handler {
 
 	const IN_PROGRESS_META = '_blink_rerun_in_progress';
 	const IN_PROGRESS_TTL  = 300;
 	const LOCK_PREFIX      = 'blink_rerun_lock_';
 
+	/**
+	 * Gateway the handler works for.
+	 *
+	 * @var Blink_PG_Payment_Gateway
+	 */
 	private $gateway;
 
+	/**
+	 * Keep the gateway for API calls and settings.
+	 *
+	 * @param Blink_PG_Payment_Gateway $gateway Payment gateway instance.
+	 */
 	public function __construct( $gateway ) {
 		$this->gateway = $gateway;
 	}
@@ -28,7 +47,7 @@ class Blink_Rerun_Handler {
 			'success' => false,
 			'error'   => __( 'This pre-authorisation is not eligible for capture', 'blink-payment-gateway-for-woocommerce' ),
 		);
-		Blink_Logger::log( 'Processing rerun for order', array( 'order_id' => $order_id ) );
+		Blink_PG_Logger::log( 'Processing rerun for order', array( 'order_id' => $order_id ) );
 
 		// Cheap early rejection on the caller's snapshot; the authoritative
 		// check runs on a reloaded order once the lock is held.
@@ -69,9 +88,12 @@ class Blink_Rerun_Handler {
 			$token = $this->gateway->utils->blink_set_tokens();
 			if ( empty( $token ) || empty( $token['access_token'] ) ) {
 				$error_message = __( 'Failed to authenticate with payment gateway', 'blink-payment-gateway-for-woocommerce' );
-				Blink_Logger::log( 'Failed to get access token for rerun', array( 'order_id' => $order_id ) );
+				Blink_PG_Logger::log( 'Failed to get access token for rerun', array( 'order_id' => $order_id ) );
 				$this->record_rerun_failure( $order, $error_message );
-				return array( 'success' => false, 'error' => $error_message );
+				return array(
+					'success' => false,
+					'error'   => $error_message,
+				);
 			}
 
 			$rerun_data = array(
@@ -81,9 +103,9 @@ class Blink_Rerun_Handler {
 			);
 			$order->update_meta_data( '_blink_rerun_reference', $rerun_data['reference'] );
 			$order->save();
-			$url        = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id . '/reruns';
+			$url = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id . '/reruns';
 
-			Blink_Logger::log( 'process_rerun() POST reruns', $rerun_data );
+			Blink_PG_Logger::log( 'process_rerun() POST reruns', $rerun_data );
 			$response = wp_remote_post(
 				$url,
 				array(
@@ -96,7 +118,7 @@ class Blink_Rerun_Handler {
 					'timeout' => 30,
 				)
 			);
-			Blink_Logger::log( 'process_rerun() POST reruns', Blink_Logger::http_response_context( $response ) );
+			Blink_PG_Logger::log( 'process_rerun() POST reruns', Blink_PG_Logger::http_response_context( $response ) );
 
 			// A webhook can complete while wp_remote_post() is waiting. Reload the
 			// order so its persisted capture/failure state wins over this request's
@@ -119,22 +141,28 @@ class Blink_Rerun_Handler {
 			}
 			if ( is_wp_error( $response ) ) {
 				$error_message = $response->get_error_message();
-				Blink_Logger::log( 'process_rerun() POST reruns', array( 'error' => $error_message ) );
+				Blink_PG_Logger::log( 'process_rerun() POST reruns', array( 'error' => $error_message ) );
 				// A final decline webhook may have landed while the request was
 				// waiting; it is authoritative over the transport failure.
 				$attempt_failure = $this->get_current_attempt_failure( $order );
 				if ( null !== $attempt_failure ) {
-					return array( 'success' => false, 'error' => $attempt_failure );
+					return array(
+						'success' => false,
+						'error'   => $attempt_failure,
+					);
 				}
 				$this->record_rerun_unknown( $order, $error_message );
-				return array( 'success' => false, 'error' => $error_message );
+				return array(
+					'success' => false,
+					'error'   => $error_message,
+				);
 			}
 
-			$http_code           = (int) wp_remote_retrieve_response_code( $response );
-			$raw_body            = wp_remote_retrieve_body( $response );
-			$decoded_body        = json_decode( $raw_body, true );
-			$valid_json          = is_array( $decoded_body );
-			$api_body            = $valid_json ? $decoded_body : array();
+			$http_code          = (int) wp_remote_retrieve_response_code( $response );
+			$raw_body           = wp_remote_retrieve_body( $response );
+			$decoded_body       = json_decode( $raw_body, true );
+			$valid_json         = is_array( $decoded_body );
+			$api_body           = $valid_json ? $decoded_body : array();
 			$new_transaction_id = ! empty( $api_body['transaction_id'] ) && is_scalar( $api_body['transaction_id'] )
 				? sanitize_text_field( (string) $api_body['transaction_id'] )
 				: '';
@@ -147,26 +175,35 @@ class Blink_Rerun_Handler {
 			$is_success         = $is_success && $this->is_successful_rerun_status( $response_status );
 			$explicit_failure   = $valid_json && isset( $api_body['success'] ) && in_array( $api_body['success'], array( false, 0, '0', 'false' ), true )
 				&& ( $this->is_failed_rerun_status( $response_status ) || ! empty( $api_body['message'] ) || ! empty( $api_body['error'] ) );
-			$confirmed_success = $is_success && '' !== $new_transaction_id;
+			$confirmed_success  = $is_success && '' !== $new_transaction_id;
 			$ambiguous_response = ! $valid_json
 				|| in_array( $http_code, array( 408, 429 ), true )
 				|| $http_code >= 500
-				|| ( $http_code < 200 || $http_code >= 300 ) && ! $explicit_failure
+				|| ( ( $http_code < 200 || $http_code >= 300 ) && ! $explicit_failure )
 				|| ( ! $confirmed_success && ! $explicit_failure );
 			if ( $ambiguous_response ) {
 				$attempt_failure = $this->get_current_attempt_failure( $order );
 				if ( null !== $attempt_failure ) {
-					return array( 'success' => false, 'error' => $attempt_failure );
+					return array(
+						'success' => false,
+						'error'   => $attempt_failure,
+					);
 				}
 				$error_message = __( 'Blink capture outcome is unknown; awaiting webhook confirmation', 'blink-payment-gateway-for-woocommerce' );
 				$this->record_rerun_unknown( $order, $error_message );
-				return array( 'success' => false, 'error' => $error_message );
+				return array(
+					'success' => false,
+					'error'   => $error_message,
+				);
 			}
-			$failed_webhook_id = (string) $order->get_meta( '_blink_last_failed_rerun_id', true );
+			$failed_webhook_id     = (string) $order->get_meta( '_blink_last_failed_rerun_id', true );
 			$failed_webhook_status = (string) $order->get_meta( '_blink_last_failed_rerun_status', true );
 			if ( $is_success && '' !== $new_transaction_id && $new_transaction_id === $failed_webhook_id && 'failed' === $failed_webhook_status ) {
 				$failure_message = (string) $order->get_meta( '_blink_last_failed_rerun_message', true );
-				return array( 'success' => false, 'error' => $failure_message ?: __( 'Capture failed', 'blink-payment-gateway-for-woocommerce' ) );
+				return array(
+					'success' => false,
+					'error'   => $failure_message ? $failure_message : __( 'Capture failed', 'blink-payment-gateway-for-woocommerce' ),
+				);
 			}
 
 			if ( $confirmed_success ) {
@@ -190,7 +227,7 @@ class Blink_Rerun_Handler {
 				$error_message = __( 'Unknown error occurred', 'blink-payment-gateway-for-woocommerce' );
 			}
 
-			Blink_Logger::log(
+			Blink_PG_Logger::log(
 				'Rerun failed',
 				array(
 					'order_id'       => $order_id,
@@ -201,12 +238,24 @@ class Blink_Rerun_Handler {
 			);
 			$this->record_rerun_failure( $order, $error_message, $new_transaction_id );
 
-			return array( 'success' => false, 'error' => $error_message );
+			return array(
+				'success' => false,
+				'error'   => $error_message,
+			);
 		} catch ( Throwable $error ) {
 			$error_message = sanitize_text_field( $error->getMessage() );
-			Blink_Logger::log( 'Rerun exception for order', array( 'order_id' => $order_id, 'error' => $error_message ) );
+			Blink_PG_Logger::log(
+				'Rerun exception for order',
+				array(
+					'order_id' => $order_id,
+					'error'    => $error_message,
+				)
+			);
 			$this->record_rerun_failure( $order, $error_message );
-			return array( 'success' => false, 'error' => $error_message );
+			return array(
+				'success' => false,
+				'error'   => $error_message,
+			);
 		} finally {
 			$this->clear_rerun_in_progress( $order, $marker );
 		}
@@ -264,6 +313,12 @@ class Blink_Rerun_Handler {
 		);
 	}
 
+	/**
+	 * Check whether a capture status from Blink means the capture failed.
+	 *
+	 * @param string $status Status returned by Blink.
+	 * @return bool
+	 */
 	public function is_failed_rerun_status( $status ) {
 		$status = strtolower( trim( urldecode( (string) $status ) ) );
 		$status = preg_replace( '/[\s_-]+/', ' ', $status );
@@ -281,8 +336,8 @@ class Blink_Rerun_Handler {
 		if ( 'yes' === $order->get_meta( '_blink_payment_complete_done', true ) ) {
 			return;
 		}
-		if ( function_exists( 'blink_payment_complete' ) ) {
-			blink_payment_complete( $order, $transaction_id, '', $order->has_status( 'processing' ) );
+		if ( function_exists( 'blink_pg_payment_complete' ) ) {
+			blink_pg_payment_complete( $order, $transaction_id, '', $order->has_status( 'processing' ) );
 		} elseif ( method_exists( $order, 'payment_complete' ) ) {
 			// The fallback is only useful to lightweight integrations/tests where
 			// the plugin helper has not been loaded.
@@ -348,6 +403,13 @@ class Blink_Rerun_Handler {
 		return '' !== $message ? $message : __( 'Capture failed', 'blink-payment-gateway-for-woocommerce' );
 	}
 
+	/**
+	 * Flag the order's capture outcome as unknown so retries are blocked, and add an order note.
+	 *
+	 * @param WC_Order $order   Order being captured.
+	 * @param mixed    $message Error detail for the order note; non-scalar values get a default message.
+	 * @return void
+	 */
 	public function record_rerun_unknown( $order, $message ) {
 		$message = sanitize_text_field( is_scalar( $message ) ? (string) $message : __( 'Capture outcome unknown', 'blink-payment-gateway-for-woocommerce' ) );
 		$order->update_meta_data( '_blink_rerun_outcome_unknown', 'yes' );
@@ -367,7 +429,7 @@ class Blink_Rerun_Handler {
 		if ( ! is_object( $order ) || 'blink' !== $order->get_payment_method() ) {
 			return false;
 		}
-		if ( ! blink_is_preauth_transaction( $order ) || empty( $order->get_meta( 'blink_res', true ) ) ) {
+		if ( ! blink_pg_is_preauth_transaction( $order ) || empty( $order->get_meta( 'blink_res', true ) ) ) {
 			return false;
 		}
 		if ( 'yes' === $order->get_meta( '_blink_rerun_outcome_unknown', true ) ) {

@@ -165,7 +165,14 @@ jQuery(function ($) {
     });
 
     const getFields = (selectedMethod = '', paymentBy = '') => {
-        $(orderForm).block({ 
+        // Only Blink loads fields here, and only that load unblocks the form, so
+        // blocking for another gateway would leave its Pay for order button stuck.
+        if (selectedMethod !== 'blink') {
+            $(orderForm).unblock();
+            return;
+        }
+
+        $(orderForm).block({
             message: null,
             overlayCSS: {
                 background: '#fff',
@@ -179,7 +186,7 @@ jQuery(function ($) {
                 url: order_params.ajaxurl,
                 type: 'POST',
                 data: {
-                    action: 'blink_payment_fields',
+                    action: 'blink_pg_payment_fields',
                     security: order_params.security,
                     payment_method: selectedMethod,
                     order: order_params.order_id,
@@ -191,10 +198,12 @@ jQuery(function ($) {
                             jQuery(document.body).trigger('update');
                         });
                     } else {
+                        $(orderForm).unblock();
                         console.error('Failed to load payment fields.');
                     }
                 },
                 error: function(error) {
+                    $(orderForm).unblock();
                     console.error('AJAX error:', error);
                 }
 
@@ -269,6 +278,12 @@ jQuery(function ($) {
     });
 
     $(document).on('click', '#place_order', async function(e) {
+        // Leave the click alone for other gateways. Some, like Klarna, take over
+        // the pay-for-order button themselves.
+        if ($(orderForm).find('input[name="payment_method"]:checked').val() !== 'blink') {
+            return;
+        }
+
         e.preventDefault();
         $(orderForm).block({ 
             message: null,

@@ -27,7 +27,7 @@ function wc_print_notice( $message, $type ) {
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-payment-gateway.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-payment-gateway.php';
 
 class Blink_Notice_Test_Order {
 	private $payment_method;
@@ -60,7 +60,7 @@ function blink_notice_assert_same( $expected, $actual, $message ) {
 }
 
 function blink_notice_gateway( $integration_type = 'direct' ) {
-	$reflection = new ReflectionClass( 'Blink_Payment_Gateway' );
+	$reflection = new ReflectionClass( 'Blink_PG_Payment_Gateway' );
 	$gateway    = $reflection->newInstanceWithoutConstructor();
 	$gateway->integration_type = $integration_type;
 	return $gateway;
