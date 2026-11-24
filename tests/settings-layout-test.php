@@ -36,6 +36,11 @@ function sanitize_text_field( $value ) {
 	return trim( strip_tags( $value ) );
 }
 
+if ( ! function_exists( 'admin_url' ) ) {
+	function admin_url( $path = '' ) { return 'https://shop.example.com/wp-admin/' . $path; }
+}
+function wp_nonce_url( $url, $action ) { return $url . '&_wpnonce=test-nonce'; }
+
 function plugin_dir_url( $file ) {
 	return 'https://shop.example/wp-content/plugins/plugin-woocommerce/includes/';
 }
@@ -115,8 +120,8 @@ class WC_Payment_Gateway {
 	}
 }
 
-require_once dirname( __DIR__ ) . '/includes/class-blink-settings-handler.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-payment-gateway.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-settings-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-payment-gateway.php';
 
 function blink_settings_assert( $condition, $message ) {
 	if ( ! $condition ) {
@@ -127,7 +132,7 @@ function blink_settings_assert( $condition, $message ) {
 function blink_settings_fields( $options = array(), $api_key = 'api', $secret_key = 'secret' ) {
 	global $blink_test_options;
 	$blink_test_options = $options;
-	return ( new Blink_Settings_Handler( $api_key, $secret_key ) )->blink_get_form_fields();
+	return ( new Blink_PG_Settings_Handler( $api_key, $secret_key ) )->blink_get_form_fields();
 }
 
 function blink_settings_xpath( $html ) {
@@ -177,7 +182,7 @@ $tests = array(
 	},
 	'advanced section uses native disclosure markup' => function () {
 		$fields  = blink_settings_fields();
-		$gateway = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+		$gateway = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
 		$html    = $gateway->generate_title_html( 'advanced', $fields['advanced'] );
 		blink_settings_assert( true === $fields['advanced']['blink_advanced_start'], 'Advanced disclosure marker missing' );
 		blink_settings_assert( false !== strpos( $html, '<details class="blink-settings-advanced">' ), 'Advanced does not use native disclosure markup' );
@@ -185,7 +190,7 @@ $tests = array(
 	},
 	'integration type renders only the selected explanation with both JS fallbacks' => function () {
 		$fields            = blink_settings_fields();
-		$gateway           = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+		$gateway           = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
 		$gateway->settings = array( 'integration_type' => 'hosted' );
 		$html              = $gateway->generate_select_html( 'integration_type', $fields['integration_type'] );
 		blink_settings_assert( false !== strpos( $html, 'The customer is redirected to Blink' ), 'Hosted fallback explanation missing' );
@@ -196,7 +201,7 @@ $tests = array(
 	'dynamic payment methods remain token driven' => function () {
 		$fields = blink_settings_fields(
 			array(
-				'blink_admin_token' => array(
+				'blink_pg_admin_token' => array(
 					'payment_types' => array( 'credit-card', 'mobile-wallet-custom' ),
 				),
 			)
@@ -208,7 +213,7 @@ $tests = array(
 	'preauthorisation keeps non-card methods disabled' => function () {
 		$fields = blink_settings_fields(
 			array(
-				'blink_admin_token'          => array( 'payment_types' => array( 'credit-card', 'direct-debit', 'open-banking' ) ),
+				'blink_pg_admin_token'          => array( 'payment_types' => array( 'credit-card', 'direct-debit', 'open-banking' ) ),
 				'woocommerce_blink_settings' => array( 'preauthorize_payments' => 'yes' ),
 			)
 		);
@@ -225,9 +230,9 @@ $tests = array(
 		blink_settings_assert( false === strpos( $html, 'please:<br>' ), 'Legacy line-break instructions remain' );
 	},
 	'apple pay status retains the existing checkbox id' => function () {
-		$gateway           = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+		$gateway           = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
 		$gateway->settings = array( 'apple_pay_enabled' => 'yes' );
-		$fields            = blink_settings_fields( array( 'blink_apple_domain_auth' => true ) );
+		$fields            = blink_settings_fields( array( 'blink_pg_apple_domain_auth' => true ) );
 		$html              = $gateway->generate_title_html( 'apple_pay_enrollment', $fields['apple_pay_enrollment'] );
 		blink_settings_assert( false !== strpos( $html, 'id="woocommerce_blink_apple_pay_enabled"' ), 'Apple Pay checkbox ID changed' );
 		blink_settings_assert( false !== strpos( $html, 'data-blink-apple-pay-status' ), 'Apple Pay visible status missing' );
@@ -236,8 +241,8 @@ $tests = array(
 		blink_settings_assert( false === strpos( $html, '<p><div' ), 'Apple Pay contains an invalid paragraph wrapper' );
 	},
 	'registered merchants have a visible editable Apple Pay checkbox in both saved states' => function () {
-		$gateway = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
-		$fields  = blink_settings_fields( array( 'blink_apple_domain_auth' => true ) );
+		$gateway = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+		$fields  = blink_settings_fields( array( 'blink_pg_apple_domain_auth' => true ) );
 		foreach ( array( 'yes', 'no' ) as $saved ) {
 			$gateway->settings = array( 'apple_pay_enabled' => $saved );
 			$html = $gateway->generate_title_html( 'apple_pay_enrollment', $fields['apple_pay_enrollment'] );
@@ -257,30 +262,30 @@ $tests = array(
 		}
 	},
 	'general section uses the first form table without an empty table' => function () {
-		$gateway = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+		$gateway = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
 		$fields  = blink_settings_fields();
 		$html    = $gateway->generate_title_html( 'general', $fields['general'] );
 		blink_settings_assert( false !== strpos( $html, '<caption class="blink-settings-caption">' ), 'General section is not part of the first table' );
 		blink_settings_assert( false === strpos( $html, '</table>' ), 'General renderer closes an empty first table' );
 	},
 	'unconfigured apple pay renders status and keeps its save control disabled' => function () {
-		$fields = blink_settings_fields( array( 'blink_apple_domain_auth' => false ) );
+		$fields = blink_settings_fields( array( 'blink_pg_apple_domain_auth' => false ) );
 		blink_settings_assert( 'disabled' === $fields['apple_pay_enabled']['custom_attributes']['disabled'], 'Unconfigured Apple Pay control should remain disabled' );
 		blink_settings_assert( false === $fields['apple_pay_enabled']['blink_registered'], 'Unconfigured Apple Pay status is incorrect' );
-		$gateway = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+		$gateway = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
 		$xpath = blink_settings_xpath( $gateway->generate_title_html( 'apple_pay_enrollment', $fields['apple_pay_enrollment'] ) );
 		blink_settings_assert( 1 === $xpath->query( '//input[@id="woocommerce_blink_apple_pay_enabled" and @disabled]' )->length, 'Unregistered rendered control must be disabled' );
 	},
 	'complete grouped settings transformation preserves controls and section boundaries' => function () {
 		foreach ( array( array(), array( 'credit-card', 'custom-method' ) ) as $methods ) {
 			$fields = blink_settings_fields( array(
-				'blink_admin_token' => array( 'payment_types' => $methods ),
-				'blink_apple_domain_auth' => true,
+				'blink_pg_admin_token' => array( 'payment_types' => $methods ),
+				'blink_pg_apple_domain_auth' => true,
 			) );
 			// Include the whole grouped region and its surrounding section boundaries.
 			$keys = array_merge( array( 'general', 'pay_methods' ), $methods, array( 'card_logos', 'card_logo_visa', 'card_logo_mastercard', 'card_logo_american_express', 'apple_pay_enrollment', 'apple_pay_enabled', 'payment_options', 'advanced' ) );
 			$fields = array_intersect_key( $fields, array_flip( $keys ) );
-			$gateway = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+			$gateway = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
 			$gateway->settings = array( 'apple_pay_enabled' => 'no', 'credit-card' => 'yes', 'card_logo_visa' => 'yes' );
 			ob_start();
 			$html = $gateway->generate_settings_html( $fields, false );
@@ -308,7 +313,7 @@ $tests = array(
 		}
 	},
 	'grouped controls keep individual WooCommerce input names and values' => function () {
-		$gateway           = ( new ReflectionClass( 'Blink_Payment_Gateway' ) )->newInstanceWithoutConstructor();
+		$gateway           = ( new ReflectionClass( 'Blink_PG_Payment_Gateway' ) )->newInstanceWithoutConstructor();
 		$gateway->settings = array( 'custom-method' => 'yes' );
 		$html              = $gateway->generate_checkbox_html(
 			'custom-method',

@@ -1,0 +1,20 @@
+{
+    "name": "blink-payment/blink-payment-gateway-for-woocommerce",
+    "description": "Blink Payment Gateway for WooCommerce",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require-dev": {
+        "wp-coding-standards/wpcs": "^3.4",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.2",
+        "phpcompatibility/phpcompatibility-wp": "^2.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "lint:php": "phpcs",
+        "lint:php:fix": "phpcbf"
+    }
+}

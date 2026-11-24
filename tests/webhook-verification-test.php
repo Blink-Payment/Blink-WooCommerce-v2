@@ -22,9 +22,10 @@ $wv_status_log = array();
 function __( $text, $domain = null ) { return $text; }
 function wp_json_encode( $value ) { return json_encode( $value ); }
 function wp_unslash( $value ) { return $value; }
+function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 function sanitize_text_field( $value ) { return trim( strip_tags( (string) $value ) ); }
 function get_woocommerce_currency() { return 'GBP'; }
-function blink_get_full_address( $order ) { return '1 Test Street'; }
+function blink_pg_get_full_address( $order ) { return '1 Test Street'; }
 
 class WP_Error {
 	private $message;
@@ -108,29 +109,29 @@ function WC() {
 }
 
 // Order status changes are recorded rather than run through WooCommerce.
-function blink_is_preauth_transaction( $order ) {
+function blink_pg_is_preauth_transaction( $order ) {
 	return $order && 'yes' === $order->get_meta( '_blink_preauth', true );
 }
 
-function blink_payment_complete( $order, $txn_id = '', $note = '', $allow_processing = false ) {
+function blink_pg_payment_complete( $order, $txn_id = '', $note = '', $allow_processing = false ) {
 	global $wv_status_log;
 	$wv_status_log[] = array( 'complete', $order->get_id(), $txn_id );
 	$order->status = 'processing';
 }
 
-function blink_payment_on_hold( $order, $reason = '' ) {
+function blink_pg_payment_on_hold( $order, $reason = '' ) {
 	global $wv_status_log;
 	$wv_status_log[] = array( 'hold', $order->get_id() );
 	$order->status = 'on-hold';
 }
 
-function blink_payment_failed( $order, $reason = '' ) {
+function blink_pg_payment_failed( $order, $reason = '' ) {
 	global $wv_status_log;
 	$wv_status_log[] = array( 'failed', $order->get_id() );
 	$order->status = 'failed';
 }
 
-class Blink_Logger {
+class Blink_PG_Logger {
 	public static $entries = array();
 	public static function log( $message, $context = null ) { self::$entries[] = array( $message, $context ); }
 	public static function http_response_context( $response ) { return array(); }
@@ -189,12 +190,12 @@ class WV_Order {
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-transaction-handler.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-payment-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-transaction-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-payment-handler.php';
 
 // Capture webhooks are handed to the rerun handler, which has its own tests;
 // here we only record what it was given.
-class WV_Transaction_Handler extends Blink_Transaction_Handler {
+class WV_Transaction_Handler extends Blink_PG_Transaction_Handler {
 	public $rerun_calls = array();
 	public function blink_handle_rerun_webhook( $order, $request, $transaction_id ) {
 		if ( ! $this->blink_is_rerun_webhook( $order, $request, $transaction_id ) ) {
@@ -252,7 +253,7 @@ function wv_reset() {
 	$wv_status_log = array();
 	$wv_gateway->rerun_handler->in_progress = false;
 	$wv_gateway->preauthorize_payments      = false;
-	Blink_Logger::$entries = array();
+	Blink_PG_Logger::$entries = array();
 }
 
 function wv_order( $id, $props = array() ) {
@@ -319,6 +320,51 @@ function wv_handler() {
 }
 
 $tests = array();
+
+// --- Webhook payload -----------------------------------------------------
+
+$tests['webhook payload keeps only the fields the plugin uses'] = function () {
+	$payload = Blink_PG_Transaction_Handler::blink_webhook_payload( array(
+		'transaction_id'   => 'BL-1',
+		'status'           => 'Captured',
+		'reference'        => 'WC-12',
+		'paylink_id'       => '5001',
+		'event_type'       => 'new_transaction',
+		'note'             => 'Card declined',
+		'message'          => 'Declined',
+		'customer_email'   => 'someone@example.com',
+		'customer_address' => '1 Test Street',
+		'card_last_four'   => '4242',
+		'merchant_data'    => '{"order_info":{"order_id":"12","customer_name":"Test Person"}}',
+	) );
+	wv_assert(
+		array(
+			'transaction_id' => 'BL-1',
+			'status'         => 'Captured',
+			'reference'      => 'WC-12',
+			'paylink_id'     => '5001',
+			'event_type'     => 'new_transaction',
+			'note'           => 'Card declined',
+			'message'        => 'Declined',
+			'merchant_data'  => array( 'order_info' => array( 'order_id' => 12 ) ),
+		),
+		$payload,
+		'Only the allow-listed fields and the merchant_data order ID survive.'
+	);
+};
+
+$tests['webhook payload reads a JSON body and sanitises its fields'] = function () {
+	$payload = Blink_PG_Transaction_Handler::blink_webhook_payload( json_encode( array(
+		'transaction_id' => '<b>BL-2</b>',
+		'status'         => array( 'Captured' ),
+		'merchant_data'  => array( 'order_info' => array( 'order_id' => 'not-a-number' ) ),
+	) ) );
+	wv_assert( array( 'transaction_id' => 'BL-2' ), $payload, 'Markup is stripped, and non-scalar or non-numeric values are dropped.' );
+};
+
+$tests['webhook payload is empty for a body that is not JSON'] = function () {
+	wv_assert( array(), Blink_PG_Transaction_Handler::blink_webhook_payload( 'transaction_id=BL-3' ), 'An unreadable body gives no fields.' );
+};
 
 // --- Forged webhooks -----------------------------------------------------
 
@@ -668,7 +714,7 @@ foreach ( $unavailable as $name => $setup ) {
 		wv_assert( 'pending', $order->get_status(), 'The order must be unchanged.' );
 		wv_assert( array(), $wv_status_log, 'No status change may run.' );
 		wv_assert( 1, count( $wv_scheduled ), 'One re-check is scheduled.' );
-		wv_assert( 'blink_recheck_webhook', $wv_scheduled[0]['hook'], 'The re-check uses the Blink hook.' );
+		wv_assert( 'blink_pg_recheck_webhook', $wv_scheduled[0]['hook'], 'The re-check uses the Blink hook.' );
 	};
 }
 
@@ -803,12 +849,12 @@ $tests['creating a paylink stores its ID on the order'] = function () {
 		public $transaction_handler;
 		public function __construct( $base ) {
 			$this->base                = $base;
-			$this->transaction_handler = new Blink_Transaction_Handler( $this );
+			$this->transaction_handler = new Blink_PG_Transaction_Handler( $this );
 		}
 		public function __get( $name ) { return $this->base->$name; }
 		public function blink_get_return_url( $order ) { return wv_redirect( $order->get_id(), $order->get_order_key() ); }
 	};
-	$handler   = new Blink_Payment_Handler( $gateway );
+	$handler   = new Blink_PG_Payment_Handler( $gateway );
 	$set_token = function () { $this->token = array( 'access_token' => 'test-token' ); };
 	$set_token->call( $handler );
 	$handler->blink_handle_hosted_payment( $order, array() );

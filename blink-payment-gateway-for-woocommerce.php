@@ -1,19 +1,32 @@
 <?php
-/*
+/**
  * Plugin Name: Blink Payment Gateway for WooCommerce
  * Plugin URI: https://www.blinkpayment.co.uk/
  * Description: Take credit card and direct debit payments on your store.
  * Author: Blink Payment
  * Author URI: https://blinkpayment.co.uk/
- * Version: 1.4.1
+ * Version: 1.4.2
  * Text Domain: blink-payment-gateway-for-woocommerce
+ * Requires at least: 6.5
+ * Requires PHP: 7.4
  * Requires Plugins: woocommerce
+ * WC requires at least: 7.6
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * @package Blink_Payment_Gateway_For_WooCommerce
  */
 
-// WooCommerce fallback notice.
-function blink_wc_missing_notice() {
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
+/**
+ * Show an admin notice that WooCommerce is required.
+ *
+ * @return void
+ */
+function blink_pg_wc_missing_notice() {
 	echo '<div class="error"><p><strong>' . sprintf(
 		/* translators: %s is a link to the WooCommerce website. */
 		esc_html__( 'Blink requires WooCommerce to be installed and active. You can download %s here.', 'blink-payment-gateway-for-woocommerce' ),
@@ -21,8 +34,14 @@ function blink_wc_missing_notice() {
 	) . '</strong></p></div>';
 }
 
-// Add settings link to plugin page.
-function blink_payment_plugin_action_links( $actions, $plugin_file ) {
+/**
+ * Add a Settings link to the plugin's row on the Plugins screen.
+ *
+ * @param string[] $actions     Plugin action links.
+ * @param string   $plugin_file Path to the plugin file, relative to the plugins directory.
+ * @return string[]
+ */
+function blink_pg_payment_plugin_action_links( $actions, $plugin_file ) {
 	static $plugin;
 	if ( ! isset( $plugin ) ) {
 		$plugin = plugin_basename( __FILE__ );
@@ -32,39 +51,52 @@ function blink_payment_plugin_action_links( $actions, $plugin_file ) {
 		$configs = include __DIR__ . '/config.php';
 		$section = str_replace( ' ', '', strtolower( $configs['method_title'] ) );
 		$actions = array_merge(
-			[
+			array(
 				'settings' => '<a href="' . admin_url( 'admin.php?page=wc-settings&tab=checkout&section=' . $section ) . '">' . __( 'Settings', 'blink-payment-gateway-for-woocommerce' ) . '</a>',
-			],
+			),
 			$actions
 		);
 	}
 	return $actions;
 }
 
-// Register the Blink Gateway class.
-function blink_add_gateway_class( $gateways ) {
-	$gateways[] = 'Blink_Payment_Gateway';
+/**
+ * Register the Blink Gateway class.
+ *
+ * @param string[] $gateways Payment gateway class names.
+ * @return string[]
+ */
+function blink_pg_add_gateway_class( $gateways ) {
+	$gateways[] = 'Blink_PG_Payment_Gateway';
 	return $gateways;
 }
 
-// Register block support.
-function blink_gateway_block_support() {
+/**
+ * Register the Blink payment method with Checkout Blocks.
+ *
+ * @return void
+ */
+function blink_pg_gateway_block_support() {
 	if ( ! class_exists( 'Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' ) ) {
 		return;
 	}
 
-	require_once __DIR__ . '/includes/class-blink-checkout-block.php';
+	require_once __DIR__ . '/includes/class-blink-pg-checkout-block.php';
 
 	add_action(
 		'woocommerce_blocks_payment_method_type_registration',
 		function ( Automattic\WooCommerce\Blocks\Payments\PaymentMethodRegistry $payment_method_registry ) {
-			$payment_method_registry->register( new Blink_Checkout_Block() );
+			$payment_method_registry->register( new Blink_PG_Checkout_Block() );
 		}
 	);
 }
 
-// Declare compatibility for checkout blocks.
-function blink_cart_checkout_blocks_compatibility() {
+/**
+ * Declare compatibility with Checkout Blocks and HPOS (custom order tables).
+ *
+ * @return void
+ */
+function blink_pg_cart_checkout_blocks_compatibility() {
 	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
 			'cart_checkout_blocks',
@@ -79,55 +111,69 @@ function blink_cart_checkout_blocks_compatibility() {
 	}
 }
 
-// Initialize the gateway class.
-function blink_init_gateway_class() {
+/**
+ * Load the gateway classes and register its filters once WooCommerce is active.
+ *
+ * @return void
+ */
+function blink_pg_init_gateway_class() {
 	if ( ! class_exists( 'WooCommerce' ) ) {
-		add_action( 'admin_notices', 'blink_wc_missing_notice' );
+		add_action( 'admin_notices', 'blink_pg_wc_missing_notice' );
 		return;
 	}
 
 	include_once __DIR__ . '/includes/helper.php';
-	include_once __DIR__ . '/includes/class-blink-payment-gateway.php';
-	include_once __DIR__ . '/includes/class-blink-ajax-handler.php';
-	include_once __DIR__ . '/includes/class-blink-api-handler.php';
-	include_once __DIR__ . '/includes/class-blink-3d-secure.php';
-	include_once __DIR__ . '/includes/class-blink-payment-utils.php';
-	include_once __DIR__ . '/includes/class-blink-logger.php';
-	require_once __DIR__ . '/includes/class-blink-settings-handler.php';
-	require_once __DIR__ . '/includes/class-blink-payment-fields-handler.php';
-	require_once __DIR__ . '/includes/class-blink-payment-handler.php';
-	require_once __DIR__ . '/includes/class-blink-refund-handler.php';
-	require_once __DIR__ . '/includes/class-blink-rerun-handler.php';
-	require_once __DIR__ . '/includes/class-blink-transaction-handler.php';
+	include_once __DIR__ . '/includes/class-blink-pg-payment-gateway.php';
+	include_once __DIR__ . '/includes/class-blink-pg-ajax-handler.php';
+	include_once __DIR__ . '/includes/class-blink-pg-api-handler.php';
+	include_once __DIR__ . '/includes/class-blink-pg-3d-secure.php';
+	include_once __DIR__ . '/includes/class-blink-pg-payment-utils.php';
+	include_once __DIR__ . '/includes/class-blink-pg-logger.php';
+	require_once __DIR__ . '/includes/class-blink-pg-settings-handler.php';
+	require_once __DIR__ . '/includes/class-blink-pg-payment-fields-handler.php';
+	require_once __DIR__ . '/includes/class-blink-pg-payment-handler.php';
+	require_once __DIR__ . '/includes/class-blink-pg-refund-handler.php';
+	require_once __DIR__ . '/includes/class-blink-pg-rerun-handler.php';
+	require_once __DIR__ . '/includes/class-blink-pg-transaction-handler.php';
 
-	add_filter( 'plugin_action_links', 'blink_payment_plugin_action_links', 10, 5 );
-	add_filter( 'woocommerce_payment_gateways', 'blink_add_gateway_class' );
+	blink_pg_migrate_options();
+
+	// Older versions logged to public files under uploads/blink-logs.
+	add_action( 'init', array( 'Blink_PG_Logger', 'maybe_remove_legacy_logs' ) );
+
+	add_filter( 'plugin_action_links', 'blink_pg_payment_plugin_action_links', 10, 5 );
+	add_filter( 'woocommerce_payment_gateways', 'blink_pg_add_gateway_class' );
 }
 
 // Hook registrations with error handling.
-add_action( 'plugins_loaded', 'blink_init_gateway_class', 20 ); // Lower priority to ensure WooCommerce loads first.
-add_action( 'woocommerce_blocks_loaded', 'blink_gateway_block_support' );
-add_action( 'before_woocommerce_init', 'blink_cart_checkout_blocks_compatibility' );
+add_action( 'plugins_loaded', 'blink_pg_init_gateway_class', 20 ); // Lower priority to ensure WooCommerce loads first.
+add_action( 'woocommerce_blocks_loaded', 'blink_pg_gateway_block_support' );
+add_action( 'before_woocommerce_init', 'blink_pg_cart_checkout_blocks_compatibility' );
 
 // 3DS challenge page.
-add_action( 'init', array( 'Blink_3D_Secure', 'register_endpoint' ) );
-add_action( 'template_redirect', array( 'Blink_3D_Secure', 'serve_minimal_3ds_page' ), 1 );
+add_action( 'init', array( 'Blink_PG_3D_Secure', 'register_endpoint' ) );
+add_action( 'template_redirect', array( 'Blink_PG_3D_Secure', 'serve_minimal_3ds_page' ), 1 );
 
 // Only add transaction handler if the class exists.
-add_action( 'wp', [ 'Blink_Transaction_Handler', 'blink_capture_order_response' ], 999 );
+add_action( 'wp', array( 'Blink_PG_Transaction_Handler', 'blink_capture_order_response' ), 999 );
 // A Hosted return Blink has not confirmed as paid: Classic title, Blocks heading, and the confirmation text.
-add_filter( 'woocommerce_endpoint_order-received_title', [ 'Blink_Transaction_Handler', 'blink_hosted_return_title' ], 100 );
-add_filter( 'woocommerce_thankyou_order_received_title', [ 'Blink_Transaction_Handler', 'blink_hosted_return_title' ], 100 );
-add_filter( 'woocommerce_thankyou_order_received_text', [ 'Blink_Transaction_Handler', 'blink_hosted_return_text' ], 100, 2 );
-add_action( 'admin_post_blink_download_log', [ 'Blink_Logger', 'handle_download' ] );
-add_action('woocommerce_order_status_changed', array('Blink_Transaction_Handler', 'blink_handle_order_status_change'), 10, 3);
-add_action( 'blink_recheck_webhook', array( 'Blink_Transaction_Handler', 'blink_recheck_webhook' ) );
-add_filter( 'woocommerce_order_actions', array( 'Blink_Transaction_Handler', 'blink_add_capture_order_action' ), 10, 2 );
-add_action( 'woocommerce_order_action_blink_capture_preauthorisation', array( 'Blink_Transaction_Handler', 'blink_capture_preauthorisation_action' ) );
-//webhook
-register_activation_hook( __FILE__, function () {
-	require_once __DIR__ . '/includes/class-blink-3d-secure.php';
-	Blink_3D_Secure::register_endpoint();
-	flush_rewrite_rules();
-} );
+add_filter( 'woocommerce_endpoint_order-received_title', array( 'Blink_PG_Transaction_Handler', 'blink_hosted_return_title' ), 100 );
+add_filter( 'woocommerce_thankyou_order_received_title', array( 'Blink_PG_Transaction_Handler', 'blink_hosted_return_title' ), 100 );
+add_filter( 'woocommerce_thankyou_order_received_text', array( 'Blink_PG_Transaction_Handler', 'blink_hosted_return_text' ), 100, 2 );
+add_action( 'admin_post_blink_pg_download_dvf', array( 'Blink_PG_Settings_Handler', 'blink_pg_download_dvf' ) );
+add_action( 'woocommerce_order_status_changed', array( 'Blink_PG_Transaction_Handler', 'blink_handle_order_status_change' ), 10, 3 );
+add_action( 'blink_pg_recheck_webhook', array( 'Blink_PG_Transaction_Handler', 'blink_recheck_webhook' ) );
+// Re-checks queued by 1.4.0 and earlier use the old hook name.
+add_action( 'blink_recheck_webhook', array( 'Blink_PG_Transaction_Handler', 'blink_recheck_webhook' ) );
+add_filter( 'woocommerce_order_actions', array( 'Blink_PG_Transaction_Handler', 'blink_add_capture_order_action' ), 10, 2 );
+add_action( 'woocommerce_order_action_blink_pg_capture_preauthorisation', array( 'Blink_PG_Transaction_Handler', 'blink_capture_preauthorisation_action' ) );
+// webhook.
+register_activation_hook(
+	__FILE__,
+	function () {
+		require_once __DIR__ . '/includes/class-blink-pg-3d-secure.php';
+		Blink_PG_3D_Secure::register_endpoint();
+		flush_rewrite_rules();
+	}
+);
 register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );

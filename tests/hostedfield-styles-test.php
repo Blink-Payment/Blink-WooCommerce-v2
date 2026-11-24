@@ -28,13 +28,21 @@ function apply_filters( $hook, $value ) {
 	return $value;
 }
 
+function apply_filters_deprecated( $hook, $args, $version, $replacement = '' ) {
+	global $test_filters, $test_deprecated;
+	if ( ! empty( $test_filters[ $hook ] ) ) {
+		$test_deprecated[] = $hook;
+	}
+	return apply_filters( $hook, $args[0] );
+}
+
 function wp_strip_all_tags( $text ) {
 	$text = preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', $text );
 	return trim( strip_tags( $text ) );
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-payment-gateway.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-payment-gateway.php';
 
 function blink_hf_assert( $condition, $message ) {
 	if ( ! $condition ) {
@@ -43,7 +51,7 @@ function blink_hf_assert( $condition, $message ) {
 }
 
 function blink_hf_print() {
-	$reflection = new ReflectionClass( 'Blink_Payment_Gateway' );
+	$reflection = new ReflectionClass( 'Blink_PG_Payment_Gateway' );
 	$gateway    = $reflection->newInstanceWithoutConstructor();
 	ob_start();
 	$gateway->blink_print_hostedfield_styles();
@@ -83,21 +91,33 @@ $tests = array(
 		}
 		blink_hf_assert( in_array( 'overflow', $matches[1], true ), 'Declarations were parsed' );
 	},
-	'blink_hostedfield_css can add rules' => function () {
+	'blink_pg_hostedfield_css can add rules' => function () {
 		$GLOBALS['test_filters'] = array();
 		add_filter(
-			'blink_hostedfield_css',
+			'blink_pg_hostedfield_css',
 			function ( $css ) {
 				return $css . "\n.hostedfield { color: #222222; }";
 			}
 		);
 		blink_hf_assert( false !== strpos( blink_hf_print(), '.hostedfield { color: #222222; }' ), 'Filtered rule is printed' );
 	},
+	'the old blink_hostedfield_css filter still works and is reported as deprecated' => function () {
+		$GLOBALS['test_filters']    = array();
+		$GLOBALS['test_deprecated'] = array();
+		add_filter(
+			'blink_hostedfield_css',
+			function ( $css ) {
+				return $css . "\n.hostedfield { color: #333333; }";
+			}
+		);
+		blink_hf_assert( false !== strpos( blink_hf_print(), '.hostedfield { color: #333333; }' ), 'Old filter rule is printed' );
+		blink_hf_assert( array( 'blink_hostedfield_css' ) === $GLOBALS['test_deprecated'], 'Old filter is reported as deprecated' );
+	},
 	'empty or non-string filter result prints nothing' => function () {
 		foreach ( array( '', '   ', null, false ) as $value ) {
 			$GLOBALS['test_filters'] = array();
 			add_filter(
-				'blink_hostedfield_css',
+				'blink_pg_hostedfield_css',
 				function () use ( $value ) {
 					return $value;
 				}
@@ -108,7 +128,7 @@ $tests = array(
 	'filtered CSS cannot close the style tag' => function () {
 		$GLOBALS['test_filters'] = array();
 		add_filter(
-			'blink_hostedfield_css',
+			'blink_pg_hostedfield_css',
 			function ( $css ) {
 				return $css . '</style><script>alert(1)</script>';
 			}

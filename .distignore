@@ -1,0 +1,42 @@
+# Files left out of the WordPress.org zip (wp dist-archive, and the SVN deploy action).
+# The zip keeps src/ and package.json so the human-readable source of dist/ ships (guideline 4).
+
+# Dotfiles and agent folders
+/.git
+/.github
+/.gitignore
+/.gitattributes
+/.git-blame-ignore-revs
+/.distignore
+/.editorconfig
+/.claude
+/.agents
+/.codex
+.DS_Store
+*:Zone.Identifier
+
+# Dependencies and build config (dist/ is committed and built from src/)
+/node_modules
+/vendor
+/package-lock.json
+/composer.json
+/composer.lock
+/babel.config.json
+/webpack.config.js
+/phpcs.xml.dist
+
+# Tests, scripts and internal docs
+/tests
+/scripts
+/docs
+/README.md
+/DEVELOPER_DOCUMENTATION.md
+/WPORG_SUBMISSION_CHECKLIST.md
+/VERSION
+
+# README screenshots (directory screenshots go in SVN assets/)
+/assets/img/settings.png
+/assets/img/PluginList.png
+
+# Logs
+*.log

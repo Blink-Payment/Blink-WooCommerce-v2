@@ -95,7 +95,7 @@ jQuery(function ($) {
             );
             var orderId = $(this).data("order-id");
             var data = {
-                action: "cancel_transaction",
+                action: "blink_pg_cancel_transaction",
                 cancel_order: blinkOrders.cancel_order,
                 order_id: orderId,
             };
@@ -127,7 +127,7 @@ jQuery(function ($) {
                     url: blinkOrders.ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'blink_generate_access_token',
+                        action: 'blink_pg_generate_access_token',
                         security: blinkOrders.security,
                     },
                     success: function(response) {
@@ -154,7 +154,7 @@ jQuery(function ($) {
                     url: blinkOrders.ajaxurl,
                     type: 'POST',
                     data: {
-                        action: 'blink_generate_applepay_domains',
+                        action: 'blink_pg_generate_applepay_domains',
                         security: blinkOrders.apple_security,
                         token: accessToken,
                         domain: "https://" + domain

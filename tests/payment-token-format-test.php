@@ -47,7 +47,7 @@ function is_wc_endpoint_url( $endpoint ) {
 	return 'order-pay' === $endpoint && $test_is_order_pay;
 }
 
-function blink_error_payment_process( $message ) {
+function blink_pg_error_payment_process( $message ) {
 	return array(
 		'result' => 'failure',
 		'error'  => $message,
@@ -91,7 +91,7 @@ function set_transient( $key, $value, $expiration ) {
 	return true;
 }
 
-class Blink_Logger {
+class Blink_PG_Logger {
 	public static function log( $message, $context = null ) {
 	}
 
@@ -101,7 +101,8 @@ class Blink_Logger {
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-payment-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-payment-utils.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-payment-handler.php';
 
 class Blink_Payment_Token_Test_Order {
 	private $id;
@@ -167,7 +168,7 @@ class Blink_Payment_Token_Test_Utils {
 
 class Blink_Payment_Token_Test_Gateway {
 	public $host_url             = 'https://gateway.example.com';
-	public $paymentMethods       = array( 'credit-card', 'direct-debit', 'open-banking' );
+	public $payment_methods       = array( 'credit-card', 'direct-debit', 'open-banking' );
 	public $preauthorize_payments = false;
 	public $utils;
 
@@ -220,7 +221,7 @@ function blink_payment_token_run_request( $request, $is_order_pay = false ) {
 	$_POST              = $request;
 	$_REQUEST           = $request;
 
-	$handler = new Blink_Payment_Handler( new Blink_Payment_Token_Test_Gateway() );
+	$handler = new Blink_PG_Payment_Handler( new Blink_Payment_Token_Test_Gateway() );
 	$result  = $handler->blink_handle_payment( 17037 );
 
 	blink_payment_token_assert_same( 'success', $result['result'], 'Expected checkout to succeed.' );

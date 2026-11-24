@@ -22,7 +22,8 @@ function sanitize_text_field( $value ) { return trim( strip_tags( (string) $valu
 function wc_clean( $value ) { return sanitize_text_field( $value ); }
 function absint( $value ) { return abs( (int) $value ); }
 // The return page re-checks a Paylink after a short wait; tests don't wait.
-function apply_filters( $hook, $value ) { return 'blink_hosted_return_recheck_delay' === $hook ? 0 : $value; }
+function apply_filters_deprecated( $hook, $args ) { return $args[0]; }
+function apply_filters( $hook, $value ) { return 'blink_pg_hosted_return_recheck_delay' === $hook ? 0 : $value; }
 function delete_transient( $key ) { return true; }
 
 class WP_Error {
@@ -68,29 +69,29 @@ function WC() {
 }
 
 // Order status changes are recorded rather than run through WooCommerce.
-function blink_is_preauth_transaction( $order ) {
+function blink_pg_is_preauth_transaction( $order ) {
 	return $order && 'yes' === $order->get_meta( '_blink_preauth', true );
 }
 
-function blink_payment_complete( $order, $txn_id = '', $note = '', $allow_processing = false ) {
+function blink_pg_payment_complete( $order, $txn_id = '', $note = '', $allow_processing = false ) {
 	global $rv_status_log;
 	$rv_status_log[] = array( 'complete', $order->get_id(), $txn_id );
 	$order->status = 'processing';
 }
 
-function blink_payment_on_hold( $order, $reason = '' ) {
+function blink_pg_payment_on_hold( $order, $reason = '' ) {
 	global $rv_status_log;
 	$rv_status_log[] = array( 'hold', $order->get_id() );
 	$order->status = 'on-hold';
 }
 
-function blink_payment_failed( $order, $reason = '' ) {
+function blink_pg_payment_failed( $order, $reason = '' ) {
 	global $rv_status_log;
 	$rv_status_log[] = array( 'failed', $order->get_id() );
 	$order->status = 'failed';
 }
 
-class Blink_Logger {
+class Blink_PG_Logger {
 	public static $entries = array();
 	public static function log( $message, $context = null ) { self::$entries[] = array( $message, $context ); }
 	public static function http_response_context( $response ) { return array(); }
@@ -145,7 +146,7 @@ class RV_Order {
 }
 
 require_once dirname( __DIR__ ) . '/includes/helper.php';
-require_once dirname( __DIR__ ) . '/includes/class-blink-transaction-handler.php';
+require_once dirname( __DIR__ ) . '/includes/class-blink-pg-transaction-handler.php';
 
 class RV_Utils {
 	public $destroyed = array();
@@ -185,8 +186,8 @@ function rv_reset() {
 	$wp            = null;
 	$_GET          = array();
 	$_REQUEST      = array();
-	Blink_Logger::$entries = array();
-	Blink_Transaction_Handler::$hosted_return_notice = null;
+	Blink_PG_Logger::$entries = array();
+	Blink_PG_Transaction_Handler::$hosted_return_notice = null;
 }
 
 function rv_order( $id, $props = array() ) {
@@ -230,9 +231,9 @@ function rv_visit( $order, $query ) {
 	$wp       = (object) array( 'query_vars' => array( 'order-received' => $order->get_id() ) );
 	$_GET     = $query;
 	$_REQUEST = $query;
-	Blink_Transaction_Handler::blink_capture_order_response();
+	Blink_PG_Transaction_Handler::blink_capture_order_response();
 	if ( isset( $query['key'] ) && $query['key'] === $order->get_order_key() ) {
-		( new Blink_Transaction_Handler( $rv_gateway ) )->blink_check_response_for_order( $order->get_id() );
+		( new Blink_PG_Transaction_Handler( $rv_gateway ) )->blink_check_response_for_order( $order->get_id() );
 	}
 	$_GET     = array();
 	$_REQUEST = array();
@@ -477,7 +478,7 @@ $tests['Hosted decline return keeps the order Pending and shows the decline mess
 	rv_hosted_return( $order, 'Declined' );
 	rv_assert( 'pending', $order->get_status(), 'Blink keeps a declined Paylink payable, so the order stays Pending.' );
 	rv_assert( array(), $rv_status_log, 'No status change may run.' );
-	rv_assert( 'declined', Blink_Transaction_Handler::$hosted_return_notice['type'], 'The fixed decline message is shown.' );
+	rv_assert( 'declined', Blink_PG_Transaction_Handler::$hosted_return_notice['type'], 'The fixed decline message is shown.' );
 };
 
 $tests['Hosted decline return with a wrong reference changes nothing'] = function () {

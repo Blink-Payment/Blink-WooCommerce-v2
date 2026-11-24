@@ -1,15 +1,39 @@
 <?php
-// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
+/**
+ * Blink webhooks, payment returns, refunds and captures.
+ *
+ * @package Blink_Payment_Gateway_For_WooCommerce
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+	exit; // Exit if accessed directly.
 }
 
-class Blink_Transaction_Handler {
+/**
+ * Checks Blink payments against the API and applies them to WooCommerce orders.
+ */
+class Blink_PG_Transaction_Handler {
 
-	const WEBHOOK_RECHECK_HOOK  = 'blink_recheck_webhook';
+	const WEBHOOK_RECHECK_HOOK  = 'blink_pg_recheck_webhook';
 	const WEBHOOK_RECHECK_LIMIT = 3;
 
+	/**
+	 * Scalar webhook fields the plugin reads. merchant_data is handled separately.
+	 */
+	const WEBHOOK_FIELDS = array( 'transaction_id', 'status', 'reference', 'paylink_id', 'event_type', 'note', 'message' );
+
+	/**
+	 * Gateway the handler works for.
+	 *
+	 * @var Blink_PG_Payment_Gateway
+	 */
 	protected $gateway;
+
+	/**
+	 * Access token from the most recent Blink token request.
+	 *
+	 * @var array
+	 */
 	protected $token;
 
 	/**
@@ -21,64 +45,133 @@ class Blink_Transaction_Handler {
 	 */
 	public static $hosted_return_notice = null;
 
+	/**
+	 * Keep the gateway for API calls and settings.
+	 *
+	 * @param Blink_PG_Payment_Gateway $gateway Payment gateway instance.
+	 */
 	public function __construct( $gateway ) {
 		$this->gateway = $gateway;
 	}
 
+	/**
+	 * Ask Blink to cancel a transaction.
+	 *
+	 * @param string $transaction_id Blink transaction ID.
+	 * @return array {
+	 *     Result of the cancel request.
+	 *
+	 *     @type bool   $success Whether Blink cancelled the transaction.
+	 *     @type string $message Message for the order note and the admin.
+	 *     @type bool   $unknown True when no answer came back (timeout, connection error or a
+	 *                           non-JSON page), so Blink may still have cancelled it.
+	 * }
+	 */
 	public function blink_cancel_transaction( $transaction_id ) {
-		Blink_Logger::log( 'cancel_transaction called', array( 'transaction_id' => $transaction_id ) );
+		Blink_PG_Logger::log( 'cancel_transaction called', array( 'transaction_id' => $transaction_id ) );
 		$url = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id . '/cancels';
 
 		$this->token = $this->gateway->utils->blink_generate_access_token();
 		if ( empty( $this->token ) ) {
-			return array( 'message' => __( 'Error creating access token', 'blink-payment-gateway-for-woocommerce' ) );
+			return array(
+				'success' => false,
+				'message' => __( 'Error creating access token', 'blink-payment-gateway-for-woocommerce' ),
+				'unknown' => false,
+			);
 		}
-		// Prepare request headers
+		// Prepare request headers.
 		$headers = array( 'Authorization' => 'Bearer ' . $this->token['access_token'] );
 
-		$response = wp_remote_post( $url, array( 'headers' => $headers ) );
-		Blink_Logger::log( 'cancel_transaction response code', Blink_Logger::http_response_context( $response ) );
+		$response = wp_remote_post(
+			$url,
+			array(
+				'headers' => $headers,
+				'timeout' => Blink_PG_Payment_Utils::API_TIMEOUT,
+			)
+		);
+		Blink_PG_Logger::log( 'cancel_transaction response code', Blink_PG_Logger::http_response_context( $response ) );
 
 		if ( is_wp_error( $response ) ) {
-			wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message(), 'error' );
-			return;
+			return array(
+				'success' => false,
+				/* translators: %s is the HTTP error, e.g. a timeout. */
+				'message' => sprintf( __( 'No response to the cancel request: %s', 'blink-payment-gateway-for-woocommerce' ), $response->get_error_message() ),
+				'unknown' => true,
+			);
 		}
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $data ) ) {
+			return array(
+				'success' => false,
+				/* translators: %d is the HTTP status code. */
+				'message' => sprintf( __( 'Unexpected response to the cancel request (HTTP %d).', 'blink-payment-gateway-for-woocommerce' ), (int) wp_remote_retrieve_response_code( $response ) ),
+				'unknown' => true,
+			);
+		}
 
-		Blink_Logger::log( 'cancel_transaction result', array( 'success' => isset( $data['success'] ) ? $data['success'] : null ) );
-		return $data;
+		$result = array(
+			'success' => ! empty( $data['success'] ),
+			'message' => blink_pg_api_message( $data, __( 'Blink did not say why the cancel failed.', 'blink-payment-gateway-for-woocommerce' ) ),
+			'unknown' => false,
+		);
+		Blink_PG_Logger::log( 'cancel_transaction result', array( 'success' => $result['success'] ) );
+		return $result;
 	}
 
-	// New function to fetch transaction status
+	/**
+	 * Fetch a transaction from Blink and store its payment source and status on the gateway.
+	 *
+	 * @param string            $transaction_id Blink transaction ID.
+	 * @param WC_Order|int|null $order          Order the transaction belongs to, used for logging.
+	 * @return string Blink's transaction status, or '' when it couldn't be fetched.
+	 */
 	public function blink_get_transaction_status( $transaction_id, $order = null ) {
-		Blink_Logger::log( 'get_transaction_status called', array( 'transaction_id' => $transaction_id, 'order_id' => is_object( $order ) ? $order->get_id() : $order ) );
+		Blink_PG_Logger::log(
+			'get_transaction_status called',
+			array(
+				'transaction_id' => $transaction_id,
+				'order_id'       => is_object( $order ) ? $order->get_id() : $order,
+			)
+		);
 		$url         = $this->gateway->host_url . '/pay/v1/transactions/' . $transaction_id;
 		$data        = array();
 		$this->token = $this->gateway->utils->blink_generate_access_token();
 		if ( $this->token ) {
-			// Prepare request headers
+			// Prepare request headers.
 			$headers = array( 'Authorization' => 'Bearer ' . $this->token['access_token'] );
 
-			$response = wp_remote_get( $url, array( 'headers' => $headers ) );
-			Blink_Logger::log( 'get_transaction_status response code', Blink_Logger::http_response_context( $response ) );
+			$response = wp_remote_get(
+				$url,
+				array(
+					'headers' => $headers,
+					'timeout' => Blink_PG_Payment_Utils::API_TIMEOUT,
+				)
+			);
+			Blink_PG_Logger::log( 'get_transaction_status response code', Blink_PG_Logger::http_response_context( $response ) );
 
-			if ( is_wp_error( $response ) ) {
-				wc_add_notice( __( 'Error fetching transaction status: ', 'blink-payment-gateway-for-woocommerce' ) . $response->get_error_message(), 'error' );
-				return;
+			// Only wp-admin asks for the status, so a failure is logged above, not shown as a
+			// shopper notice. The status stays empty.
+			if ( ! is_wp_error( $response ) ) {
+				$data = json_decode( wp_remote_retrieve_body( $response ) );
 			}
-
-			$data = json_decode( wp_remote_retrieve_body( $response ) );
 		}
 
-		$this->gateway->paymentSource = ! empty( $data->data->payment_source ) ? $data->data->payment_source : '';
-		$this->gateway->paymentStatus = ! empty( $data->data->status ) ? $data->data->status : '';
-		Blink_Logger::log( 'get_transaction_status result', array( 'payment_source' => $this->gateway->paymentSource, 'status' => $this->gateway->paymentStatus ) );
+		$this->gateway->payment_source = ! empty( $data->data->payment_source ) ? $data->data->payment_source : '';
+		$this->gateway->payment_status = ! empty( $data->data->status ) ? $data->data->status : '';
+		Blink_PG_Logger::log(
+			'get_transaction_status result',
+			array(
+				'payment_source' => $this->gateway->payment_source,
+				'status'         => $this->gateway->payment_status,
+			)
+		);
+		return $this->gateway->payment_status;
 	}
 
 	/**
 	 * Get client IP address for logging purposes.
-	 * 
+	 *
 	 * @return string Client IP address.
 	 */
 	private function blink_get_client_ip() {
@@ -86,7 +179,7 @@ class Blink_Transaction_Handler {
 		foreach ( $ip_keys as $key ) {
 			if ( ! empty( $_SERVER[ $key ] ) ) {
 				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
-				// Handle comma-separated IPs (from X-Forwarded-For)
+				// Handle comma-separated IPs (from X-Forwarded-For).
 				if ( strpos( $ip, ',' ) !== false ) {
 					$ip = trim( explode( ',', $ip )[0] );
 				}
@@ -96,41 +189,42 @@ class Blink_Transaction_Handler {
 		return 'unknown';
 	}
 
-	/*
+	/**
 	 * Blink payment notifications. Blink does not sign webhooks, so the payload is
 	 * only used to find the order and the payment; everything applied to the order
 	 * is read back from Blink's API.
+	 *
+	 * @return void
 	 */
 	public function blink_webhook() {
-		Blink_Logger::log( 'webhook called', array( 'ip' => $this->blink_get_client_ip() ) );
+		Blink_PG_Logger::log( 'webhook called', array( 'ip' => $this->blink_get_client_ip() ) );
 
-		// Note: This is a webhook endpoint for external payment processors
-		// Nonce verification is not applicable for webhook endpoints as they come from external systems
-		// Basic security: only allow POST requests for webhooks
-		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || $_SERVER['REQUEST_METHOD'] !== 'POST' ) {
+		// Note: This is a webhook endpoint for external payment processors.
+		// Nonce verification is not applicable for webhook endpoints as they come from external systems.
+		// Basic security: only allow POST requests for webhooks.
+		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'POST' !== $_SERVER['REQUEST_METHOD'] ) {
 			http_response_code( 405 );
 			exit( 'Method not allowed' );
 		}
 
-		$request  = isset( $_REQUEST['transaction_id'] ) ? $_REQUEST : file_get_contents( 'php://input' );
-		if ( is_array( $request ) ) {
-			$data = isset( $request['merchant_data'] ) ? stripslashes( $request['merchant_data'] ) : '';
-			$request['merchant_data'] = json_decode( $data, true );
-		} else {
-			$request = json_decode( $request, true );
-		}
+		// Blink sends form fields or a JSON body. Webhooks come from Blink's servers, so
+		// there is no nonce; the payload only finds the order, and blink_process_webhook()
+		// reads the payment back from Blink before changing anything.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Webhook from Blink; verified against Blink's API.
+		$body    = isset( $_REQUEST['transaction_id'] ) ? wp_unslash( $_REQUEST ) : file_get_contents( 'php://input' );
+		$request = self::blink_webhook_payload( $body );
 
-		Blink_Logger::log( 'request data', array( 'request' => $request ) );
+		Blink_PG_Logger::log( 'request data', array( 'request' => $request ) );
 
-		if(empty($request['status'])) {
-			Blink_Logger::log( 'no transaction status found in the request' );
+		if ( empty( $request['status'] ) ) {
+			Blink_PG_Logger::log( 'no transaction status found in the request' );
 			echo wp_json_encode( array( 'error' => 'No valid transaction status found in the request' ) );
 			exit();
 		}
 
-		// Security: Validate transaction_id exists and is not empty
+		// Security: Validate transaction_id exists and is not empty.
 		if ( empty( $request['transaction_id'] ) ) {
-			Blink_Logger::log( 'webhook rejected: missing transaction_id', array( 'ip' => $this->blink_get_client_ip() ) );
+			Blink_PG_Logger::log( 'webhook rejected: missing transaction_id', array( 'ip' => $this->blink_get_client_ip() ) );
 			http_response_code( 400 );
 			echo wp_json_encode( array( 'error' => 'Missing transaction_id' ) );
 			exit();
@@ -143,6 +237,40 @@ class Blink_Transaction_Handler {
 	}
 
 	/**
+	 * The webhook fields the plugin uses, sanitised. Everything else Blink sends,
+	 * such as customer and card details, is dropped before it is logged or stored.
+	 *
+	 * @param array|string $body Form fields (unslashed), or a JSON body.
+	 * @return array Scalar fields from WEBHOOK_FIELDS, and merchant_data reduced to
+	 *               order_info.order_id.
+	 */
+	public static function blink_webhook_payload( $body ) {
+		if ( is_string( $body ) ) {
+			$body = json_decode( $body, true );
+		}
+		if ( ! is_array( $body ) ) {
+			return array();
+		}
+
+		$payload = array();
+		foreach ( self::WEBHOOK_FIELDS as $key ) {
+			if ( isset( $body[ $key ] ) && is_scalar( $body[ $key ] ) ) {
+				$payload[ $key ] = sanitize_text_field( (string) $body[ $key ] );
+			}
+		}
+
+		$merchant_data = isset( $body['merchant_data'] ) ? $body['merchant_data'] : null;
+		if ( is_string( $merchant_data ) ) {
+			$merchant_data = json_decode( $merchant_data, true );
+		}
+		if ( is_array( $merchant_data ) && isset( $merchant_data['order_info']['order_id'] ) && is_numeric( $merchant_data['order_info']['order_id'] ) ) {
+			$payload['merchant_data'] = array( 'order_info' => array( 'order_id' => (int) $merchant_data['order_info']['order_id'] ) );
+		}
+
+		return $payload;
+	}
+
+	/**
 	 * Verify a webhook with Blink and apply it to its order.
 	 *
 	 * @param array $request Decoded webhook payload.
@@ -152,17 +280,20 @@ class Blink_Transaction_Handler {
 	public function blink_process_webhook( $request, $attempt = 0 ) {
 		$transaction_id = ! empty( $request['transaction_id'] ) && is_scalar( $request['transaction_id'] ) ? sanitize_text_field( (string) $request['transaction_id'] ) : '';
 
-		Blink_Logger::log( 'Webhook processing', array(
-			'transaction_id' => $transaction_id,
-			'reference' => isset($request['reference']) ? $request['reference'] : 'not set',
-			'status' => isset($request['status']) ? $request['status'] : 'not set',
-			'event_type' => isset($request['event_type']) ? $request['event_type'] : 'not set',
-			'attempt' => $attempt,
-		) );
+		Blink_PG_Logger::log(
+			'Webhook processing',
+			array(
+				'transaction_id' => $transaction_id,
+				'reference'      => isset( $request['reference'] ) ? $request['reference'] : 'not set',
+				'status'         => isset( $request['status'] ) ? $request['status'] : 'not set',
+				'event_type'     => isset( $request['event_type'] ) ? $request['event_type'] : 'not set',
+				'attempt'        => $attempt,
+			)
+		);
 
 		$order = $this->blink_find_webhook_order( $request, $transaction_id );
 		if ( ! $order ) {
-			Blink_Logger::log( 'Order not found', array( 'transaction_id' => $transaction_id ) );
+			Blink_PG_Logger::log( 'Order not found', array( 'transaction_id' => $transaction_id ) );
 			return array(
 				'code' => 200,
 				'body' => array(
@@ -172,13 +303,16 @@ class Blink_Transaction_Handler {
 			);
 		}
 
-		// Security: Verify order belongs to Blink payment method
+		// Security: Verify order belongs to Blink payment method.
 		if ( 'blink' !== $order->get_payment_method() ) {
-			Blink_Logger::log( 'webhook rejected: order does not belong to Blink', array(
-				'order_id' => $order->get_id(),
-				'transaction_id' => $transaction_id,
-				'ip' => $this->blink_get_client_ip()
-			) );
+			Blink_PG_Logger::log(
+				'webhook rejected: order does not belong to Blink',
+				array(
+					'order_id'       => $order->get_id(),
+					'transaction_id' => $transaction_id,
+					'ip'             => $this->blink_get_client_ip(),
+				)
+			);
 			return $this->blink_webhook_response( 403 );
 		}
 
@@ -190,22 +324,28 @@ class Blink_Transaction_Handler {
 			return $this->blink_webhook_response( 503 );
 		}
 		if ( 'unlinked' === $verification['result'] ) {
-			Blink_Logger::log( 'webhook rejected: payment not linked to order', array(
-				'order_id' => $order->get_id(),
-				'transaction_id' => $transaction_id,
-				'reason' => $verification['reason'],
-				'ip' => $this->blink_get_client_ip()
-			) );
+			Blink_PG_Logger::log(
+				'webhook rejected: payment not linked to order',
+				array(
+					'order_id'       => $order->get_id(),
+					'transaction_id' => $transaction_id,
+					'reason'         => $verification['reason'],
+					'ip'             => $this->blink_get_client_ip(),
+				)
+			);
 			return $this->blink_webhook_response( 403 );
 		}
 
 		$status = $verification['status'];
-		Blink_Logger::log( 'Webhook verified', array(
-			'order_id' => $order->get_id(),
-			'transaction_id' => $transaction_id,
-			'status' => $status,
-			'webhook_status' => isset( $request['status'] ) ? $request['status'] : '',
-		) );
+		Blink_PG_Logger::log(
+			'Webhook verified',
+			array(
+				'order_id'       => $order->get_id(),
+				'transaction_id' => $transaction_id,
+				'status'         => $status,
+				'webhook_status' => isset( $request['status'] ) ? $request['status'] : '',
+			)
+		);
 
 		// A rerun is a capture attempt against an existing pre-authorisation.
 		// Handle it before the generic transaction path so a failed capture
@@ -224,7 +364,14 @@ class Blink_Transaction_Handler {
 		// A repeat of the transaction and status this order already recorded, such
 		// as a reversal that put it On-hold, must not be applied again.
 		if ( '' !== $transaction_id && $transaction_id === (string) $order->get_transaction_id() && $status === (string) $order->get_meta( 'status', true ) ) {
-			Blink_Logger::log( 'Repeat webhook for a recorded status ignored', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id, 'status' => $status ) );
+			Blink_PG_Logger::log(
+				'Repeat webhook for a recorded status ignored',
+				array(
+					'order_id'       => $order->get_id(),
+					'transaction_id' => $transaction_id,
+					'status'         => $status,
+				)
+			);
 			return $this->blink_webhook_response( 200 );
 		}
 
@@ -246,12 +393,15 @@ class Blink_Transaction_Handler {
 			return $this->blink_webhook_response( 200 );
 		}
 
-		Blink_Logger::log( 'Order found and updating', array(
-			'order_id' => $order->get_id(),
-			'transaction_id' => $transaction_id,
-			'status' => $status,
-			'payment_method' => $order->get_payment_method()
-		) );
+		Blink_PG_Logger::log(
+			'Order found and updating',
+			array(
+				'order_id'       => $order->get_id(),
+				'transaction_id' => $transaction_id,
+				'status'         => $status,
+				'payment_method' => $order->get_payment_method(),
+			)
+		);
 
 		$order->update_meta_data( '_debug', $request );
 		$order->update_meta_data( 'blink_res', $transaction_id );
@@ -261,17 +411,26 @@ class Blink_Transaction_Handler {
 			$order->update_meta_data( '_blink_paylink_paid_id', $verification['paylink_id'] );
 		}
 
-		$mapped_status = blink_get_status( $status, '', $order );
+		$mapped_status = blink_pg_get_status( $status, '', $order );
 		$this->blink_add_preauth_note( $order, $transaction_id, $status );
 
-		Blink_Logger::log( 'Webhook processed', array( 'order_id' => $order->get_id(), 'status' => $status ) );
-		blink_change_status( $order, $transaction_id, $status, '', 'failed' === $mapped_status ? $verification['message'] : '' );
+		Blink_PG_Logger::log(
+			'Webhook processed',
+			array(
+				'order_id' => $order->get_id(),
+				'status'   => $status,
+			)
+		);
+		blink_pg_change_status( $order, $transaction_id, $status, '', 'failed' === $mapped_status ? $verification['message'] : '' );
 
-		Blink_Logger::log( 'Order updated successfully', array(
-			'order_id' => $order->get_id(),
-			'blink_res' => $order->get_meta('blink_res', true),
-			'gateway_status' => $order->get_meta('_gateway_status', true),
-		) );
+		Blink_PG_Logger::log(
+			'Order updated successfully',
+			array(
+				'order_id'       => $order->get_id(),
+				'blink_res'      => $order->get_meta( 'blink_res', true ),
+				'gateway_status' => $order->get_meta( '_gateway_status', true ),
+			)
+		);
 
 		return $this->blink_webhook_response( 200 );
 	}
@@ -284,25 +443,36 @@ class Blink_Transaction_Handler {
 	public static function blink_recheck_webhook( $args ) {
 		$gateway = self::blink_get_gateway();
 		if ( ! $gateway || empty( $gateway->transaction_handler ) ) {
-			Blink_Logger::log( 'Webhook re-check skipped: gateway unavailable' );
+			Blink_PG_Logger::log( 'Webhook re-check skipped: gateway unavailable' );
 			return;
 		}
 		$gateway->transaction_handler->blink_recheck_webhook_request( $args );
 	}
 
 	/**
+	 * Process a webhook again from the copy saved by a scheduled re-check.
+	 *
 	 * @param array $args Scheduled 'request' and 'attempt'.
+	 * @return void
 	 */
 	public function blink_recheck_webhook_request( $args ) {
 		$request = isset( $args['request'] ) && is_array( $args['request'] ) ? $args['request'] : array();
 		$attempt = isset( $args['attempt'] ) ? (int) $args['attempt'] : 1;
-		Blink_Logger::log( 'Webhook re-check', array( 'transaction_id' => isset( $request['transaction_id'] ) ? $request['transaction_id'] : '', 'attempt' => $attempt ) );
+		Blink_PG_Logger::log(
+			'Webhook re-check',
+			array(
+				'transaction_id' => isset( $request['transaction_id'] ) ? $request['transaction_id'] : '',
+				'attempt'        => $attempt,
+			)
+		);
 		$this->blink_process_webhook( $request, $attempt );
 	}
 
 	/**
 	 * Find the order a webhook names, from merchant_data, the reference or a stored transaction ID.
 	 *
+	 * @param array  $request        Webhook payload.
+	 * @param string $transaction_id Blink transaction ID from the webhook.
 	 * @return WC_Order|null
 	 */
 	private function blink_find_webhook_order( $request, $transaction_id ) {
@@ -314,25 +484,33 @@ class Blink_Transaction_Handler {
 
 		if ( ! empty( $merchant_data['order_info']['order_id'] ) ) {
 			$order_id = sanitize_text_field( $merchant_data['order_info']['order_id'] );
-			Blink_Logger::log( 'Order ID from merchant_data', array( 'order_id' => $order_id ) );
+			Blink_PG_Logger::log( 'Order ID from merchant_data', array( 'order_id' => $order_id ) );
 		} elseif ( ! empty( $request['reference'] ) && is_scalar( $request['reference'] ) ) {
-			// Try to extract order ID from reference, e.g. "WC-124"
+			// Try to extract order ID from reference, e.g. "WC-124".
 			if ( preg_match( '/WC-(\d+)/', $request['reference'], $matches ) ) {
 				$order_id = $matches[1];
-				Blink_Logger::log( 'Order ID from reference', array( 'order_id' => $order_id, 'reference' => $request['reference'] ) );
+				Blink_PG_Logger::log(
+					'Order ID from reference',
+					array(
+						'order_id'  => $order_id,
+						'reference' => $request['reference'],
+					)
+				);
 			}
 		}
 
 		if ( ! $order_id ) {
-			$recent_orders = wc_get_orders( array(
-				'limit'  => 20, // Limit to very recent orders only
-				'return' => 'ids',
-				'status' => array( 'wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed' ),
-				'orderby' => 'date',
-				'order'   => 'DESC',
-			) );
+			$recent_orders = wc_get_orders(
+				array(
+					'limit'   => 20, // Limit to very recent orders only.
+					'return'  => 'ids',
+					'status'  => array( 'wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed' ),
+					'orderby' => 'date',
+					'order'   => 'DESC',
+				)
+			);
 
-			// Check each order's meta data efficiently
+			// Check each order's meta data efficiently.
 			foreach ( (array) $recent_orders as $order_id_candidate ) {
 				$candidate_order = wc_get_order( $order_id_candidate );
 				if ( ! $candidate_order ) {
@@ -350,7 +528,11 @@ class Blink_Transaction_Handler {
 	}
 
 	/**
-	 * merchant_data arrives as an array (form posts) or a JSON string (JSON bodies).
+	 * Read a webhook's merchant_data, which arrives as an array (form posts) or a
+	 * JSON string (JSON bodies).
+	 *
+	 * @param array $request Webhook payload.
+	 * @return array Decoded merchant_data, or an empty array.
 	 */
 	private function blink_webhook_merchant_data( $request ) {
 		$merchant_data = isset( $request['merchant_data'] ) ? $request['merchant_data'] : array();
@@ -363,6 +545,10 @@ class Blink_Transaction_Handler {
 	/**
 	 * Look a webhook's Paylink or transaction up with Blink and check it belongs to the order.
 	 *
+	 * @param WC_Order $order          Order the webhook names.
+	 * @param array    $request        Webhook payload.
+	 * @param string   $transaction_id Blink transaction ID from the webhook.
+	 * @param bool     $is_rerun       Whether the webhook is for a pre-authorisation capture.
 	 * @return array 'result' (verified, unlinked or unavailable), the verified 'status'
 	 *               ('' when a Paylink is not paid), 'mismatch' (null, or 'type' and
 	 *               'detail' when it belongs to the order but does not fit it),
@@ -377,6 +563,15 @@ class Blink_Transaction_Handler {
 		return $this->blink_verify_transaction( $order, $transaction_id, $is_rerun );
 	}
 
+	/**
+	 * Look a Paylink up with Blink, check it belongs to the order and is paid, and
+	 * check its transaction when the webhook names one.
+	 *
+	 * @param WC_Order $order          Order the webhook names.
+	 * @param string   $paylink_id     Blink Paylink ID.
+	 * @param string   $transaction_id Blink transaction ID from the webhook, or '' for a Hosted return.
+	 * @return array Verification result, as from blink_verification().
+	 */
 	private function blink_verify_paylink( $order, $paylink_id, $transaction_id ) {
 		$lookup = $this->blink_fetch_from_blink( '/paylink/v1/paylinks/' . rawurlencode( $paylink_id ) );
 		if ( 'ok' !== $lookup['state'] ) {
@@ -388,11 +583,25 @@ class Blink_Transaction_Handler {
 		}
 
 		// Only Paid means paid. A declined Paylink stays payable as "Payment
-		// Attempted", which blink_get_status() would treat as complete.
+		// Attempted", which blink_pg_get_status() would treat as complete.
 		$paylink_status = isset( $paylink['status'] ) && is_scalar( $paylink['status'] ) ? strtolower( trim( (string) $paylink['status'] ) ) : '';
 		if ( 'paid' !== $paylink_status ) {
-			Blink_Logger::log( 'Paylink not paid; nothing to apply', array( 'order_id' => $order->get_id(), 'paylink_id' => $paylink_id, 'status' => $paylink_status ) );
-			return self::blink_verification( 'verified', array( 'paylink_id' => $paylink_id, 'paylink_status' => $paylink_status, 'paylink' => $paylink ) );
+			Blink_PG_Logger::log(
+				'Paylink not paid; nothing to apply',
+				array(
+					'order_id'   => $order->get_id(),
+					'paylink_id' => $paylink_id,
+					'status'     => $paylink_status,
+				)
+			);
+			return self::blink_verification(
+				'verified',
+				array(
+					'paylink_id'     => $paylink_id,
+					'paylink_status' => $paylink_status,
+					'paylink'        => $paylink,
+				)
+			);
 		}
 
 		// The transaction ID comes from the webhook and is stored for refunds and
@@ -408,21 +617,42 @@ class Blink_Transaction_Handler {
 		$type             = isset( $paylink['transaction_type'] ) && is_scalar( $paylink['transaction_type'] ) ? (string) $paylink['transaction_type'] : '';
 		$paylink_currency = isset( $paylink['currency'] ) && is_scalar( $paylink['currency'] ) ? strtoupper( (string) $paylink['currency'] ) : '';
 		$mismatch         = null;
-		if ( ( 'preauth' === strtolower( $type ) ) !== (bool) blink_is_preauth_transaction( $order ) ) {
-			$mismatch = array( 'type' => 'mode', 'detail' => sprintf( 'transaction type %s', $type ) );
+		if ( ( 'preauth' === strtolower( $type ) ) !== (bool) blink_pg_is_preauth_transaction( $order ) ) {
+			$mismatch = array(
+				'type'   => 'mode',
+				'detail' => sprintf( 'transaction type %s', $type ),
+			);
 		} elseif ( ! self::blink_amount_matches( isset( $paylink['amount'] ) ? $paylink['amount'] : null, $order->get_total() ) ) {
-			$mismatch = array( 'type' => 'amount', 'detail' => sprintf( 'amount %s', isset( $paylink['amount'] ) && is_scalar( $paylink['amount'] ) ? $paylink['amount'] : '' ) );
-		} elseif ( $paylink_currency !== strtoupper( (string) $order->get_currency() ) ) {
-			$mismatch = array( 'type' => 'amount', 'detail' => sprintf( 'currency %s', $paylink_currency ) );
+			$mismatch = array(
+				'type'   => 'amount',
+				'detail' => sprintf( 'amount %s', isset( $paylink['amount'] ) && is_scalar( $paylink['amount'] ) ? $paylink['amount'] : '' ),
+			);
+		} elseif ( strtoupper( (string) $order->get_currency() ) !== $paylink_currency ) {
+			$mismatch = array(
+				'type'   => 'amount',
+				'detail' => sprintf( 'currency %s', $paylink_currency ),
+			);
 		}
 
-		return self::blink_verification( 'verified', array( 'status' => 'Paid', 'mismatch' => $mismatch, 'paylink_id' => $paylink_id ) );
+		return self::blink_verification(
+			'verified',
+			array(
+				'status'     => 'Paid',
+				'mismatch'   => $mismatch,
+				'paylink_id' => $paylink_id,
+			)
+		);
 	}
 
 	/**
 	 * A Paylink belongs to the order when its ID was stored on the order, or, for
 	 * Paylinks created before IDs were stored, when the redirect URL the plugin
 	 * gave Blink carries this order's ID and key.
+	 *
+	 * @param WC_Order $order      Order to check against.
+	 * @param string   $paylink_id Blink Paylink ID.
+	 * @param array    $paylink    Paylink details from Blink.
+	 * @return bool
 	 */
 	private function blink_paylink_belongs_to_order( $order, $paylink_id, $paylink ) {
 		foreach ( (array) $order->get_meta( '_blink_paylink_id', false ) as $meta ) {
@@ -434,11 +664,11 @@ class Blink_Transaction_Handler {
 
 		$redirect = isset( $paylink['redirect_url'] ) && is_string( $paylink['redirect_url'] ) ? $paylink['redirect_url'] : '';
 		$query    = array();
-		parse_str( (string) parse_url( $redirect, PHP_URL_QUERY ), $query );
+		parse_str( (string) wp_parse_url( $redirect, PHP_URL_QUERY ), $query );
 		if ( isset( $query['order-received'] ) && is_scalar( $query['order-received'] ) ) {
 			$received_id = (string) $query['order-received'];
 		} else {
-			$received_id = preg_match( '#/order-received/(\d+)/?$#', (string) parse_url( $redirect, PHP_URL_PATH ), $matches ) ? $matches[1] : '';
+			$received_id = preg_match( '#/order-received/(\d+)/?$#', (string) wp_parse_url( $redirect, PHP_URL_PATH ), $matches ) ? $matches[1] : '';
 		}
 
 		return '' !== $received_id
@@ -454,6 +684,11 @@ class Blink_Transaction_Handler {
 	 * transaction only when Blink knows it, it is not a decline, its amount and
 	 * currency match the Paylink, any merchant_data names this order, and no
 	 * other order has recorded it.
+	 *
+	 * @param WC_Order $order          Order the Paylink belongs to.
+	 * @param string   $transaction_id Blink transaction ID from the webhook.
+	 * @param array    $paylink        Paylink details from Blink.
+	 * @return array Verification result, as from blink_verification().
 	 */
 	private function blink_verify_paylink_transaction( $order, $transaction_id, $paylink ) {
 		$lookup = $this->blink_fetch_from_blink( '/pay/v1/transactions/' . rawurlencode( $transaction_id ) );
@@ -462,7 +697,7 @@ class Blink_Transaction_Handler {
 		}
 		$transaction = isset( $lookup['body']['data'] ) && is_array( $lookup['body']['data'] ) ? $lookup['body']['data'] : array();
 		$status      = isset( $transaction['status'] ) && is_scalar( $transaction['status'] ) ? (string) $transaction['status'] : '';
-		if ( '' === $status || ( 'failed' === blink_get_status( $status ) && ! self::blink_is_preauth_status( $status ) ) ) {
+		if ( '' === $status || ( 'failed' === blink_pg_get_status( $status ) && ! self::blink_is_preauth_status( $status ) ) ) {
 			return self::blink_verification( 'unlinked', array( 'reason' => 'paylink transaction not successful' ) );
 		}
 
@@ -492,26 +727,36 @@ class Blink_Transaction_Handler {
 	/**
 	 * A captured pre-authorisation keeps its original ID only in blink_res and its
 	 * capture in blink_rerun_id, so check those as well as the transaction ID.
+	 *
+	 * @param WC_Order $order          Order to leave out of the search.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @return bool Whether another order has recorded the transaction.
 	 */
 	private function blink_transaction_recorded_elsewhere( $order, $transaction_id ) {
-		$common = array(
+		$common         = array(
 			'limit'   => 1,
 			'return'  => 'ids',
-			'exclude' => array( $order->get_id() ),
+			'exclude' => array( $order->get_id() ), // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_exclude -- One ID, limit 1.
 		);
 		$by_transaction = wc_get_orders( array_merge( $common, array( 'transaction_id' => $transaction_id ) ) );
 		if ( ! empty( $by_transaction ) ) {
 			return true;
 		}
 		foreach ( array( 'blink_res', 'blink_rerun_id' ) as $key ) {
-			$by_meta = wc_get_orders( array_merge( $common, array(
-				'meta_query' => array(
+			// Only reached for a webhook whose transaction ID is not the order's own.
+			$by_meta = wc_get_orders(
+				array_merge(
+					$common,
 					array(
-						'key'   => $key,
-						'value' => $transaction_id,
-					),
-				),
-			) ) );
+						'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Blink's IDs are only stored in meta.
+							array(
+								'key'   => $key,
+								'value' => $transaction_id,
+							),
+						),
+					)
+				)
+			);
 			if ( ! empty( $by_meta ) ) {
 				return true;
 			}
@@ -519,6 +764,14 @@ class Blink_Transaction_Handler {
 		return false;
 	}
 
+	/**
+	 * Look a transaction up with Blink and check it belongs to the order and fits it.
+	 *
+	 * @param WC_Order $order          Order the webhook names.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @param bool     $is_rerun       Whether the transaction is a pre-authorisation capture.
+	 * @return array Verification result, as from blink_verification().
+	 */
 	private function blink_verify_transaction( $order, $transaction_id, $is_rerun ) {
 		$lookup = $this->blink_fetch_from_blink( '/pay/v1/transactions/' . rawurlencode( $transaction_id ) );
 		if ( 'ok' !== $lookup['state'] ) {
@@ -556,33 +809,71 @@ class Blink_Transaction_Handler {
 		}
 
 		$mismatch = null;
-		if ( ! $is_rerun && self::blink_is_preauth_status( $status ) && ! blink_is_preauth_transaction( $order ) ) {
-			$mismatch = array( 'type' => 'mode', 'detail' => sprintf( 'status %s on a sale order', $status ) );
+		if ( ! $is_rerun && self::blink_is_preauth_status( $status ) && ! blink_pg_is_preauth_transaction( $order ) ) {
+			$mismatch = array(
+				'type'   => 'mode',
+				'detail' => sprintf( 'status %s on a sale order', $status ),
+			);
 		} elseif ( ! $is_rerun && ! $amount_matches ) {
-			$mismatch = array( 'type' => 'amount', 'detail' => sprintf( 'amount %s', isset( $transaction['amount'] ) && is_scalar( $transaction['amount'] ) ? $transaction['amount'] : '' ) );
+			$mismatch = array(
+				'type'   => 'amount',
+				'detail' => sprintf( 'amount %s', isset( $transaction['amount'] ) && is_scalar( $transaction['amount'] ) ? $transaction['amount'] : '' ),
+			);
 		}
 
-		return self::blink_verification( 'verified', array(
-			'status'         => $status,
-			'mismatch'       => $mismatch,
-			'message'        => isset( $transaction['message'] ) && is_scalar( $transaction['message'] ) ? sanitize_text_field( (string) $transaction['message'] ) : '',
-			'payment_source' => isset( $transaction['payment_source'] ) && is_scalar( $transaction['payment_source'] ) ? sanitize_text_field( (string) $transaction['payment_source'] ) : '',
-		) );
+		return self::blink_verification(
+			'verified',
+			array(
+				'status'         => $status,
+				'mismatch'       => $mismatch,
+				'message'        => isset( $transaction['message'] ) && is_scalar( $transaction['message'] ) ? sanitize_text_field( (string) $transaction['message'] ) : '',
+				'payment_source' => isset( $transaction['payment_source'] ) && is_scalar( $transaction['payment_source'] ) ? sanitize_text_field( (string) $transaction['payment_source'] ) : '',
+			)
+		);
 	}
 
+	/**
+	 * Build a verification result with every field present.
+	 *
+	 * @param string $result Verified, unlinked or unavailable.
+	 * @param array  $fields Fields to set over the defaults.
+	 * @return array
+	 */
 	private static function blink_verification( $result, $fields = array() ) {
 		return array_merge(
-			array( 'result' => $result, 'status' => '', 'mismatch' => null, 'paylink_id' => '', 'paylink_status' => '', 'paylink' => null, 'message' => '', 'payment_source' => '', 'reason' => '' ),
+			array(
+				'result'         => $result,
+				'status'         => '',
+				'mismatch'       => null,
+				'paylink_id'     => '',
+				'paylink_status' => '',
+				'paylink'        => null,
+				'message'        => '',
+				'payment_source' => '',
+				'reason'         => '',
+			),
 			$fields
 		);
 	}
 
+	/**
+	 * Check whether the order has a capture in progress or one whose outcome is unknown.
+	 *
+	 * @param WC_Order $order Order to check.
+	 * @return bool
+	 */
 	private function blink_is_capture_pending( $order ) {
 		$rerun_handler = isset( $this->gateway->rerun_handler ) ? $this->gateway->rerun_handler : null;
 		return ( is_object( $rerun_handler ) && $rerun_handler->is_rerun_in_progress( $order ) )
 			|| 'yes' === $order->get_meta( '_blink_rerun_outcome_unknown', true );
 	}
 
+	/**
+	 * Check whether a Blink status means the payment is pre-authorised.
+	 *
+	 * @param string $status Status returned by Blink.
+	 * @return bool
+	 */
 	private static function blink_is_preauth_status( $status ) {
 		$status = preg_replace( '/[\s_-]+/', ' ', strtolower( trim( (string) $status ) ) );
 		return in_array( $status, array( 'preauth', 'pre auth', 'preauthorized', 'pre authorized', 'preauthorised', 'pre authorised' ), true );
@@ -591,6 +882,10 @@ class Blink_Transaction_Handler {
 	/**
 	 * Compare amounts in pence: the transactions API returns numbers, Paylinks and
 	 * WooCommerce return strings.
+	 *
+	 * @param mixed $amount      Amount from Blink.
+	 * @param mixed $order_total Amount to compare it with.
+	 * @return bool
 	 */
 	private static function blink_amount_matches( $amount, $order_total ) {
 		return is_numeric( $amount ) && is_numeric( $order_total )
@@ -600,12 +895,13 @@ class Blink_Transaction_Handler {
 	/**
 	 * GET a Blink API resource.
 	 *
+	 * @param string $path API path, appended to the gateway's host URL.
 	 * @return array 'state' (ok, not_found or unavailable) and, when ok, the decoded 'body'.
 	 */
 	private function blink_fetch_from_blink( $path ) {
 		$token = $this->gateway->utils->blink_generate_access_token();
 		if ( empty( $token ) || empty( $token['access_token'] ) ) {
-			Blink_Logger::log( 'Blink verification: failed to get access token' );
+			Blink_PG_Logger::log( 'Blink verification: failed to get access token' );
 			return array( 'state' => 'unavailable' );
 		}
 
@@ -613,38 +909,65 @@ class Blink_Transaction_Handler {
 			$this->gateway->host_url . $path,
 			array(
 				'headers' => array( 'Authorization' => 'Bearer ' . $token['access_token'] ),
-				'timeout' => 10, // Shorter timeout for webhook validation
+				'timeout' => 10, // Shorter timeout for webhook validation.
 			)
 		);
 		if ( is_wp_error( $response ) ) {
-			Blink_Logger::log( 'Blink verification: API error', array( 'path' => $path, 'error' => $response->get_error_message() ) );
+			Blink_PG_Logger::log(
+				'Blink verification: API error',
+				array(
+					'path'  => $path,
+					'error' => $response->get_error_message(),
+				)
+			);
 			return array( 'state' => 'unavailable' );
 		}
 
 		// Only the response code is logged: the body holds customer details.
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		if ( 0 === $code || 429 === $code || $code >= 500 ) {
-			Blink_Logger::log( 'Blink verification: Blink unavailable', array( 'path' => $path, 'response_code' => $code ) );
+			Blink_PG_Logger::log(
+				'Blink verification: Blink unavailable',
+				array(
+					'path'          => $path,
+					'response_code' => $code,
+				)
+			);
 			return array( 'state' => 'unavailable' );
 		}
 		if ( 200 !== $code ) {
-			Blink_Logger::log( 'Blink verification: not found', array( 'path' => $path, 'response_code' => $code ) );
+			Blink_PG_Logger::log(
+				'Blink verification: not found',
+				array(
+					'path'          => $path,
+					'response_code' => $code,
+				)
+			);
 			return array( 'state' => 'not_found' );
 		}
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $body ) ) {
-			Blink_Logger::log( 'Blink verification: unreadable response', array( 'path' => $path ) );
+			Blink_PG_Logger::log( 'Blink verification: unreadable response', array( 'path' => $path ) );
 			return array( 'state' => 'unavailable' );
 		}
-		return array( 'state' => 'ok', 'body' => $body );
+		return array(
+			'state' => 'ok',
+			'body'  => $body,
+		);
 	}
 
 	/**
 	 * A genuine payment for this order that does not fit it (wrong amount,
 	 * currency or transaction type). Money may have moved, so the merchant is told.
+	 *
+	 * @param WC_Order $order          Order the payment was made for.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @param string   $status         Status returned by Blink.
+	 * @param array    $mismatch       What does not fit: 'type' (mode or amount) and 'detail'.
+	 * @return void
 	 */
 	private function blink_record_unexpected_payment( $order, $transaction_id, $status, $mismatch ) {
-		if ( 'failed' === blink_get_status( $status, '', $order ) ) {
+		if ( 'failed' === blink_pg_get_status( $status, '', $order ) ) {
 			/* translators: 1: transaction ID, 2: what does not match */
 			$order->add_order_note( sprintf( __( 'Blink: ignored declined transaction %1$s because it does not match this order (%2$s).', 'blink-payment-gateway-for-woocommerce' ), $transaction_id, $mismatch['detail'] ) );
 			$order->save();
@@ -659,12 +982,24 @@ class Blink_Transaction_Handler {
 			$order->add_order_note( $note );
 		}
 		$order->save();
-		Blink_Logger::log( 'Webhook payment does not match order', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id, 'mismatch' => $mismatch['type'] ) );
+		Blink_PG_Logger::log(
+			'Webhook payment does not match order',
+			array(
+				'order_id'       => $order->get_id(),
+				'transaction_id' => $transaction_id,
+				'mismatch'       => $mismatch['type'],
+			)
+		);
 	}
 
 	/**
 	 * Store the verified transaction of a Paylink a Hosted return already applied,
 	 * for refunds and captures.
+	 *
+	 * @param WC_Order $order          Order the Paylink paid.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @param string   $status         Status returned by Blink.
+	 * @return void
 	 */
 	private function blink_record_paylink_transaction( $order, $transaction_id, $status ) {
 		$order->update_meta_data( 'blink_res', $transaction_id );
@@ -675,34 +1010,51 @@ class Blink_Transaction_Handler {
 		// A pre-authorisation can only be captured once its transaction is recorded.
 		$this->blink_add_preauth_note( $order, $transaction_id, $status );
 		$order->save();
-		Blink_Logger::log( 'Paylink transaction recorded', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id ) );
+		Blink_PG_Logger::log(
+			'Paylink transaction recorded',
+			array(
+				'order_id'       => $order->get_id(),
+				'transaction_id' => $transaction_id,
+			)
+		);
 	}
 
 	/**
 	 * Tell the merchant how to take an authorised pre-authorisation.
+	 *
+	 * @param WC_Order $order          Order to add the note to.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @param string   $status         Status returned by Blink.
+	 * @return void
 	 */
 	private function blink_add_preauth_note( $order, $transaction_id, $status ) {
-		if ( ! blink_is_preauth_transaction( $order ) || 'hold' !== blink_get_status( $status, '', $order ) ) {
+		if ( ! blink_pg_is_preauth_transaction( $order ) || 'hold' !== blink_pg_get_status( $status, '', $order ) ) {
 			return;
 		}
-		$preauth_note = __('Blink payment preauthorized (Transaction ID: ', 'blink-payment-gateway-for-woocommerce') . $transaction_id . '). ' .
-					   __('Process order to take payment, or cancel to remove the pre-authorization. ', 'blink-payment-gateway-for-woocommerce') .
-					   __('Refunding is unavailable until payment has been captured. ', 'blink-payment-gateway-for-woocommerce');
+		$preauth_note = __( 'Blink payment preauthorized (Transaction ID: ', 'blink-payment-gateway-for-woocommerce' ) . $transaction_id . '). ' .
+						__( 'Process order to take payment, or cancel to remove the pre-authorization. ', 'blink-payment-gateway-for-woocommerce' ) .
+						__( 'Refunding is unavailable until payment has been captured. ', 'blink-payment-gateway-for-woocommerce' );
 		$order->add_order_note( $preauth_note );
 	}
 
 	/**
 	 * A verified payment event for an order that is already paid.
+	 *
+	 * @param WC_Order $order          Paid order.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @param string   $status         Status returned by Blink.
+	 * @param string   $paylink_id     Blink Paylink ID, or ''.
+	 * @return void
 	 */
 	private function blink_record_payment_on_paid_order( $order, $transaction_id, $status, $paylink_id ) {
 		// The status comes from Blink's API, so a change to the payment this order
 		// recorded is genuine, unlike a decline from some other attempt.
-		if ( '' !== $transaction_id && $transaction_id === (string) $order->get_transaction_id() && 'complete' !== blink_get_status( $status, '', $order ) ) {
+		if ( '' !== $transaction_id && $transaction_id === (string) $order->get_transaction_id() && 'complete' !== blink_pg_get_status( $status, '', $order ) ) {
 			$this->blink_record_reversal( $order, $transaction_id, $status );
 			return;
 		}
 
-		if ( 'failed' === blink_get_status( $status, '', $order ) ) {
+		if ( 'failed' === blink_pg_get_status( $status, '', $order ) ) {
 			/* translators: %s: transaction ID */
 			$order->add_order_note( sprintf( __( 'Blink: ignored declined transaction %s because this order is already paid.', 'blink-payment-gateway-for-woocommerce' ), $transaction_id ) );
 			$order->save();
@@ -712,7 +1064,13 @@ class Blink_Transaction_Handler {
 		$same_payment = $transaction_id === (string) $order->get_transaction_id()
 			|| ( '' !== $paylink_id && $paylink_id === (string) $order->get_meta( '_blink_paylink_paid_id', true ) );
 		if ( $same_payment ) {
-			Blink_Logger::log( 'Repeat webhook for a recorded payment ignored', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id ) );
+			Blink_PG_Logger::log(
+				'Repeat webhook for a recorded payment ignored',
+				array(
+					'order_id'       => $order->get_id(),
+					'transaction_id' => $transaction_id,
+				)
+			);
 			return;
 		}
 
@@ -726,10 +1084,22 @@ class Blink_Transaction_Handler {
 	 * (for example voided or reversed). Hold the order rather than fail it, so
 	 * the merchant checks before fulfilling. A refund only gets a note, because
 	 * refunds are normally made through WooCommerce.
+	 *
+	 * @param WC_Order $order          Paid order.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @param string   $status         Status returned by Blink.
+	 * @return void
 	 */
 	private function blink_record_reversal( $order, $transaction_id, $status ) {
 		$order->update_meta_data( 'status', $status );
-		Blink_Logger::log( 'Recorded payment no longer successful', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id, 'status' => $status ) );
+		Blink_PG_Logger::log(
+			'Recorded payment no longer successful',
+			array(
+				'order_id'       => $order->get_id(),
+				'transaction_id' => $transaction_id,
+				'status'         => $status,
+			)
+		);
 
 		if ( false !== strpos( strtolower( $status ), 'refund' ) ) {
 			/* translators: 1: transaction ID, 2: Blink status */
@@ -746,6 +1116,12 @@ class Blink_Transaction_Handler {
 	/**
 	 * Blink retries a webhook that gets a 503 five times, five minutes apart.
 	 * Re-check once those retries are over, in case Blink was down throughout.
+	 *
+	 * @param WC_Order $order          Order the webhook names.
+	 * @param array    $request        Webhook payload.
+	 * @param string   $transaction_id Blink transaction ID.
+	 * @param int      $attempt        Number of earlier re-checks of this webhook.
+	 * @return void
 	 */
 	private function blink_schedule_webhook_recheck( $order, $request, $transaction_id, $attempt ) {
 		if ( $attempt >= self::WEBHOOK_RECHECK_LIMIT ) {
@@ -755,7 +1131,7 @@ class Blink_Transaction_Handler {
 			return;
 		}
 		if ( ! function_exists( 'as_schedule_single_action' ) ) {
-			Blink_Logger::log( 'Webhook re-check not scheduled: Action Scheduler unavailable', array( 'order_id' => $order->get_id() ) );
+			Blink_PG_Logger::log( 'Webhook re-check not scheduled: Action Scheduler unavailable', array( 'order_id' => $order->get_id() ) );
 			return;
 		}
 
@@ -769,11 +1145,21 @@ class Blink_Transaction_Handler {
 			return;
 		}
 		as_schedule_single_action( time() + 30 * MINUTE_IN_SECONDS, self::WEBHOOK_RECHECK_HOOK, $args, 'blink' );
-		Blink_Logger::log( 'Webhook re-check scheduled', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id, 'attempt' => $attempt + 1 ) );
+		Blink_PG_Logger::log(
+			'Webhook re-check scheduled',
+			array(
+				'order_id'       => $order->get_id(),
+				'transaction_id' => $transaction_id,
+				'attempt'        => $attempt + 1,
+			)
+		);
 	}
 
 	/**
 	 * The fields needed to verify the webhook again, without customer details.
+	 *
+	 * @param array $request Webhook payload.
+	 * @return array
 	 */
 	private function blink_webhook_recheck_request( $request ) {
 		$recheck = array();
@@ -791,6 +1177,9 @@ class Blink_Transaction_Handler {
 
 	/**
 	 * Webhook responses never say whether an order exists or what state it is in.
+	 *
+	 * @param int $code HTTP status code: 200, 403 or 503.
+	 * @return array HTTP response 'code' and 'body'.
 	 */
 	private function blink_webhook_response( $code ) {
 		$bodies = array(
@@ -798,7 +1187,10 @@ class Blink_Transaction_Handler {
 			403 => array( 'error' => 'Forbidden' ),
 			503 => array( 'error' => 'Unable to verify the transaction with Blink; retry later' ),
 		);
-		return array( 'code' => $code, 'body' => $bodies[ $code ] );
+		return array(
+			'code' => $code,
+			'body' => $bodies[ $code ],
+		);
 	}
 
 	/**
@@ -822,29 +1214,39 @@ class Blink_Transaction_Handler {
 		$rerun_handler = isset( $this->gateway->rerun_handler ) ? $this->gateway->rerun_handler : null;
 
 		if ( ! is_object( $rerun_handler ) ) {
-			Blink_Logger::log( 'Rerun webhook ignored: rerun handler unavailable', array( 'order_id' => $order->get_id() ) );
+			Blink_PG_Logger::log( 'Rerun webhook ignored: rerun handler unavailable', array( 'order_id' => $order->get_id() ) );
 			return true;
 		}
 		$webhook_reference = ! empty( $request['reference'] ) && is_scalar( $request['reference'] ) ? sanitize_text_field( (string) $request['reference'] ) : '';
 		if ( 'yes' === $order->get_meta( '_blink_rerun_outcome_unknown', true ) ) {
 			$expected_reference = (string) $order->get_meta( '_blink_rerun_reference', true );
 			if ( '' === $expected_reference || $expected_reference !== $webhook_reference ) {
-				Blink_Logger::log( 'Unknown rerun outcome remains blocked: webhook correlation unavailable', array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id ) );
+				Blink_PG_Logger::log(
+					'Unknown rerun outcome remains blocked: webhook correlation unavailable',
+					array(
+						'order_id'       => $order->get_id(),
+						'transaction_id' => $transaction_id,
+					)
+				);
 				return true;
 			}
 		}
 
-		$is_success    = $rerun_handler->is_successful_rerun_status( $status );
-		$captured_id = (string) $order->get_meta( 'blink_rerun_id', true );
+		$is_success       = $rerun_handler->is_successful_rerun_status( $status );
+		$captured_id      = (string) $order->get_meta( 'blink_rerun_id', true );
 		$matching_capture = '' !== $captured_id && $captured_id === (string) $transaction_id;
-		$mapped_status = $is_success ? 'complete' : ( $matching_capture && $rerun_handler->is_failed_rerun_status( $status ) ? 'failed' : blink_get_status( $status, '', $order ) );
+		$mapped_status    = $is_success ? 'complete' : ( $matching_capture && $rerun_handler->is_failed_rerun_status( $status ) ? 'failed' : blink_pg_get_status( $status, '', $order ) );
 		// Once a capture is recorded, only events for that exact capture may
 		// update its result. Unrelated/late reruns are ignored; a matching
 		// terminal event is still recorded (for example a later reversal).
 		if ( '' !== $captured_id && $captured_id !== (string) $transaction_id ) {
-			Blink_Logger::log(
+			Blink_PG_Logger::log(
 				'Rerun webhook ignored because capture is already recorded',
-				array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id, 'status' => $status )
+				array(
+					'order_id'       => $order->get_id(),
+					'transaction_id' => $transaction_id,
+					'status'         => $status,
+				)
 			);
 			return true;
 		}
@@ -879,9 +1281,13 @@ class Blink_Transaction_Handler {
 				$order->update_status( 'failed' );
 			}
 		} else {
-			Blink_Logger::log(
+			Blink_PG_Logger::log(
 				'Rerun webhook reported a non-final status',
-				array( 'order_id' => $order->get_id(), 'transaction_id' => $transaction_id, 'status' => $status )
+				array(
+					'order_id'       => $order->get_id(),
+					'transaction_id' => $transaction_id,
+					'status'         => $status,
+				)
 			);
 			return true;
 		}
@@ -907,7 +1313,7 @@ class Blink_Transaction_Handler {
 		return 'rerun_transaction' === $event_type
 			&& is_object( $order )
 			&& 'blink' === $order->get_payment_method()
-			&& blink_is_preauth_transaction( $order )
+			&& blink_pg_is_preauth_transaction( $order )
 			&& '' !== $original
 			&& '' !== (string) $transaction_id
 			&& $original !== (string) $transaction_id;
@@ -955,12 +1361,15 @@ class Blink_Transaction_Handler {
 		// The webhook re-checks a payment Blink could not confirm and records one
 		// that does not fit the order, so neither is applied here.
 		if ( 'verified' !== $verification['result'] || null !== $verification['mismatch'] ) {
-			Blink_Logger::log( 'Return not applied', array(
-				'order_id'       => $order_id,
-				'transaction_id' => $transaction_id,
-				'result'         => $verification['result'],
-				'reason'         => null !== $verification['mismatch'] ? $verification['mismatch']['type'] : $verification['reason'],
-			) );
+			Blink_PG_Logger::log(
+				'Return not applied',
+				array(
+					'order_id'       => $order_id,
+					'transaction_id' => $transaction_id,
+					'result'         => $verification['result'],
+					'reason'         => null !== $verification['mismatch'] ? $verification['mismatch']['type'] : $verification['reason'],
+				)
+			);
 			return;
 		}
 
@@ -979,8 +1388,14 @@ class Blink_Transaction_Handler {
 		}
 		$this->blink_add_preauth_note( $wc_order, $transaction_id, $status );
 		$wc_order->save();
-		Blink_Logger::log( 'Transaction handler processed', array( 'order_id' => $order_id, 'status' => $status ) );
-		blink_change_status( $wc_order, $transaction_id, $status, $source, $message );
+		Blink_PG_Logger::log(
+			'Transaction handler processed',
+			array(
+				'order_id' => $order_id,
+				'status'   => $status,
+			)
+		);
+		blink_pg_change_status( $wc_order, $transaction_id, $status, $source, $message );
 		if (
 			$this->gateway->blink_is_hosted()
 			&& $wc_order->has_status( 'failed' )
@@ -990,8 +1405,8 @@ class Blink_Transaction_Handler {
 			$message = self::blink_get_hosted_decline_message();
 		}
 		$this->blink_update_payment_message( $wc_order, $message );
-		delete_transient( 'blink_3d_process' . $order_id );
-		delete_transient( 'blink_3d_challenge_token_' . $order_id );
+		delete_transient( 'blink_pg_3d_process_' . $order_id );
+		delete_transient( 'blink_pg_3d_challenge_token_' . $order_id );
 	}
 
 	/**
@@ -1053,8 +1468,17 @@ class Blink_Transaction_Handler {
 		foreach ( $paylink_ids as $index => $paylink_id ) {
 			$verification = $this->blink_verify_paylink( $wc_order, $paylink_id, '' );
 			if ( 'unavailable' === $verification['result'] ) {
-				Blink_Logger::log( 'Hosted Paylinks not checked: Blink unavailable', array( 'order_id' => $wc_order->get_id(), 'paylink_id' => $paylink_id ) );
-				return array( 'result' => 'unavailable', 'payable' => null );
+				Blink_PG_Logger::log(
+					'Hosted Paylinks not checked: Blink unavailable',
+					array(
+						'order_id'   => $wc_order->get_id(),
+						'paylink_id' => $paylink_id,
+					)
+				);
+				return array(
+					'result'  => 'unavailable',
+					'payable' => null,
+				);
 			}
 			if ( 'verified' !== $verification['result'] ) {
 				continue;
@@ -1066,8 +1490,18 @@ class Blink_Transaction_Handler {
 				continue;
 			}
 			if ( null !== $verification['mismatch'] ) {
-				Blink_Logger::log( 'Hosted Paylink paid but does not fit the order; left for the webhook', array( 'order_id' => $wc_order->get_id(), 'paylink_id' => $paylink_id, 'mismatch' => $verification['mismatch']['type'] ) );
-				return array( 'result' => 'mismatch', 'payable' => null );
+				Blink_PG_Logger::log(
+					'Hosted Paylink paid but does not fit the order; left for the webhook',
+					array(
+						'order_id'   => $wc_order->get_id(),
+						'paylink_id' => $paylink_id,
+						'mismatch'   => $verification['mismatch']['type'],
+					)
+				);
+				return array(
+					'result'  => 'mismatch',
+					'payable' => null,
+				);
 			}
 
 			$status = $verification['status'];
@@ -1075,15 +1509,33 @@ class Blink_Transaction_Handler {
 			$wc_order->update_meta_data( 'status', $status );
 			$wc_order->update_meta_data( '_blink_status', $status );
 			$wc_order->save();
-			Blink_Logger::log( 'Hosted payment confirmed by Paylink', array( 'order_id' => $wc_order->get_id(), 'paylink_id' => $paylink_id ) );
+			Blink_PG_Logger::log(
+				'Hosted payment confirmed by Paylink',
+				array(
+					'order_id'   => $wc_order->get_id(),
+					'paylink_id' => $paylink_id,
+				)
+			);
 			/* translators: %s: Paylink ID */
-			blink_change_status( $wc_order, '', $status, '', sprintf( __( 'Blink confirmed Paylink %s is paid.', 'blink-payment-gateway-for-woocommerce' ), $paylink_id ) );
+			blink_pg_change_status( $wc_order, '', $status, '', sprintf( __( 'Blink confirmed Paylink %s is paid.', 'blink-payment-gateway-for-woocommerce' ), $paylink_id ) );
 			$this->blink_update_payment_message( $wc_order );
-			return array( 'result' => 'paid', 'payable' => null );
+			return array(
+				'result'  => 'paid',
+				'payable' => null,
+			);
 		}
 
-		Blink_Logger::log( 'Hosted Paylinks checked: none paid', array( 'order_id' => $wc_order->get_id(), 'paylinks' => count( $paylink_ids ) ) );
-		return array( 'result' => 'unpaid', 'payable' => $payable );
+		Blink_PG_Logger::log(
+			'Hosted Paylinks checked: none paid',
+			array(
+				'order_id' => $wc_order->get_id(),
+				'paylinks' => count( $paylink_ids ),
+			)
+		);
+		return array(
+			'result'  => 'unpaid',
+			'payable' => $payable,
+		);
 	}
 
 	/**
@@ -1103,7 +1555,8 @@ class Blink_Transaction_Handler {
 		// Blink records the payment before redirecting, but the Paylink API can
 		// briefly lag behind, so a return that says Paid is checked once more.
 		if ( 'paid' === $status && 'unpaid' === $check['result'] && array() !== $this->blink_stored_paylink_ids( $wc_order ) ) {
-			$delay = (int) apply_filters( 'blink_hosted_return_recheck_delay', 1 );
+			$delay = apply_filters_deprecated( 'blink_hosted_return_recheck_delay', array( 1 ), '1.4.2', 'blink_pg_hosted_return_recheck_delay' );
+			$delay = (int) apply_filters( 'blink_pg_hosted_return_recheck_delay', $delay );
 			if ( $delay > 0 ) {
 				sleep( $delay );
 			}
@@ -1114,17 +1567,33 @@ class Blink_Transaction_Handler {
 			return;
 		}
 		if ( 'mismatch' === $check['result'] ) {
-			self::$hosted_return_notice = array( 'type' => 'mismatch', 'order_id' => $wc_order->get_id() );
+			self::$hosted_return_notice = array(
+				'type'     => 'mismatch',
+				'order_id' => $wc_order->get_id(),
+			);
 		} elseif ( 'paid' === $status ) {
-			self::$hosted_return_notice = array( 'type' => 'confirming', 'order_id' => $wc_order->get_id() );
+			self::$hosted_return_notice = array(
+				'type'     => 'confirming',
+				'order_id' => $wc_order->get_id(),
+			);
 		} elseif ( 'declined' === $status ) {
-			self::$hosted_return_notice = array( 'type' => 'declined', 'order_id' => $wc_order->get_id() );
+			self::$hosted_return_notice = array(
+				'type'     => 'declined',
+				'order_id' => $wc_order->get_id(),
+			);
 			if ( 'unpaid' === $check['result'] ) {
 				$wc_order->add_order_note( __( 'Blink: the customer\'s payment was declined. The Paylink is still open, so the order stays pending and the customer can pay again.', 'blink-payment-gateway-for-woocommerce' ) );
 				$wc_order->save();
 			}
 		}
-		Blink_Logger::log( 'Hosted return not confirmed', array( 'order_id' => $wc_order->get_id(), 'url_status' => $status, 'result' => $check['result'] ) );
+		Blink_PG_Logger::log(
+			'Hosted return not confirmed',
+			array(
+				'order_id'   => $wc_order->get_id(),
+				'url_status' => $status,
+				'result'     => $check['result'],
+			)
+		);
 	}
 
 	/**
@@ -1196,6 +1665,7 @@ class Blink_Transaction_Handler {
 		if ( empty( $wp->query_vars['order-received'] ) ) {
 			return;
 		}
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter, applied as its thank-you page does.
 		$order_id = apply_filters( 'woocommerce_thankyou_order_id', absint( $wp->query_vars['order-received'] ) );
 		$wc_order = wc_get_order( $order_id );
 		if ( empty( $wc_order ) || 'blink' !== $wc_order->get_payment_method() ) {
@@ -1208,7 +1678,10 @@ class Blink_Transaction_Handler {
 			return;
 		}
 
-		$order_key = isset( $_GET['key'] ) && is_scalar( $_GET['key'] ) ? wc_clean( wp_unslash( $_GET['key'] ) ) : '';
+		// The return from Blink carries no WordPress nonce. The order key must match, and
+		// the payment is confirmed with Blink before the order changes.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$order_key = isset( $_GET['key'] ) && is_scalar( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
 		if ( '' === $order_key || ! hash_equals( (string) $wc_order->get_order_key(), $order_key ) ) {
 			return;
 		}
@@ -1229,6 +1702,7 @@ class Blink_Transaction_Handler {
 
 		$status    = isset( $_GET['status'] ) && is_scalar( $_GET['status'] ) ? sanitize_text_field( wp_unslash( $_GET['status'] ) ) : '';
 		$reference = isset( $_GET['reference'] ) && is_scalar( $_GET['reference'] ) ? sanitize_text_field( wp_unslash( $_GET['reference'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 		if ( 'WC-' . $order_id !== $reference ) {
 			return;
 		}
@@ -1236,40 +1710,41 @@ class Blink_Transaction_Handler {
 	}
 
 	/**
-	 * Handle order status change to trigger rerun for preauthorized orders
+	 * Handle order status change to trigger rerun for preauthorized orders.
 	 *
-	 * @param int $order_id Order ID
-	 * @param string $old_status Old order status
-	 * @param string $new_status New order status
+	 * @param int    $order_id   Order ID.
+	 * @param string $old_status Old order status.
+	 * @param string $new_status New order status.
+	 * @return void
 	 */
-	public static function blink_handle_order_status_change($order_id, $old_status, $new_status) {
-		// Only process when changing to 'processing' from 'on-hold'
-		if ($new_status !== 'processing' || $old_status !== 'on-hold') {
+	public static function blink_handle_order_status_change( $order_id, $old_status, $new_status ) {
+		// Only process when changing to 'processing' from 'on-hold'.
+		if ( 'processing' !== $new_status || 'on-hold' !== $old_status ) {
 			return;
 		}
 
-		$order = wc_get_order($order_id);
-		if (!$order) {
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
 			return;
 		}
 
-		// Check if this is a Blink payment method
-		if ($order->get_payment_method() !== 'blink') {
+		// Check if this is a Blink payment method.
+		if ( $order->get_payment_method() !== 'blink' ) {
 			return;
 		}
 
 		$gateway = self::blink_get_gateway();
-		
-		if (!$gateway || !isset($gateway->rerun_handler) || !is_object($gateway->rerun_handler)) {
+
+		if ( ! $gateway || ! isset( $gateway->rerun_handler ) || ! is_object( $gateway->rerun_handler ) ) {
 			return;
 		}
 
-		// Check if order is eligible for rerun
-		if (!$gateway->rerun_handler->is_eligible_for_rerun($order)) {
+		// Check if order is eligible for rerun.
+		if ( ! $gateway->rerun_handler->is_eligible_for_rerun( $order ) ) {
 			return;
 		}
 
-		$result = $gateway->rerun_handler->process_rerun($order);
+		$result = $gateway->rerun_handler->process_rerun( $order );
 		if ( ! empty( $result['success'] ) ) {
 			// process_rerun() may have received a completing webhook while the
 			// HTTP request was in flight. Reload persisted state before completion
@@ -1291,18 +1766,24 @@ class Blink_Transaction_Handler {
 			// this request was rejected under the lock and Processing is correct.
 			$already_captured = '' !== (string) $order->get_meta( 'blink_rerun_id', true );
 			if ( $already_captured ) {
-				Blink_Logger::log(
+				Blink_PG_Logger::log(
 					'Legacy pre-authorisation capture skipped; order already captured',
-					array( 'order_id' => $order_id, 'error' => isset( $result['error'] ) ? $result['error'] : '' )
+					array(
+						'order_id' => $order_id,
+						'error'    => isset( $result['error'] ) ? $result['error'] : '',
+					)
 				);
 				return;
 			}
 			if ( $order->has_status( 'processing' ) ) {
 				$order->update_status( 'on-hold' );
 			}
-			Blink_Logger::log(
+			Blink_PG_Logger::log(
 				'Legacy pre-authorisation capture failed; order restored to on-hold',
-				array( 'order_id' => $order_id, 'error' => isset( $result['error'] ) ? $result['error'] : '' )
+				array(
+					'order_id' => $order_id,
+					'error'    => isset( $result['error'] ) ? $result['error'] : '',
+				)
 			);
 		}
 	}
@@ -1321,7 +1802,7 @@ class Blink_Transaction_Handler {
 
 		$gateway = self::blink_get_gateway();
 		if ( $gateway && isset( $gateway->rerun_handler ) && $gateway->rerun_handler->is_eligible_for_rerun( $order, true ) ) {
-			$actions['blink_capture_preauthorisation'] = __( 'Capture Blink pre-authorisation', 'blink-payment-gateway-for-woocommerce' );
+			$actions['blink_pg_capture_preauthorisation'] = __( 'Capture Blink pre-authorisation', 'blink-payment-gateway-for-woocommerce' );
 		}
 
 		return $actions;
@@ -1343,7 +1824,7 @@ class Blink_Transaction_Handler {
 			return;
 		}
 
-		$result = $gateway->rerun_handler->process_rerun( $order, true );
+		$result      = $gateway->rerun_handler->process_rerun( $order, true );
 		$fresh_order = wc_get_order( $order->get_id() );
 		if ( $fresh_order ) {
 			$order = $fresh_order;
@@ -1356,7 +1837,7 @@ class Blink_Transaction_Handler {
 	/**
 	 * Return the configured Blink gateway without constructing a duplicate instance.
 	 *
-	 * @return Blink_Payment_Gateway|null
+	 * @return Blink_PG_Payment_Gateway|null
 	 */
 	private static function blink_get_gateway() {
 		if ( ! function_exists( 'WC' ) || ! WC() || ! method_exists( WC(), 'payment_gateways' ) ) {

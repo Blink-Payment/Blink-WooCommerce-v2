@@ -1,22 +1,59 @@
 <?php
-// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
+/**
+ * Takes payments for Blink orders.
+ *
+ * @package Blink_Payment_Gateway_For_WooCommerce
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+	exit; // Exit if accessed directly.
 }
 
 
-class Blink_Payment_Handler {
+/**
+ * Sends Direct card, wallet, direct debit and open banking payments to Blink, and creates Hosted Paylinks.
+ */
+class Blink_PG_Payment_Handler {
 
+	/**
+	 * The gateway this handler belongs to.
+	 *
+	 * @var Blink_PG_Payment_Gateway
+	 */
 	protected $gateway;
+
+	/**
+	 * Access token data for the current payment.
+	 *
+	 * @var array
+	 */
 	protected $token;
+
+	/**
+	 * Payment intent data for the current payment.
+	 *
+	 * @var array|null
+	 */
 	protected $intent;
 
+	/**
+	 * Set up the handler for a gateway.
+	 *
+	 * @param Blink_PG_Payment_Gateway $gateway The Blink gateway.
+	 */
 	public function __construct( $gateway ) {
 		$this->gateway = $gateway;
 	}
 
+	/**
+	 * Create an open banking payment and return where to send the customer.
+	 *
+	 * @param WC_Order $order   WooCommerce order.
+	 * @param array    $request Checkout request data.
+	 * @return array Keys success, redirect_url and error; empty if the request failed.
+	 */
 	public function blink_process_open_banking( $order, $request ) {
-		Blink_Logger::log( 'process_open_banking called', array( 'order_id' => $order->get_id() ) );
+		Blink_PG_Logger::log( 'process_open_banking called', array( 'order_id' => $order->get_id() ) );
 		$order_id   = $order->get_id();
 		$return_arr = array(
 			'success'      => false,
@@ -32,13 +69,14 @@ class Blink_Payment_Handler {
 				'user_email'        => ! empty( $request['customer_email'] ) ? sanitize_email( $request['customer_email'] ) : $order->get_billing_email(),
 				'customer_address'  => ! empty( $request['customer_address'] ) ? sanitize_text_field( $request['customer_address'] ) : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(),
 				'customer_postcode' => ! empty( $request['customer_postcode'] ) ? sanitize_text_field( $request['customer_postcode'] ) : $order->get_billing_postcode(),
-				'merchant_data'     => blink_get_payment_information( $order_id ),
+				'merchant_data'     => blink_pg_get_payment_information( $order_id ),
 			);
 			$url          = $this->gateway->host_url . '/pay/v1/openbankings';
-			Blink_Logger::log( 'blink_process_open_banking() POST openbankings', $request_data );
-			$response     = wp_remote_post(
+			Blink_PG_Logger::log( 'blink_process_open_banking() POST openbankings', $request_data );
+			$response = wp_remote_post(
 				$url,
 				array(
+					'timeout' => Blink_PG_Payment_Utils::API_TIMEOUT,
 					'method'  => 'POST',
 					'headers' => array(
 						'Authorization'   => 'Bearer ' . $this->token['access_token'],
@@ -50,37 +88,44 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'blink_process_open_banking() POST openbankings', Blink_Logger::http_response_context( $response ) );
+			Blink_PG_Logger::log( 'blink_process_open_banking() POST openbankings', Blink_PG_Logger::http_response_context( $response ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
 			}
 
 			$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
-			if ( 200 == wp_remote_retrieve_response_code( $response ) ) {
+			if ( 200 === (int) wp_remote_retrieve_response_code( $response ) ) {
 				$return_arr['success'] = true;
-				Blink_Logger::log( 'process_open_banking response', $api_body );
+				Blink_PG_Logger::log( 'process_open_banking response', $api_body );
 
 				if ( ! empty( $api_body['url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['url'];
 				} elseif ( ! empty( $api_body['redirect_url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['redirect_url'];
 				}
-				Blink_Logger::log( 'process_open_banking success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
-			} 
-			if(! empty( $api_body['error'] )) {
+				Blink_PG_Logger::log( 'process_open_banking success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
+			}
+			if ( ! empty( $api_body['error'] ) ) {
 				$error                 = ! empty( $api_body['error_response'] ) ? $api_body['error_response'] : $api_body['error'];
 				$return_arr['success'] = false;
 				$return_arr['error']   = $error;
-				Blink_Logger::log( 'process_open_banking error', array( 'error' => $error ) );
+				Blink_PG_Logger::log( 'process_open_banking error', array( 'error' => $error ) );
 			}
 		}
 
 		return $return_arr;
 	}
 
+	/**
+	 * Create a direct debit payment and return where to send the customer.
+	 *
+	 * @param WC_Order $order   WooCommerce order.
+	 * @param array    $request Checkout request data.
+	 * @return array Keys success, redirect_url and error; empty if the request failed.
+	 */
 	public function blink_process_direct_debit( $order, $request ) {
-		Blink_Logger::log( 'process_direct_debit called', array( 'order_id' => $order->get_id() ) );
+		Blink_PG_Logger::log( 'process_direct_debit called', array( 'order_id' => $order->get_id() ) );
 		$order_id   = $order->get_id();
 		$return_arr = array(
 			'success'      => false,
@@ -101,13 +146,14 @@ class Blink_Payment_Handler {
 				'account_number'      => $request['account_number'],
 				'customer_address'    => ! empty( $request['customer_address'] ) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(),
 				'customer_postcode'   => ! empty( $request['customer_postcode'] ) ? $request['customer_postcode'] : $order->get_billing_postcode(),
-				'merchant_data'       => blink_get_payment_information( $order_id ),
+				'merchant_data'       => blink_pg_get_payment_information( $order_id ),
 			);
 			$url          = $this->gateway->host_url . '/pay/v1/directdebits';
-			Blink_Logger::log( 'blink_process_direct_debit() POST directdebits', $request_data );
-			$response     = wp_remote_post(
+			Blink_PG_Logger::log( 'blink_process_direct_debit() POST directdebits', $request_data );
+			$response = wp_remote_post(
 				$url,
 				array(
+					'timeout' => Blink_PG_Payment_Utils::API_TIMEOUT,
 					'method'  => 'POST',
 					'headers' => array(
 						'Authorization'   => 'Bearer ' . $this->token['access_token'],
@@ -119,51 +165,65 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'blink_process_direct_debit() POST directdebits', Blink_Logger::http_response_context( $response ) );
+			Blink_PG_Logger::log( 'blink_process_direct_debit() POST directdebits', Blink_PG_Logger::http_response_context( $response ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
 			}
 
 			$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
-			if ( 200 == wp_remote_retrieve_response_code( $response ) ) {
+			if ( 200 === (int) wp_remote_retrieve_response_code( $response ) ) {
 				$return_arr['success'] = true;
 				if ( ! empty( $api_body['url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['url'];
 				}
-				Blink_Logger::log( 'process_direct_debit success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
-			} 
-			if( ! empty( $api_body['error'] )) {
+				Blink_PG_Logger::log( 'process_direct_debit success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
+			}
+			if ( ! empty( $api_body['error'] ) ) {
 				$error                 = ! empty( $api_body['error_response'] ) ? $api_body['error_response'] : $api_body['error'];
 				$return_arr['success'] = false;
 				$return_arr['error']   = $error;
-				Blink_Logger::log( 'process_direct_debit error', array( 'error' => $error ) );
+				Blink_PG_Logger::log( 'process_direct_debit error', array( 'error' => $error ) );
 			}
 		}
 
 		return $return_arr;
 	}
 
+	/**
+	 * Send a card, Google Pay or Apple Pay payment and return where to send the customer, including the 3-D Secure challenge.
+	 *
+	 * @param WC_Order $order    WooCommerce order.
+	 * @param array    $request  Checkout request data, including the payment token.
+	 * @param string   $endpoint Blink pay endpoint: creditcards, googlepay or applepay.
+	 * @return array Keys success, redirect_url and error; empty if the request failed.
+	 */
 	public function blink_process_credit_card( $order, $request, $endpoint = 'creditcards' ) {
-		Blink_Logger::log( 'process_credit_card called', array( 'order_id' => $order->get_id(), 'endpoint' => $endpoint ) );
-		$cart_amount = null; 
+		Blink_PG_Logger::log(
+			'process_credit_card called',
+			array(
+				'order_id' => $order->get_id(),
+				'endpoint' => $endpoint,
+			)
+		);
+		$cart_amount = null;
 
 		if ( WC()->cart && method_exists( WC()->cart, 'get_total' ) ) {
 			$cart_amount = WC()->cart->get_total( 'raw' );
 		}
 
-		$amount      = ! empty( $order ) ? $order->get_total() : $cart_amount;
+		$amount = ! empty( $order ) ? $order->get_total() : $cart_amount;
 
 		if ( empty( $amount ) ) {
-				Blink_Logger::log( 'process_credit_card: empty amount' );
+				Blink_PG_Logger::log( 'process_credit_card: empty amount' );
 				return array(
-				'success'      => false,
-				'redirect_url' => false,
-				'error'        => 'Invalid order.',
-			);
+					'success'      => false,
+					'redirect_url' => false,
+					'error'        => 'Invalid order.',
+				);
 		}
-		
-		$return_arr  = array(
+
+		$return_arr = array(
 			'success'      => false,
 			'redirect_url' => false,
 			'error'        => false,
@@ -174,7 +234,7 @@ class Blink_Payment_Handler {
 		}
 
 		if ( empty( $request['paymentToken'] ) ) {
-			Blink_Logger::log( 'process_credit_card: missing payment token' );
+			Blink_PG_Logger::log( 'process_credit_card: missing payment token' );
 			return array(
 				'success'      => false,
 				'redirect_url' => false,
@@ -184,9 +244,9 @@ class Blink_Payment_Handler {
 
 		$order_id = $order->get_id();
 		if ( ! empty( $this->token['access_token'] ) && ! empty( $this->intent['payment_intent'] ) ) {
-			// Determine transaction type based on preauthorization setting
+			// Determine transaction type based on preauthorization setting.
 			$transaction_type = $this->gateway->preauthorize_payments ? 'PREAUTH' : 'SALE';
-			
+
 			$request_data = array(
 				'resource'           => $endpoint,
 				'payment_intent'     => $this->intent['payment_intent'],
@@ -199,7 +259,7 @@ class Blink_Payment_Handler {
 				'customer_address'   => ! empty( $request['customer_address'] ) ? $request['customer_address'] : $order->get_billing_address_1() . ', ' . $order->get_billing_address_2(),
 				'customer_postcode'  => ! empty( $request['customer_postcode'] ) ? $request['customer_postcode'] : $order->get_billing_postcode(),
 				'transaction_unique' => 'WC-' . $order_id,
-				'merchant_data'      => blink_get_payment_information( $order_id ),
+				'merchant_data'      => blink_pg_get_payment_information( $order_id ),
 			);
 
 			$request_data['device_timezone']          = $request['device_timezone'];
@@ -207,20 +267,21 @@ class Blink_Payment_Handler {
 			$request_data['device_accept_language']   = $request['device_accept_language'];
 			$request_data['device_screen_resolution'] = $request['device_screen_resolution'];
 
-			if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-				$ip = explode(',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ))[0];
+			if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+				$ip = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) )[0];
 			} else {
 				$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 			}
 
-			$request_data['remote_address']           = $ip;
-			$request_data['device_ip_address']        = $ip;
+			$request_data['remote_address']    = $ip;
+			$request_data['device_ip_address'] = $ip;
 
 			$url = $this->gateway->host_url . '/pay/v1/' . $endpoint;
-			Blink_Logger::log( 'blink_process_credit_card() POST ' . $endpoint, $request_data );
+			Blink_PG_Logger::log( 'blink_process_credit_card() POST ' . $endpoint, $request_data );
 			$response = wp_remote_post(
 				$url,
 				array(
+					'timeout' => Blink_PG_Payment_Utils::API_TIMEOUT,
 					'method'  => 'POST',
 					'headers' => array(
 						'Authorization'   => 'Bearer ' . $this->token['access_token'],
@@ -232,63 +293,68 @@ class Blink_Payment_Handler {
 					'body'    => $request_data,
 				)
 			);
-			Blink_Logger::log( 'blink_process_credit_card() POST ' . $endpoint, Blink_Logger::http_response_context( $response ) );
+			Blink_PG_Logger::log( 'blink_process_credit_card() POST ' . $endpoint, Blink_PG_Logger::http_response_context( $response ) );
 
 			if ( is_wp_error( $response ) ) {
 				return array();
 			}
 
 			$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
-			if ( 200 == wp_remote_retrieve_response_code( $response ) ) {
+			if ( 200 === (int) wp_remote_retrieve_response_code( $response ) ) {
 				$return_arr['success'] = true;
 
-					if ( isset( $api_body['acsform'] ) ) {
-							$threedToken = $api_body['acsform'];
-						set_transient( 'blink_3d_process' . $order_id, $threedToken, 300 );
-						$nonce = wp_generate_uuid4();
-						set_transient( 'blink_3d_challenge_token_' . $order_id, $nonce, 300 );
-						$return_arr['redirect_url'] = blink_get_3ds_challenge_url( $order_id, $nonce );
-					} elseif ( isset( $api_body['url'] ) ) {
-						$return_arr['redirect_url'] = $api_body['url'];
-					}
-					Blink_Logger::log( 'process_credit_card success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
-			} else {
-				if ( isset( $api_body['url'] ) ) {
+				if ( isset( $api_body['acsform'] ) ) {
+					$threed_token = $api_body['acsform'];
+					set_transient( 'blink_pg_3d_process_' . $order_id, $threed_token, 300 );
+					$nonce = wp_generate_uuid4();
+					set_transient( 'blink_pg_3d_challenge_token_' . $order_id, $nonce, 300 );
+					$return_arr['redirect_url'] = blink_pg_get_3ds_challenge_url( $order_id, $nonce );
+				} elseif ( isset( $api_body['url'] ) ) {
 					$return_arr['redirect_url'] = $api_body['url'];
 				}
+					Blink_PG_Logger::log( 'process_credit_card success', array( 'redirect_url' => $return_arr['redirect_url'] ) );
+			} elseif ( isset( $api_body['url'] ) ) {
+					$return_arr['redirect_url'] = $api_body['url'];
 			}
-			if( ! empty( $api_body['error'] )) {
+			if ( ! empty( $api_body['error'] ) ) {
 				$error                 = ! empty( $api_body['error_response'] ) ? $api_body['error_response'] : $api_body['error'];
 				$return_arr['success'] = false;
 				$return_arr['error']   = $error;
-				Blink_Logger::log( 'process_credit_card error', array( 'error' => $error ) );
+				Blink_PG_Logger::log( 'process_credit_card error', array( 'error' => $error ) );
 			}
 		}
 
 		return $return_arr;
 	}
 
+	/**
+	 * Take payment for an order with the payment method the customer chose, or hand it to the Hosted flow.
+	 *
+	 * @param int $order_id Order ID.
+	 * @return array|null Result and redirect URL for WooCommerce, or null on the order-pay page when there is no intent or token.
+	 */
 	public function blink_handle_payment( $order_id ) {
 
-		Blink_Logger::log( 'handle_payment called', array( 'order_id' => $order_id ) );
-		$order   = wc_get_order( $order_id );
+		Blink_PG_Logger::log( 'handle_payment called', array( 'order_id' => $order_id ) );
+		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
-			Blink_Logger::log( 'handle_payment error: invalid order', array( 'order_id' => $order_id ) );
-			return blink_error_payment_process( __( 'Invalid order.', 'blink-payment-gateway-for-woocommerce' ) );
+			Blink_PG_Logger::log( 'handle_payment error: invalid order', array( 'order_id' => $order_id ) );
+			return blink_pg_error_payment_process( __( 'Invalid order.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
-		$request = $_POST;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WooCommerce verified the checkout nonce (woocommerce-process_checkout, woocommerce-pay or the Store API nonce) before calling the gateway. Fields are sanitised where they are used.
+		$request     = $_POST;
 		$order_total = (float) $order->get_total();
 		if ( $order_total <= 0 ) {
-			Blink_Logger::log( 'handle_payment zero total order', array( 'order_id' => $order_id ) );
+			Blink_PG_Logger::log( 'handle_payment zero total order', array( 'order_id' => $order_id ) );
 			return array(
 				'result'   => 'success',
 				'redirect' => $this->gateway->blink_get_return_url( $order ),
 			);
 		}
 
-		$intent_id = ! empty( $request['intent_id'] ) ? $request['intent_id'] : '';
-		$this->token  = $this->gateway->utils->blink_set_tokens($intent_id);
+		$intent_id   = ! empty( $request['intent_id'] ) ? $request['intent_id'] : '';
+		$this->token = $this->gateway->utils->blink_set_tokens( $intent_id );
 		$order->add_meta_data( '_blink_intent_id', $intent_id );
 		$order->save();
 		if ( method_exists( $this->gateway, 'blink_is_hosted' ) && $this->gateway->blink_is_hosted() ) {
@@ -301,8 +367,8 @@ class Blink_Payment_Handler {
 			if ( is_wc_endpoint_url( 'order-pay' ) ) {
 				return;
 			}
-			Blink_Logger::log( 'handle_payment error: missing intent or token' );
-			return blink_error_payment_process( __( 'Missing intent or token', 'blink-payment-gateway-for-woocommerce' ) );
+			Blink_PG_Logger::log( 'handle_payment error: missing intent or token' );
+			return blink_pg_error_payment_process( __( 'Missing intent or token', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		$payment_by = isset( $request['payment_by'] ) ? sanitize_text_field( wp_unslash( $request['payment_by'] ) ) : '';
@@ -332,8 +398,8 @@ class Blink_Payment_Handler {
 		}
 
 		$supported_methods = array();
-		if ( ! empty( $this->gateway->paymentMethods ) && is_array( $this->gateway->paymentMethods ) ) {
-			$supported_methods = $this->gateway->paymentMethods;
+		if ( ! empty( $this->gateway->payment_methods ) && is_array( $this->gateway->payment_methods ) ) {
+			$supported_methods = $this->gateway->payment_methods;
 		}
 		if ( in_array( 'credit-card', $supported_methods, true ) ) {
 			$supported_methods[] = 'google-pay';
@@ -342,24 +408,32 @@ class Blink_Payment_Handler {
 		$supported_methods = array_unique( $supported_methods );
 
 		if ( empty( $payment_by ) ) {
-			Blink_Logger::log( 'handle_payment error: missing payment_by', array( 'order_id' => $order_id ) );
-			return blink_error_payment_process( __( 'Unable to determine Blink payment method.', 'blink-payment-gateway-for-woocommerce' ) );
+			Blink_PG_Logger::log( 'handle_payment error: missing payment_by', array( 'order_id' => $order_id ) );
+			return blink_pg_error_payment_process( __( 'Unable to determine Blink payment method.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		if ( empty( $supported_methods ) || ! in_array( $payment_by, $supported_methods, true ) ) {
-			Blink_Logger::log( 'handle_payment error: unsupported payment_by', array( 'order_id' => $order_id, 'payment_by' => $payment_by ) );
-			return blink_error_payment_process( __( 'Unsupported Blink payment method.', 'blink-payment-gateway-for-woocommerce' ) );
+			Blink_PG_Logger::log(
+				'handle_payment error: unsupported payment_by',
+				array(
+					'order_id'   => $order_id,
+					'payment_by' => $payment_by,
+				)
+			);
+			return blink_pg_error_payment_process( __( 'Unsupported Blink payment method.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		$response = null;
 
 		switch ( $payment_by ) {
 			case 'credit-card':
+				// phpcs:disable WordPress.Security.NonceVerification.Recommended -- WooCommerce verified the checkout nonce (woocommerce-process_checkout, woocommerce-pay or the Store API nonce) before calling the gateway.
 				if ( isset( $_REQUEST['credit-card-data'] ) ) {
 					parse_str( sanitize_text_field( wp_unslash( $_REQUEST['credit-card-data'] ) ), $parsed_data );
+					// phpcs:enable WordPress.Security.NonceVerification.Recommended
 					$parsed_data['customer_name']  = sanitize_text_field( $request['customer_name'] );
 					$parsed_data['customer_email'] = sanitize_email( $request['customer_email'] );
-					$request = array_merge( $request, $parsed_data );
+					$request                       = array_merge( $request, $parsed_data );
 				}
 				$response = $this->blink_process_credit_card( $order, $request );
 				break;
@@ -378,18 +452,18 @@ class Blink_Payment_Handler {
 		}
 
 		if ( ! is_array( $response ) || ! array_key_exists( 'success', $response ) ) {
-			Blink_Logger::log( 'handle_payment failed: invalid processor response', array( 'payment_by' => $payment_by ) );
+			Blink_PG_Logger::log( 'handle_payment failed: invalid processor response', array( 'payment_by' => $payment_by ) );
 			$this->gateway->utils->blink_destroy_session_tokens( $intent_id );
-			return blink_error_payment_process( __( 'Unable to complete Blink payment. Please try again.', 'blink-payment-gateway-for-woocommerce' ) );
+			return blink_pg_error_payment_process( __( 'Unable to complete Blink payment. Please try again.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
 		if ( ! $response['success'] ) {
-			Blink_Logger::log( 'handle_payment failed', array( 'error' => $response['error'] ) );
-			$this->gateway->utils->blink_destroy_session_tokens($intent_id);
-			return blink_error_payment_process( ! empty( $response['error'] ) ? $response['error'] : __( 'Unable to complete Blink payment. Please try again.', 'blink-payment-gateway-for-woocommerce' ) );
+			Blink_PG_Logger::log( 'handle_payment failed', array( 'error' => $response['error'] ) );
+			$this->gateway->utils->blink_destroy_session_tokens( $intent_id );
+			return blink_pg_error_payment_process( ! empty( $response['error'] ) ? $response['error'] : __( 'Unable to complete Blink payment. Please try again.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 
-		Blink_Logger::log( 'handle_payment success', array( 'redirect' => $response['redirect_url'] ) );
+		Blink_PG_Logger::log( 'handle_payment success', array( 'redirect' => $response['redirect_url'] ) );
 		return array(
 			'result'   => 'success',
 			'redirect' => $response['redirect_url'],
@@ -398,29 +472,32 @@ class Blink_Payment_Handler {
 
 	/**
 	 * Handle hosted payment (paylink API).
+	 *
+	 * @param WC_Order $order   WooCommerce order.
+	 * @param array    $request Checkout request data. Not used.
+	 * @return array Result and redirect URL for WooCommerce.
 	 */
 	public function blink_handle_hosted_payment( $order, $request ) {
-		Blink_Logger::log( 'handle_hosted_payment called', array( 'order_id' => $order->get_id() ) );
+		Blink_PG_Logger::log( 'handle_hosted_payment called', array( 'order_id' => $order->get_id() ) );
 		$order_id = $order->get_id();
 		// Before any call to Blink, while the loaded order is still current: run
 		// later, a status change from a webhook in the meantime could be overwritten.
 		$this->blink_start_hosted_attempt( $order );
 
-
-		// Prepare paylink API data
+		// Prepare paylink API data.
 		$payment_methods = array();
-		if ( isset( $this->gateway->paymentMethods ) && is_array( $this->gateway->paymentMethods ) ) {
-			$payment_methods = $this->gateway->paymentMethods;
+		if ( isset( $this->gateway->payment_methods ) && is_array( $this->gateway->payment_methods ) ) {
+			$payment_methods = $this->gateway->payment_methods;
 		} else {
 			$payment_methods = array( 'credit-card' );
 		}
 
-		$amount = (float) $order->get_total();
+		$amount        = (float) $order->get_total();
 		$customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
 
-		// Determine transaction type based on preauthorization setting
+		// Determine transaction type based on preauthorization setting.
 		$transaction_type = $this->gateway->preauthorize_payments ? 'PREAUTH' : 'SALE';
-		
+
 		$paylink_data = array(
 			'payment_method'     => $payment_methods,
 			'transaction_type'   => $transaction_type,
@@ -429,10 +506,10 @@ class Blink_Payment_Handler {
 			'transaction_unique' => 'WC-' . $order_id,
 			'is_decide_amount'   => false,
 			'amount'             => $amount,
-			'address'            => blink_get_full_address($order),
+			'address'            => blink_pg_get_full_address( $order ),
 			'postcode'           => $order->get_billing_postcode(),
 			'notes'              => 'WooCommerce Order #' . $order_id,
-			'currency'         	 => get_woocommerce_currency(),
+			'currency'           => get_woocommerce_currency(),
 			'redirect_url'       => $this->gateway->blink_get_return_url( $order ),
 			'notification_url'   => WC()->api_request_url( 'blink_gateway' ),
 		);
@@ -442,7 +519,7 @@ class Blink_Payment_Handler {
 		$check = $this->gateway->transaction_handler->blink_check_hosted_paylinks( $order );
 		if ( 'unavailable' === $check['result'] ) {
 			// An earlier Paylink may already be paid, so a new one could take a second payment.
-			return blink_error_payment_process( __( 'We could not reach the payment provider. Please try again in a moment.', 'blink-payment-gateway-for-woocommerce' ) );
+			return blink_pg_error_payment_process( __( 'We could not reach the payment provider. Please try again in a moment.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 		if ( 'paid' === $check['result'] ) {
 			return array(
@@ -451,10 +528,16 @@ class Blink_Payment_Handler {
 			);
 		}
 		if ( 'mismatch' === $check['result'] ) {
-			return blink_error_payment_process( __( 'We received a payment that does not match this order. Please contact us rather than paying again.', 'blink-payment-gateway-for-woocommerce' ) );
+			return blink_pg_error_payment_process( __( 'We received a payment that does not match this order. Please contact us rather than paying again.', 'blink-payment-gateway-for-woocommerce' ) );
 		}
 		if ( null !== $check['payable'] && $this->blink_paylink_fits_attempt( $check['payable'], $paylink_data ) ) {
-			Blink_Logger::log( 'handle_hosted_payment reusing Paylink', array( 'order_id' => $order_id, 'paylink_id' => $check['payable']['id'] ) );
+			Blink_PG_Logger::log(
+				'handle_hosted_payment reusing Paylink',
+				array(
+					'order_id'   => $order_id,
+					'paylink_id' => $check['payable']['id'],
+				)
+			);
 			return array(
 				'result'   => 'success',
 				'redirect' => $check['payable']['paylink_url'],
@@ -462,24 +545,23 @@ class Blink_Payment_Handler {
 		}
 
 		$url = $this->gateway->host_url . '/paylink/v1/paylinks';
-		Blink_Logger::log( 'handle_hosted_payment() POST paylinks', $paylink_data );
+		Blink_PG_Logger::log( 'handle_hosted_payment() POST paylinks', $paylink_data );
 		$response = wp_remote_post(
 			$url,
 			array(
 				'method'  => 'POST',
 				'headers' => array(
-					'Authorization'   => 'Bearer ' . $this->token['access_token'],
-					'Content-Type'    => 'application/json',
+					'Authorization' => 'Bearer ' . $this->token['access_token'],
+					'Content-Type'  => 'application/json',
 				),
 				'body'    => wp_json_encode( $paylink_data ),
 				'timeout' => 30,
 			)
 		);
-		Blink_Logger::log( 'handle_hosted_payment() POST paylinks', Blink_Logger::http_response_context( $response ) );
-
+		Blink_PG_Logger::log( 'handle_hosted_payment() POST paylinks', Blink_PG_Logger::http_response_context( $response ) );
 
 		if ( is_wp_error( $response ) ) {
-			return blink_error_payment_process( $response->get_error_message() );
+			return blink_pg_error_payment_process( $response->get_error_message() );
 		}
 
 		$api_body = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -489,15 +571,15 @@ class Blink_Payment_Handler {
 				$order->add_meta_data( '_blink_paylink_id', sanitize_text_field( (string) $api_body['id'] ) );
 				$order->save();
 			}
-			Blink_Logger::log( 'handle_hosted_payment success', array( 'redirect' => $api_body['paylink_url'] ) );
+			Blink_PG_Logger::log( 'handle_hosted_payment success', array( 'redirect' => $api_body['paylink_url'] ) );
 			return array(
 				'result'   => 'success',
 				'redirect' => $api_body['paylink_url'],
 			);
 		} else {
 			$error = ! empty( $api_body['error'] ) ? $api_body['error'] : $api_body;
-			Blink_Logger::log( 'handle_hosted_payment error', array( 'error' => $error ) );
-			return blink_error_payment_process( $error );
+			Blink_PG_Logger::log( 'handle_hosted_payment error', array( 'error' => $error ) );
+			return blink_pg_error_payment_process( $error );
 		}
 	}
 

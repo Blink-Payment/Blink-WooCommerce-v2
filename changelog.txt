@@ -1,5 +1,22 @@
 *** WooCommerce - Blink Changelog ***
 
+2026-11-24 - version 1.4.2
+
+* Debug logs now go to WooCommerce › Status › Logs and no longer contain customer details. Log files from older versions are deleted, as they could be read over the web.
+* Improved security of block checkout payment field loading, Apple Pay setup and webhook handling.
+* Block checkout card fields now reload after the order total changes, for example when a coupon is applied. Before, the shopper had to reload the page to pay by card.
+* Block checkout card fields now load on sites installed in a subfolder or using plain permalinks.
+* The pay-for-order page no longer shows a critical error for an order that doesn't exist.
+* On the classic checkout and the pay-for-order page, Blink no longer takes over the Place order button when the shopper picks another payment method. Before, gateways that open their own popup from that button, such as Klarna, failed with an error.
+* On the pay-for-order page, choosing another payment method no longer leaves the form greyed out with a Pay for order button that can't be clicked.
+* WooCommerce's Refund button shows again on orders paid through other gateways. Versions up to 1.3.7 tagged those orders as Blink ones, which hid it. On Blink orders, the button now also shows when Blink can't be reached to check the payment.
+* The plugin no longer changes the timeout of other plugins' and WordPress's HTTP requests. Its own requests to Blink wait up to 30 seconds, so a slow cancel or refund is less likely to fail.
+* If Blink doesn't answer a Cancel Order request, the plugin checks the payment with Blink and cancels the order if Blink has cancelled it, instead of noting that the cancel failed.
+* Cancel and refund errors from Blink show Blink's reason, without PHP warnings.
+* The block checkout script can be cached by browsers.
+* Now requires WordPress 6.5 or later and WooCommerce 7.6 or later. The installation steps cover moving from the GitHub version.
+* For developers: the plugin's functions, classes, hooks, options and REST route now start with blink_pg_ (REST: blink-payment-gateway/v1). The old hook names still work but are deprecated; use blink_pg_get_return_url, blink_pg_hostedfield_css, blink_pg_custom_script, blink_pg_custom_style and blink_pg_hosted_return_recheck_delay instead.
+
 2026-11-09 - version 1.4.1
 
 * Improved webhook verification.
